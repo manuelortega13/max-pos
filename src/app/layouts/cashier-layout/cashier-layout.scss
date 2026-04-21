@@ -1,0 +1,75 @@
+.cashier-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+
+  &__toolbar {
+    background: var(--mat-sys-surface);
+    border-bottom: 1px solid var(--mat-sys-outline-variant);
+    gap: 1rem;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+  }
+
+  &__brand-icon {
+    color: var(--mat-sys-primary);
+    font-size: 1.75rem;
+    width: 1.75rem;
+    height: 1.75rem;
+  }
+
+  &__title {
+    font-size: 1.15rem;
+    font-weight: 500;
+    margin-right: 1rem;
+  }
+
+  &__nav {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  &__nav-link--active {
+    background: var(--mat-sys-secondary-container);
+    color: var(--mat-sys-on-secondary-container);
+  }
+
+  &__badge {
+    display: inline-block;
+    margin-left: 0.5rem;
+  }
+
+  &__spacer {
+    flex: 1 1 auto;
+  }
+
+  &__user {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  &__user-text {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.1;
+    text-align: right;
+
+    strong {
+      font-size: 0.9rem;
+      color: var(--mat-sys-on-surface);
+    }
+
+    small {
+      font-size: 0.75rem;
+      color: var(--mat-sys-on-surface-variant);
+    }
+  }
+
+  &__main {
+    flex: 1;
+    overflow: auto;
+    background: var(--mat-sys-surface-container-lowest);
+  }
+}

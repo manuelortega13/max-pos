@@ -1,0 +1,61 @@
+<mat-sidenav-container class="admin-shell">
+  <mat-sidenav
+    class="admin-shell__sidenav"
+    [mode]="isHandset() ? 'over' : 'side'"
+    [opened]="!isHandset() && sidenavOpen()"
+    [fixedInViewport]="isHandset()"
+  >
+    <div class="admin-shell__brand">
+      <mat-icon class="admin-shell__brand-icon">point_of_sale</mat-icon>
+      <div class="admin-shell__brand-text">
+        <strong>MaxPOS</strong>
+        <small>Admin Console</small>
+      </div>
+    </div>
+
+    <mat-divider></mat-divider>
+
+    <mat-nav-list class="admin-shell__nav">
+      @for (item of navItems; track item.path) {
+        <a
+          mat-list-item
+          [routerLink]="item.path"
+          routerLinkActive="admin-shell__nav-link--active"
+          [activated]="false"
+        >
+          <mat-icon matListItemIcon>{{ item.icon }}</mat-icon>
+          <span matListItemTitle>{{ item.label }}</span>
+        </a>
+      }
+    </mat-nav-list>
+  </mat-sidenav>
+
+  <mat-sidenav-content class="admin-shell__content">
+    <mat-toolbar class="admin-shell__toolbar">
+      <button mat-icon-button aria-label="Toggle menu" (click)="toggleSidenav()">
+        <mat-icon>menu</mat-icon>
+      </button>
+      <span class="admin-shell__toolbar-spacer"></span>
+      <button mat-icon-button aria-label="Notifications">
+        <mat-icon>notifications</mat-icon>
+      </button>
+      <button mat-icon-button [matMenuTriggerFor]="userMenu" aria-label="Account menu">
+        <mat-icon>account_circle</mat-icon>
+      </button>
+      <mat-menu #userMenu="matMenu">
+        <button mat-menu-item>
+          <mat-icon>person</mat-icon>
+          <span>Profile</span>
+        </button>
+        <button mat-menu-item (click)="exit()">
+          <mat-icon>logout</mat-icon>
+          <span>Exit to home</span>
+        </button>
+      </mat-menu>
+    </mat-toolbar>
+
+    <main class="admin-shell__main">
+      <router-outlet></router-outlet>
+    </main>
+  </mat-sidenav-content>
+</mat-sidenav-container>

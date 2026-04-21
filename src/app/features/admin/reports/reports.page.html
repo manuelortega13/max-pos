@@ -1,0 +1,111 @@
+<section class="page">
+  <header class="page__header">
+    <div>
+      <h1 class="page__title">Reports</h1>
+      <p class="page__subtitle">Performance across the store</p>
+    </div>
+    <button mat-stroked-button>
+      <mat-icon>download</mat-icon>
+      Export report
+    </button>
+  </header>
+
+  <div class="kpi-grid">
+    <mat-card appearance="outlined" class="kpi">
+      <div class="kpi__icon kpi__icon--primary"><mat-icon>payments</mat-icon></div>
+      <div>
+        <span class="kpi__label">Total revenue</span>
+        <span class="kpi__value">{{ summary().revenue | money }}</span>
+      </div>
+    </mat-card>
+    <mat-card appearance="outlined" class="kpi">
+      <div class="kpi__icon kpi__icon--tertiary"><mat-icon>shopping_bag</mat-icon></div>
+      <div>
+        <span class="kpi__label">Items sold</span>
+        <span class="kpi__value">{{ summary().itemsSold }}</span>
+      </div>
+    </mat-card>
+    <mat-card appearance="outlined" class="kpi">
+      <div class="kpi__icon kpi__icon--secondary"><mat-icon>receipt_long</mat-icon></div>
+      <div>
+        <span class="kpi__label">Transactions</span>
+        <span class="kpi__value">{{ summary().transactions }}</span>
+      </div>
+    </mat-card>
+    <mat-card appearance="outlined" class="kpi">
+      <div class="kpi__icon kpi__icon--neutral"><mat-icon>local_atm</mat-icon></div>
+      <div>
+        <span class="kpi__label">Average ticket</span>
+        <span class="kpi__value">{{ summary().averageTicket | money }}</span>
+      </div>
+    </mat-card>
+  </div>
+
+  <div class="reports-grid">
+    <mat-card appearance="outlined">
+      <mat-card-header>
+        <mat-card-title>Top products</mat-card-title>
+        <mat-card-subtitle>By revenue</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <ul class="rank-list">
+          @for (row of topProducts(); track row.label) {
+            <li class="rank-list__item">
+              <div class="rank-list__row">
+                <span class="rank-list__label">{{ row.label }}</span>
+                <span class="rank-list__value">{{ row.value | money }}</span>
+              </div>
+              <mat-progress-bar mode="determinate" [value]="row.percentage"></mat-progress-bar>
+              <small class="rank-list__meta">{{ row.count }} units sold</small>
+            </li>
+          }
+        </ul>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card appearance="outlined">
+      <mat-card-header>
+        <mat-card-title>By cashier</mat-card-title>
+        <mat-card-subtitle>Revenue per employee</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <ul class="rank-list">
+          @for (row of byCashier(); track row.label) {
+            <li class="rank-list__item">
+              <div class="rank-list__row">
+                <span class="rank-list__label">{{ row.label }}</span>
+                <span class="rank-list__value">{{ row.value | money }}</span>
+              </div>
+              <mat-progress-bar mode="determinate" [value]="row.percentage"></mat-progress-bar>
+              <small class="rank-list__meta">{{ row.count }} transactions</small>
+            </li>
+          }
+        </ul>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card appearance="outlined" class="span-full">
+      <mat-card-header>
+        <mat-card-title>By category</mat-card-title>
+        <mat-card-subtitle>Revenue distribution</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <ul class="rank-list">
+          @for (row of byCategory(); track row.label) {
+            <li class="rank-list__item">
+              <div class="rank-list__row">
+                <span class="rank-list__label">
+                  <span class="rank-list__dot" [style.background]="row.color"></span>
+                  {{ row.label }}
+                </span>
+                <span class="rank-list__value">{{ row.value | money }}</span>
+              </div>
+              <mat-progress-bar mode="determinate" [value]="row.percentage"></mat-progress-bar>
+              <small class="rank-list__meta">{{ row.count }} units sold</small>
+            </li>
+          }
+        </ul>
+      </mat-card-content>
+    </mat-card>
+  </div>
+</section>

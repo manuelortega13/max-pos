@@ -1,0 +1,67 @@
+<section class="page">
+  <header class="page__header">
+    <div>
+      <h1 class="page__title">My transactions</h1>
+      <p class="page__subtitle">Sales you've rung up on this shift</p>
+    </div>
+  </header>
+
+  <div class="summary">
+    <mat-card appearance="outlined" class="summary__card">
+      <span class="summary__label">Transactions</span>
+      <span class="summary__value">{{ totals().transactions }}</span>
+    </mat-card>
+    <mat-card appearance="outlined" class="summary__card">
+      <span class="summary__label">Revenue</span>
+      <span class="summary__value">{{ totals().revenue | money }}</span>
+    </mat-card>
+    <mat-card appearance="outlined" class="summary__card">
+      <span class="summary__label">Items sold</span>
+      <span class="summary__value">{{ totals().items }}</span>
+    </mat-card>
+  </div>
+
+  <mat-card appearance="outlined">
+    <mat-card-content>
+      <div class="table-wrap">
+        <table mat-table [dataSource]="sales()" class="w-full">
+          <ng-container matColumnDef="id">
+            <th mat-header-cell *matHeaderCellDef>Sale #</th>
+            <td mat-cell *matCellDef="let s"><strong>{{ s.id }}</strong></td>
+          </ng-container>
+          <ng-container matColumnDef="date">
+            <th mat-header-cell *matHeaderCellDef>Date</th>
+            <td mat-cell *matCellDef="let s">{{ s.date | date: 'medium' }}</td>
+          </ng-container>
+          <ng-container matColumnDef="items">
+            <th mat-header-cell *matHeaderCellDef>Items</th>
+            <td mat-cell *matCellDef="let s">{{ s.items.length }}</td>
+          </ng-container>
+          <ng-container matColumnDef="payment">
+            <th mat-header-cell *matHeaderCellDef>Payment</th>
+            <td mat-cell *matCellDef="let s">{{ s.paymentMethod | titlecase }}</td>
+          </ng-container>
+          <ng-container matColumnDef="total">
+            <th mat-header-cell *matHeaderCellDef>Total</th>
+            <td mat-cell *matCellDef="let s"><strong>{{ s.total | money }}</strong></td>
+          </ng-container>
+          <ng-container matColumnDef="status">
+            <th mat-header-cell *matHeaderCellDef>Status</th>
+            <td mat-cell *matCellDef="let s">
+              <mat-chip [class]="'status-chip status-chip--' + s.status" disableRipple>
+                {{ s.status | titlecase }}
+              </mat-chip>
+            </td>
+          </ng-container>
+          <tr mat-header-row *matHeaderRowDef="columns"></tr>
+          <tr mat-row *matRowDef="let row; columns: columns"></tr>
+          <tr *matNoDataRow>
+            <td [attr.colspan]="columns.length" class="no-data">
+              No transactions yet — head to the register to get started.
+            </td>
+          </tr>
+        </table>
+      </div>
+    </mat-card-content>
+  </mat-card>
+</section>

@@ -1,0 +1,179 @@
+<div class="pos">
+  <section class="pos__catalog">
+    <header class="pos__catalog-header">
+      <div class="pos__search-row">
+        <mat-form-field appearance="outline" class="pos__search">
+          <mat-label>Scan or search</mat-label>
+          <input
+            matInput
+            [ngModel]="search()"
+            (ngModelChange)="search.set($event)"
+            placeholder="Scan barcode, name or SKU"
+            autofocus
+          />
+          <mat-icon matPrefix>qr_code_scanner</mat-icon>
+        </mat-form-field>
+
+        <button
+          type="button"
+          mat-stroked-button
+          class="pos__qty-btn"
+          matTooltip="Set quantity for next item (F3)"
+          (click)="openQuantityDialog()"
+        >
+          <mat-icon>calculate</mat-icon>
+          <span>Quantity</span>
+          <kbd class="pos__kbd">F3</kbd>
+        </button>
+      </div>
+
+      @if (pendingQuantity(); as qty) {
+        <div class="pos__pending-banner" role="status">
+          <mat-icon>info</mat-icon>
+          <span>
+            Next product will be added with quantity
+            <strong>×{{ qty }}</strong>
+          </span>
+          <button
+            mat-icon-button
+            (click)="clearPendingQuantity()"
+            aria-label="Clear pending quantity"
+            matTooltip="Clear"
+          >
+            <mat-icon>close</mat-icon>
+          </button>
+        </div>
+      }
+
+      <mat-button-toggle-group
+        [value]="activeCategory()"
+        (change)="activeCategory.set($event.value)"
+        class="pos__categories"
+      >
+        <mat-button-toggle value="all">All</mat-button-toggle>
+        @for (category of categories(); track category.id) {
+          <mat-button-toggle [value]="category.id">
+            <mat-icon>{{ category.icon }}</mat-icon>
+            {{ category.name }}
+          </mat-button-toggle>
+        }
+      </mat-button-toggle-group>
+    </header>
+
+    <div class="pos__grid">
+      @for (product of filteredProducts(); track product.id) {
+        <button
+          type="button"
+          class="product-tile"
+          [class.product-tile--low]="product.stock > 0 && product.stock <= 10"
+          [class.product-tile--out]="product.stock === 0"
+          (click)="addToCart(product)"
+          [disabled]="product.stock === 0"
+        >
+          <span class="product-tile__image">{{ product.image }}</span>
+          <span class="product-tile__name">{{ product.name }}</span>
+          <span class="product-tile__price">{{ product.price | money }}</span>
+          <span class="product-tile__stock">{{ product.stock }} in stock</span>
+        </button>
+      } @empty {
+        <div class="pos__empty">
+          <mat-icon>search_off</mat-icon>
+          <p>No products match your search.</p>
+        </div>
+      }
+    </div>
+  </section>
+
+  <aside class="pos__cart">
+    <header class="pos__cart-header">
+      <div>
+        <strong>Current sale</strong>
+        <small>{{ itemCount() }} item(s)</small>
+      </div>
+      <button
+        mat-icon-button
+        matTooltip="Clear cart"
+        (click)="clearCart()"
+        [disabled]="isEmpty()"
+      >
+        <mat-icon>delete_sweep</mat-icon>
+      </button>
+    </header>
+
+    <mat-divider></mat-divider>
+
+    <div class="pos__cart-body">
+      @if (isEmpty()) {
+        <div class="pos__cart-empty">
+          <mat-icon>shopping_cart</mat-icon>
+          <p>Cart is empty</p>
+          <small>Tap a product to add it</small>
+        </div>
+      } @else {
+        <ul class="cart-list">
+          @for (line of cart(); track line.product.id) {
+            <li class="cart-line">
+              <span class="cart-line__image">{{ line.product.image }}</span>
+              <div class="cart-line__info">
+                <strong>{{ line.product.name }}</strong>
+                <small>{{ line.product.price | money }} each</small>
+              </div>
+              <div class="cart-line__qty">
+                <button mat-icon-button (click)="decrement(line.product.id)" aria-label="Decrease">
+                  <mat-icon>remove</mat-icon>
+                </button>
+                <span>{{ line.quantity }}</span>
+                <button mat-icon-button (click)="increment(line.product.id)" aria-label="Increase">
+                  <mat-icon>add</mat-icon>
+                </button>
+              </div>
+              <strong class="cart-line__total">
+                {{ line.product.price * line.quantity | money }}
+              </strong>
+              <button
+                mat-icon-button
+                class="cart-line__remove"
+                (click)="remove(line.product.id)"
+                aria-label="Remove"
+              >
+                <mat-icon>close</mat-icon>
+              </button>
+            </li>
+          }
+        </ul>
+      }
+    </div>
+
+    <mat-divider></mat-divider>
+
+    <footer class="pos__cart-footer">
+      <div class="totals">
+        <div class="totals__row">
+          <span>Subtotal</span>
+          <span>{{ subtotal() | money }}</span>
+        </div>
+        <div class="totals__row">
+          <span>Tax</span>
+          <span>{{ tax() | money }}</span>
+        </div>
+        <div class="totals__row totals__row--grand">
+          <span>Total</span>
+          <span>{{ total() | money }}</span>
+        </div>
+      </div>
+
+      <button
+        mat-flat-button
+        color="primary"
+        class="pos__checkout"
+        [disabled]="isEmpty()"
+        matTooltip="Ctrl / ⌘ + Enter"
+        (click)="checkout()"
+      >
+        <mat-icon>point_of_sale</mat-icon>
+        <span>Charge {{ total() | money }}</span>
+        <kbd class="pos__shortcut">Ctrl&nbsp;+&nbsp;⏎</kbd>
+      </button>
+    </footer>
+  </aside>
+</div>

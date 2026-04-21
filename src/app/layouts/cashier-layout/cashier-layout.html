@@ -1,0 +1,57 @@
+<div class="cashier-shell">
+  <mat-toolbar class="cashier-shell__toolbar">
+    <mat-icon class="cashier-shell__brand-icon">point_of_sale</mat-icon>
+    <span class="cashier-shell__title">MaxPOS Register</span>
+
+    <nav class="cashier-shell__nav">
+      <a
+        mat-button
+        routerLink="pos"
+        routerLinkActive="cashier-shell__nav-link--active"
+      >
+        <mat-icon>shopping_cart</mat-icon>
+        Sell
+        @if (cartItemCount() > 0) {
+          <span
+            class="cashier-shell__badge"
+            [matBadge]="cartItemCount()"
+            matBadgeOverlap="false"
+            matBadgeColor="accent"
+          ></span>
+        }
+      </a>
+      <a
+        mat-button
+        routerLink="transactions"
+        routerLinkActive="cashier-shell__nav-link--active"
+      >
+        <mat-icon>history</mat-icon>
+        My Transactions
+      </a>
+    </nav>
+
+    <span class="cashier-shell__spacer"></span>
+
+    @if (currentUser(); as user) {
+      <div class="cashier-shell__user">
+        <div class="cashier-shell__user-text">
+          <strong>{{ user.name }}</strong>
+          <small>Cashier</small>
+        </div>
+        <button mat-icon-button [matMenuTriggerFor]="userMenu" aria-label="Account menu">
+          <mat-icon>account_circle</mat-icon>
+        </button>
+        <mat-menu #userMenu="matMenu">
+          <button mat-menu-item (click)="exit()">
+            <mat-icon>logout</mat-icon>
+            <span>End shift</span>
+          </button>
+        </mat-menu>
+      </div>
+    }
+  </mat-toolbar>
+
+  <main class="cashier-shell__main">
+    <router-outlet></router-outlet>
+  </main>
+</div>

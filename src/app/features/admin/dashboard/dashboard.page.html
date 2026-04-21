@@ -1,0 +1,133 @@
+<section class="page">
+  <header class="page__header">
+    <div>
+      <h1 class="page__title">Dashboard</h1>
+      <p class="page__subtitle">Overview of today's activity</p>
+    </div>
+  </header>
+
+  <div class="kpi-grid">
+    <mat-card appearance="outlined" class="kpi">
+      <div class="kpi__icon kpi__icon--primary"><mat-icon>payments</mat-icon></div>
+      <div class="kpi__body">
+        <span class="kpi__label">Revenue today</span>
+        <span class="kpi__value">{{ todayRevenue() | money }}</span>
+      </div>
+    </mat-card>
+
+    <mat-card appearance="outlined" class="kpi">
+      <div class="kpi__icon kpi__icon--tertiary"><mat-icon>receipt_long</mat-icon></div>
+      <div class="kpi__body">
+        <span class="kpi__label">Transactions today</span>
+        <span class="kpi__value">{{ todayTransactions() | number }}</span>
+      </div>
+    </mat-card>
+
+    <mat-card appearance="outlined" class="kpi">
+      <div class="kpi__icon kpi__icon--secondary"><mat-icon>local_atm</mat-icon></div>
+      <div class="kpi__body">
+        <span class="kpi__label">Average ticket</span>
+        <span class="kpi__value">{{ averageTicket() | money }}</span>
+      </div>
+    </mat-card>
+
+    <mat-card appearance="outlined" class="kpi">
+      <div class="kpi__icon kpi__icon--neutral"><mat-icon>group</mat-icon></div>
+      <div class="kpi__body">
+        <span class="kpi__label">Active cashiers</span>
+        <span class="kpi__value">{{ activeCashiers() }}</span>
+      </div>
+    </mat-card>
+  </div>
+
+  <div class="split">
+    <mat-card appearance="outlined" class="split__main">
+      <mat-card-header>
+        <mat-card-title>Recent sales</mat-card-title>
+        <mat-card-subtitle>Last 5 transactions</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <table mat-table [dataSource]="recentSales()" class="w-full">
+          <ng-container matColumnDef="id">
+            <th mat-header-cell *matHeaderCellDef>Sale #</th>
+            <td mat-cell *matCellDef="let sale">{{ sale.id }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="date">
+            <th mat-header-cell *matHeaderCellDef>Date</th>
+            <td mat-cell *matCellDef="let sale">{{ sale.date | date: 'short' }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="cashier">
+            <th mat-header-cell *matHeaderCellDef>Cashier</th>
+            <td mat-cell *matCellDef="let sale">{{ sale.cashierName }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="items">
+            <th mat-header-cell *matHeaderCellDef>Items</th>
+            <td mat-cell *matCellDef="let sale">{{ sale.items.length }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="total">
+            <th mat-header-cell *matHeaderCellDef>Total</th>
+            <td mat-cell *matCellDef="let sale"><strong>{{ sale.total | money }}</strong></td>
+          </ng-container>
+
+          <ng-container matColumnDef="status">
+            <th mat-header-cell *matHeaderCellDef>Status</th>
+            <td mat-cell *matCellDef="let sale">
+              <mat-chip [class]="'status-chip status-chip--' + sale.status" disableRipple>
+                {{ sale.status | titlecase }}
+              </mat-chip>
+            </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="saleColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: saleColumns"></tr>
+        </table>
+      </mat-card-content>
+      <mat-card-actions align="end">
+        <a mat-button routerLink="/admin/sales">View all sales</a>
+      </mat-card-actions>
+    </mat-card>
+
+    <mat-card appearance="outlined" class="split__side">
+      <mat-card-header>
+        <mat-card-title>Low stock alerts</mat-card-title>
+        <mat-card-subtitle>
+          @if (lowStock().length === 0) {
+            All products well stocked
+          } @else {
+            {{ lowStock().length }} item(s) running low
+          }
+        </mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        @if (lowStock().length === 0) {
+          <div class="empty-state">
+            <mat-icon>check_circle</mat-icon>
+            <p>Nothing to restock right now.</p>
+          </div>
+        } @else {
+          <ul class="low-stock">
+            @for (product of lowStock(); track product.id) {
+              <li class="low-stock__item">
+                <span class="low-stock__emoji">{{ product.image }}</span>
+                <div class="low-stock__info">
+                  <strong>{{ product.name }}</strong>
+                  <small>{{ product.sku }}</small>
+                </div>
+                <mat-chip class="status-chip status-chip--warn" disableRipple>
+                  {{ product.stock }} left
+                </mat-chip>
+              </li>
+            }
+          </ul>
+        }
+      </mat-card-content>
+      <mat-card-actions align="end">
+        <a mat-button routerLink="/admin/inventory">Manage inventory</a>
+      </mat-card-actions>
+    </mat-card>
+  </div>
+</section>

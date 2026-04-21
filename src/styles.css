@@ -1,0 +1,36 @@
+@import 'tailwindcss';
+
+html {
+  color-scheme: light;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  background: var(--mat-sys-surface, #f8fafc);
+  color: var(--mat-sys-on-surface, #0f172a);
+  font-family: 'Roboto', system-ui, sans-serif;
+}
+
+mat-icon {
+  vertical-align: middle;
+}
+
+.w-full {
+  width: 100%;
+}
+
+.checkout-dialog-panel .mat-mdc-dialog-title {
+  padding: 1.5rem 2rem 0.5rem;
+}
+
+.checkout-dialog-panel .mat-mdc-dialog-content {
+  padding: 0.5rem 2rem 1rem;
+  max-height: 80vh;
+}
+
+.checkout-dialog-panel .mat-mdc-dialog-actions {
+  padding: 1rem 2rem 1.5rem;
+  gap: 0.5rem;
+}

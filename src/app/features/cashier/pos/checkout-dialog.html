@@ -1,0 +1,188 @@
+@switch (step()) {
+  @case ('payment') {
+    <h2 mat-dialog-title>
+      <mat-icon>point_of_sale</mat-icon>
+      Complete sale
+    </h2>
+    <form (ngSubmit)="confirm()">
+    <mat-dialog-content class="dialog">
+      <div class="totals">
+        <div class="totals__row">
+          <span>Subtotal</span>
+          <span>{{ data.subtotal | money }}</span>
+        </div>
+        <div class="totals__row">
+          <span>Tax</span>
+          <span>{{ data.tax | money }}</span>
+        </div>
+        <div class="totals__row totals__row--grand">
+          <span>Total due</span>
+          <span>{{ data.total | money }}</span>
+        </div>
+      </div>
+
+      <div class="section">
+        <label class="section__label">Payment method</label>
+        <mat-button-toggle-group
+          [value]="paymentMethod()"
+          (change)="paymentMethod.set($event.value)"
+          name="paymentMethod"
+          class="methods"
+        >
+          <mat-button-toggle value="cash">
+            <mat-icon>payments</mat-icon>
+            Cash
+          </mat-button-toggle>
+          <mat-button-toggle value="card">
+            <mat-icon>credit_card</mat-icon>
+            Card
+          </mat-button-toggle>
+          <mat-button-toggle value="transfer">
+            <mat-icon>account_balance</mat-icon>
+            Transfer
+          </mat-button-toggle>
+        </mat-button-toggle-group>
+      </div>
+
+      @if (paymentMethod() === 'cash') {
+        <mat-form-field appearance="outline">
+          <mat-label>Cash received</mat-label>
+          <input
+            matInput
+            type="text"
+            inputmode="decimal"
+            #cashInput
+            [ngModel]="cashReceivedText()"
+            (ngModelChange)="cashReceivedText.set($event)"
+            (blur)="normalizeCash()"
+            [ngModelOptions]="{ standalone: true }"
+          />
+          <span matTextSuffix>&nbsp;/ {{ data.total | money }} due</span>
+          @if (insufficientCash()) {
+            <mat-hint class="hint-error">Amount is less than the total</mat-hint>
+          }
+        </mat-form-field>
+        <div class="change">
+          <span>Change</span>
+          <strong>{{ change() | money }}</strong>
+        </div>
+      }
+    </mat-dialog-content>
+    <mat-dialog-actions align="end">
+      <button type="button" mat-stroked-button mat-dialog-close>Cancel</button>
+      <button
+        #confirmBtn
+        type="submit"
+        mat-flat-button
+        color="primary"
+        [disabled]="insufficientCash()"
+      >
+        <mat-icon>check</mat-icon>
+        Confirm payment
+      </button>
+    </mat-dialog-actions>
+    </form>
+  }
+
+  @case ('receipt') {
+    <mat-dialog-content class="dialog">
+      <div class="success">
+        <div class="success__badge">
+          <mat-icon>check_circle</mat-icon>
+        </div>
+        <div>
+          <h2 class="success__title">Payment received</h2>
+          <p class="success__subtitle">{{ data.total | money }} · {{ saleId }}</p>
+        </div>
+      </div>
+
+      <section class="receipt">
+        <header class="receipt__header">
+          <strong>{{ settings().storeName }}</strong>
+          <small>{{ settings().address }}</small>
+          <small>{{ settings().phone }}</small>
+        </header>
+
+        <mat-divider></mat-divider>
+
+        <div class="receipt__meta">
+          <div>
+            <span class="receipt__label">Sale #</span>
+            <strong>{{ saleId }}</strong>
+          </div>
+          <div>
+            <span class="receipt__label">Date</span>
+            <strong>{{ completedAt | date: 'short' }}</strong>
+          </div>
+          @if (cashier(); as user) {
+            <div>
+              <span class="receipt__label">Cashier</span>
+              <strong>{{ user.name }}</strong>
+            </div>
+          }
+          <div>
+            <span class="receipt__label">Payment</span>
+            <strong class="capitalize">{{ paymentMethod() }}</strong>
+          </div>
+        </div>
+
+        <mat-divider></mat-divider>
+
+        <ul class="receipt__items">
+          @for (line of data.lines; track line.product.id) {
+            <li class="receipt__item">
+              <span class="receipt__qty">{{ line.quantity }}×</span>
+              <span class="receipt__name">{{ line.product.name }}</span>
+              <span class="receipt__amount">
+                {{ line.product.price * line.quantity | money }}
+              </span>
+            </li>
+          }
+        </ul>
+
+        <mat-divider></mat-divider>
+
+        <div class="receipt__totals">
+          <div class="receipt__row">
+            <span>Subtotal</span>
+            <span>{{ data.subtotal | money }}</span>
+          </div>
+          <div class="receipt__row">
+            <span>Tax</span>
+            <span>{{ data.tax | money }}</span>
+          </div>
+          <div class="receipt__row receipt__row--grand">
+            <span>Total</span>
+            <span>{{ data.total | money }}</span>
+          </div>
+
+          @if (paymentMethod() === 'cash') {
+            <mat-divider></mat-divider>
+            <div class="receipt__row">
+              <span>Cash received</span>
+              <span>{{ cashReceived() | money }}</span>
+            </div>
+            <div class="receipt__row receipt__row--change">
+              <span>Change</span>
+              <span>{{ change() | money }}</span>
+            </div>
+          }
+        </div>
+
+        <mat-divider></mat-divider>
+
+        <footer class="receipt__footer">{{ settings().receiptFooter }}</footer>
+      </section>
+    </mat-dialog-content>
+    <mat-dialog-actions align="end">
+      <button mat-stroked-button>
+        <mat-icon>print</mat-icon>
+        Print
+      </button>
+      <button #newSaleBtn mat-flat-button color="primary" (click)="done()">
+        <mat-icon>add_shopping_cart</mat-icon>
+        New sale
+      </button>
+    </mat-dialog-actions>
+  }
+}

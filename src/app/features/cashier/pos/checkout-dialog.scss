@@ -1,0 +1,227 @@
+.dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+  min-width: 640px;
+  padding-top: 1rem;
+  padding-bottom: 1rem;
+}
+
+h2[mat-dialog-title] {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.totals {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+
+  &__row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.95rem;
+    color: var(--mat-sys-on-surface-variant);
+
+    &--grand {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: var(--mat-sys-on-surface);
+      padding-top: 0.5rem;
+      border-top: 1px solid var(--mat-sys-outline-variant);
+    }
+  }
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+
+  &__label {
+    font-weight: 500;
+    color: var(--mat-sys-on-surface-variant);
+  }
+}
+
+.methods {
+  width: 100%;
+
+  ::ng-deep .mat-button-toggle {
+    flex: 1;
+  }
+
+  ::ng-deep .mat-button-toggle-label-content {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    justify-content: center;
+  }
+}
+
+.hint-error {
+  color: var(--mat-sys-error);
+}
+
+.change {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--mat-sys-primary-container);
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  color: var(--mat-sys-on-primary-container);
+}
+
+.success {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 2rem 2.25rem;
+  margin: 0.5rem 0;
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  border-radius: 0.75rem;
+
+  &__badge {
+    flex-shrink: 0;
+    width: 3.5rem;
+    height: 3.5rem;
+    border-radius: 50%;
+    background: rgba(16, 185, 129, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    mat-icon {
+      color: #059669;
+      font-size: 2.25rem;
+      width: 2.25rem;
+      height: 2.25rem;
+    }
+  }
+
+  &__title {
+    margin: 0 0 0.25rem;
+    font-size: 1.25rem;
+    font-weight: 600;
+  }
+
+  &__subtitle {
+    margin: 0;
+    color: var(--mat-sys-on-surface-variant);
+    font-size: 0.9rem;
+  }
+}
+
+.receipt {
+  background: var(--mat-sys-surface-container-lowest);
+  border: 1px dashed var(--mat-sys-outline-variant);
+  border-radius: 0.75rem;
+  padding: 1.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  font-family: 'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  &__header {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 0.1rem;
+
+    strong {
+      font-size: 1rem;
+    }
+
+    small {
+      color: var(--mat-sys-on-surface-variant);
+      font-size: 0.75rem;
+    }
+  }
+
+  &__meta {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem 1rem;
+    font-size: 0.8rem;
+
+    > div {
+      display: flex;
+      flex-direction: column;
+    }
+  }
+
+  &__label {
+    color: var(--mat-sys-on-surface-variant);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  &__items {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  &__item {
+    display: grid;
+    grid-template-columns: 2.5rem 1fr auto;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+  }
+
+  &__qty {
+    color: var(--mat-sys-on-surface-variant);
+  }
+
+  &__name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  &__amount {
+    font-weight: 600;
+  }
+
+  &__totals {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  &__row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.85rem;
+    color: var(--mat-sys-on-surface-variant);
+
+    &--grand {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--mat-sys-on-surface);
+    }
+
+    &--change {
+      font-weight: 600;
+      color: var(--mat-sys-primary);
+    }
+  }
+
+  &__footer {
+    text-align: center;
+    font-size: 0.8rem;
+    color: var(--mat-sys-on-surface-variant);
+    font-style: italic;
+  }
+}
+
+.capitalize {
+  text-transform: capitalize;
+}

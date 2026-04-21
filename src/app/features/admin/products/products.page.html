@@ -1,0 +1,123 @@
+<section class="page">
+  <header class="page__header">
+    <div>
+      <h1 class="page__title">Products</h1>
+      <p class="page__subtitle">Manage your product catalog</p>
+    </div>
+    <button mat-flat-button color="primary">
+      <mat-icon>add</mat-icon>
+      New product
+    </button>
+  </header>
+
+  <mat-card appearance="outlined">
+    <mat-card-content>
+      <div class="filters">
+        <mat-form-field appearance="outline" class="filters__search">
+          <mat-label>Search</mat-label>
+          <input
+            matInput
+            placeholder="Name, SKU, or barcode"
+            [ngModel]="search()"
+            (ngModelChange)="search.set($event)"
+          />
+          <mat-icon matPrefix>search</mat-icon>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="filters__category">
+          <mat-label>Category</mat-label>
+          <mat-select [ngModel]="categoryFilter()" (ngModelChange)="categoryFilter.set($event)">
+            <mat-option value="all">All categories</mat-option>
+            @for (category of categories(); track category.id) {
+              <mat-option [value]="category.id">{{ category.name }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+      </div>
+
+      <div class="table-wrap">
+        <table mat-table [dataSource]="filtered()" class="w-full">
+          <ng-container matColumnDef="image">
+            <th mat-header-cell *matHeaderCellDef></th>
+            <td mat-cell *matCellDef="let p" class="cell-image">{{ p.image }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="name">
+            <th mat-header-cell *matHeaderCellDef>Name</th>
+            <td mat-cell *matCellDef="let p">
+              <div class="cell-title">
+                <strong>{{ p.name }}</strong>
+                <small>{{ p.description }}</small>
+              </div>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="sku">
+            <th mat-header-cell *matHeaderCellDef>SKU</th>
+            <td mat-cell *matCellDef="let p">{{ p.sku }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="category">
+            <th mat-header-cell *matHeaderCellDef>Category</th>
+            <td mat-cell *matCellDef="let p">{{ categoryName(p.categoryId) }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="price">
+            <th mat-header-cell *matHeaderCellDef>Price</th>
+            <td mat-cell *matCellDef="let p"><strong>{{ p.price | money }}</strong></td>
+          </ng-container>
+
+          <ng-container matColumnDef="stock">
+            <th mat-header-cell *matHeaderCellDef>Stock</th>
+            <td mat-cell *matCellDef="let p">
+              <mat-chip class="status-chip" [class]="'status-chip ' + stockChipClass(p.stock)" disableRipple>
+                {{ p.stock }}
+              </mat-chip>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="status">
+            <th mat-header-cell *matHeaderCellDef>Status</th>
+            <td mat-cell *matCellDef="let p">
+              <mat-chip [class]="'status-chip ' + (p.active ? 'status-chip--completed' : 'status-chip--refunded')" disableRipple>
+                {{ p.active ? 'Active' : 'Inactive' }}
+              </mat-chip>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="actions">
+            <th mat-header-cell *matHeaderCellDef class="cell-actions"></th>
+            <td mat-cell *matCellDef="let p" class="cell-actions">
+              <button mat-icon-button [matMenuTriggerFor]="rowMenu" aria-label="Row actions">
+                <mat-icon>more_vert</mat-icon>
+              </button>
+              <mat-menu #rowMenu="matMenu">
+                <button mat-menu-item>
+                  <mat-icon>edit</mat-icon>
+                  <span>Edit</span>
+                </button>
+                <button mat-menu-item>
+                  <mat-icon>content_copy</mat-icon>
+                  <span>Duplicate</span>
+                </button>
+                <button mat-menu-item>
+                  <mat-icon>delete</mat-icon>
+                  <span>Delete</span>
+                </button>
+              </mat-menu>
+            </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="columns"></tr>
+          <tr mat-row *matRowDef="let row; columns: columns"></tr>
+
+          <tr *matNoDataRow>
+            <td [attr.colspan]="columns.length" class="no-data">
+              No products match your filters.
+            </td>
+          </tr>
+        </table>
+      </div>
+    </mat-card-content>
+  </mat-card>
+</section>

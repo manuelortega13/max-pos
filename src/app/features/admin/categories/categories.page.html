@@ -1,0 +1,39 @@
+<section class="page">
+  <header class="page__header">
+    <div>
+      <h1 class="page__title">Categories</h1>
+      <p class="page__subtitle">Group your products</p>
+    </div>
+    <button mat-flat-button color="primary">
+      <mat-icon>add</mat-icon>
+      New category
+    </button>
+  </header>
+
+  <div class="category-grid">
+    @for (category of categories(); track category.id) {
+      <mat-card appearance="outlined" class="category-card">
+        <div class="category-card__accent" [style.background]="category.color"></div>
+        <mat-card-header>
+          <div mat-card-avatar class="category-card__avatar" [style.background]="category.color">
+            <mat-icon>{{ category.icon }}</mat-icon>
+          </div>
+          <mat-card-title>{{ category.name }}</mat-card-title>
+          <mat-card-subtitle>{{ category.productCount }} product(s)</mat-card-subtitle>
+        </mat-card-header>
+        <mat-card-content>
+          <p>{{ category.description }}</p>
+        </mat-card-content>
+        <mat-card-actions align="end">
+          <button mat-icon-button [matMenuTriggerFor]="menu" aria-label="Category actions">
+            <mat-icon>more_vert</mat-icon>
+          </button>
+          <mat-menu #menu="matMenu">
+            <button mat-menu-item><mat-icon>edit</mat-icon><span>Edit</span></button>
+            <button mat-menu-item><mat-icon>delete</mat-icon><span>Delete</span></button>
+          </mat-menu>
+        </mat-card-actions>
+      </mat-card>
+    }
+  </div>
+</section>

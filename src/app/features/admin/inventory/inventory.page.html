@@ -1,0 +1,105 @@
+<section class="page">
+  <header class="page__header">
+    <div>
+      <h1 class="page__title">Inventory</h1>
+      <p class="page__subtitle">Stock levels across the catalog</p>
+    </div>
+    <button mat-stroked-button>
+      <mat-icon>download</mat-icon>
+      Export CSV
+    </button>
+  </header>
+
+  <div class="summary">
+    <mat-card appearance="outlined" class="summary__card">
+      <span class="summary__label">Products</span>
+      <span class="summary__value">{{ totals().totalProducts }}</span>
+    </mat-card>
+    <mat-card appearance="outlined" class="summary__card">
+      <span class="summary__label">Total units on hand</span>
+      <span class="summary__value">{{ totals().totalUnits }}</span>
+    </mat-card>
+    <mat-card appearance="outlined" class="summary__card">
+      <span class="summary__label">Inventory value (cost)</span>
+      <span class="summary__value">{{ totals().totalValue | money }}</span>
+    </mat-card>
+    <mat-card appearance="outlined" class="summary__card summary__card--warn">
+      <span class="summary__label">Low stock</span>
+      <span class="summary__value">{{ totals().lowStock }}</span>
+    </mat-card>
+    <mat-card appearance="outlined" class="summary__card summary__card--danger">
+      <span class="summary__label">Out of stock</span>
+      <span class="summary__value">{{ totals().outOfStock }}</span>
+    </mat-card>
+  </div>
+
+  <mat-card appearance="outlined">
+    <mat-card-content>
+      <mat-button-toggle-group
+        [value]="filter()"
+        (change)="filter.set($event.value)"
+        class="stock-filter"
+      >
+        <mat-button-toggle value="all">All</mat-button-toggle>
+        <mat-button-toggle value="ok">In stock</mat-button-toggle>
+        <mat-button-toggle value="low">Low</mat-button-toggle>
+        <mat-button-toggle value="out">Out</mat-button-toggle>
+      </mat-button-toggle-group>
+
+      <div class="table-wrap">
+        <table mat-table [dataSource]="rows()" class="w-full">
+          <ng-container matColumnDef="image">
+            <th mat-header-cell *matHeaderCellDef></th>
+            <td mat-cell *matCellDef="let p" class="cell-image">{{ p.image }}</td>
+          </ng-container>
+          <ng-container matColumnDef="name">
+            <th mat-header-cell *matHeaderCellDef>Product</th>
+            <td mat-cell *matCellDef="let p">
+              <div class="cell-title">
+                <strong>{{ p.name }}</strong>
+                <small>{{ p.sku }}</small>
+              </div>
+            </td>
+          </ng-container>
+          <ng-container matColumnDef="category">
+            <th mat-header-cell *matHeaderCellDef>Category</th>
+            <td mat-cell *matCellDef="let p">{{ categoryName(p.categoryId) }}</td>
+          </ng-container>
+          <ng-container matColumnDef="stock">
+            <th mat-header-cell *matHeaderCellDef>Stock</th>
+            <td mat-cell *matCellDef="let p">
+              <div class="stock-cell">
+                <strong>{{ p.stock }}</strong>
+                <mat-chip class="status-chip" [class]="'status-chip ' + chipClass(p.stock)" disableRipple>
+                  {{ chipLabel(p.stock) }}
+                </mat-chip>
+              </div>
+            </td>
+          </ng-container>
+          <ng-container matColumnDef="cost">
+            <th mat-header-cell *matHeaderCellDef>Unit cost</th>
+            <td mat-cell *matCellDef="let p">{{ p.cost | money }}</td>
+          </ng-container>
+          <ng-container matColumnDef="value">
+            <th mat-header-cell *matHeaderCellDef>Line value</th>
+            <td mat-cell *matCellDef="let p">{{ (p.cost * p.stock) | money }}</td>
+          </ng-container>
+          <ng-container matColumnDef="actions">
+            <th mat-header-cell *matHeaderCellDef></th>
+            <td mat-cell *matCellDef="let p">
+              <button mat-stroked-button matTooltip="Add stock">
+                <mat-icon>add</mat-icon>
+                Restock
+              </button>
+            </td>
+          </ng-container>
+          <tr mat-header-row *matHeaderRowDef="columns"></tr>
+          <tr mat-row *matRowDef="let row; columns: columns"></tr>
+          <tr *matNoDataRow>
+            <td [attr.colspan]="columns.length" class="no-data">Nothing matches this filter.</td>
+          </tr>
+        </table>
+      </div>
+    </mat-card-content>
+  </mat-card>
+</section>

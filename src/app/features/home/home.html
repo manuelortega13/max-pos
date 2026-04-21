@@ -1,0 +1,49 @@
+<div class="home">
+  <header class="home__header">
+    <div class="home__brand">
+      <mat-icon class="home__brand-icon">point_of_sale</mat-icon>
+      <span>MaxPOS</span>
+    </div>
+    <p class="home__tagline">Choose a workspace to continue</p>
+  </header>
+
+  <div class="home__roles">
+    <mat-card class="home__role" appearance="outlined">
+      <mat-card-header>
+        <div mat-card-avatar class="home__avatar home__avatar--admin">
+          <mat-icon>admin_panel_settings</mat-icon>
+        </div>
+        <mat-card-title>Administrator</mat-card-title>
+        <mat-card-subtitle>Manage the entire store</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <p>Dashboard, products, categories, inventory, sales, users, reports, and settings.</p>
+      </mat-card-content>
+      <mat-card-actions align="end">
+        <a mat-flat-button color="primary" routerLink="/admin">
+          Enter admin
+          <mat-icon iconPositionEnd>arrow_forward</mat-icon>
+        </a>
+      </mat-card-actions>
+    </mat-card>
+
+    <mat-card class="home__role" appearance="outlined">
+      <mat-card-header>
+        <div mat-card-avatar class="home__avatar home__avatar--cashier">
+          <mat-icon>shopping_cart_checkout</mat-icon>
+        </div>
+        <mat-card-title>Cashier</mat-card-title>
+        <mat-card-subtitle>Ring up sales</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <p>Fast register with product catalog, cart, checkout, and your transaction history.</p>
+      </mat-card-content>
+      <mat-card-actions align="end">
+        <a mat-flat-button color="primary" routerLink="/cashier">
+          Open register
+          <mat-icon iconPositionEnd>arrow_forward</mat-icon>
+        </a>
+      </mat-card-actions>
+    </mat-card>
+  </div>
+</div>
