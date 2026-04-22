@@ -1,7 +1,9 @@
 package com.maxpos.product;
 
+import com.maxpos.product.dto.ProductBatchDto;
 import com.maxpos.product.dto.ProductDto;
 import com.maxpos.product.dto.ProductUpsertRequest;
+import com.maxpos.product.dto.RestockRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -57,5 +59,16 @@ public class ProductController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable UUID id) {
         service.delete(id);
+    }
+
+    @PostMapping("/{id}/restock")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ProductDto restock(@PathVariable UUID id, @Valid @RequestBody RestockRequest req) {
+        return service.restock(id, req);
+    }
+
+    @GetMapping("/{id}/batches")
+    public List<ProductBatchDto> batches(@PathVariable UUID id) {
+        return service.listBatches(id);
     }
 }

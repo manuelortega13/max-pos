@@ -130,4 +130,67 @@
       </mat-card-actions>
     </mat-card>
   </div>
+
+  <mat-card appearance="outlined" class="expiring-card">
+    <mat-card-header>
+      <div mat-card-avatar class="expiring-card__avatar">
+        <mat-icon>event_busy</mat-icon>
+      </div>
+      <mat-card-title>Expiring soon</mat-card-title>
+      <mat-card-subtitle>
+        @if (expiringCount() === 0) {
+          Nothing expires in the next 30 days
+        } @else {
+          {{ expiringCount() }} batch(es) within 30 days
+          @if (alreadyExpiredCount() > 0) {
+            · <strong>{{ alreadyExpiredCount() }} already expired</strong>
+          }
+        }
+      </mat-card-subtitle>
+    </mat-card-header>
+    <mat-card-content>
+      @if (expiringCount() === 0) {
+        <div class="empty-state">
+          <mat-icon>check_circle</mat-icon>
+          <p>All batches are well within shelf life.</p>
+        </div>
+      } @else {
+        <ul class="expiring-list">
+          @for (batch of expiringBatches(); track batch.batchId) {
+            <li
+              class="expiring-list__item"
+              [class.expiring-list__item--expired]="batch.daysUntilExpiry < 0"
+              [class.expiring-list__item--soon]="batch.daysUntilExpiry >= 0 && batch.daysUntilExpiry <= 7"
+            >
+              @if (batch.productImageUrl) {
+                <img
+                  [src]="batch.productImageUrl"
+                  [alt]="batch.productName"
+                  class="expiring-list__photo"
+                />
+              } @else {
+                <span class="expiring-list__emoji">{{ batch.productImage }}</span>
+              }
+              <div class="expiring-list__info">
+                <strong>{{ batch.productName }}</strong>
+                <small>{{ batch.quantityRemaining }} units · expires {{ batch.expiryDate }}</small>
+              </div>
+              <span class="expiring-list__days">
+                @if (batch.daysUntilExpiry < 0) {
+                  Expired {{ -batch.daysUntilExpiry }}d ago
+                } @else if (batch.daysUntilExpiry === 0) {
+                  Today
+                } @else {
+                  {{ batch.daysUntilExpiry }}d left
+                }
+              </span>
+            </li>
+          }
+        </ul>
+      }
+    </mat-card-content>
+    <mat-card-actions align="end">
+      <a mat-button routerLink="/admin/inventory">Review inventory</a>
+    </mat-card-actions>
+  </mat-card>
 </section>

@@ -36,14 +36,17 @@
   }
 
   &__roles {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(320px, 380px));
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
     gap: 1.5rem;
     width: 100%;
     max-width: 840px;
   }
 
   &__role {
+    flex: 0 1 380px;
+    min-width: 320px;
     transition: transform 0.2s ease, box-shadow 0.2s ease;
 
     &:hover {

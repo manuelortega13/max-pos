@@ -1,15 +1,24 @@
 import { Routes } from '@angular/router';
+import { adminGuard } from './core/guards/admin.guard';
+import { authGuard } from './core/guards/auth.guard';
+import { publicOnlyGuard } from './core/guards/public-only.guard';
 
 export const routes: Routes = [
   {
+    path: 'login',
+    canActivate: [publicOnlyGuard],
+    loadComponent: () => import('./features/login/login.page').then((m) => m.LoginPage),
+    title: 'Sign in — MaxPOS',
+  },
+  {
     path: '',
     pathMatch: 'full',
-    loadComponent: () =>
-      import('./features/home/home').then((m) => m.HomePage),
+    loadComponent: () => import('./features/home/home').then((m) => m.HomePage),
     title: 'MaxPOS',
   },
   {
     path: 'admin',
+    canActivate: [adminGuard],
     loadComponent: () =>
       import('./layouts/admin-layout/admin-layout').then((m) => m.AdminLayout),
     children: [
@@ -66,6 +75,7 @@ export const routes: Routes = [
   },
   {
     path: 'cashier',
+    canActivate: [authGuard],
     loadComponent: () =>
       import('./layouts/cashier-layout/cashier-layout').then((m) => m.CashierLayout),
     children: [
@@ -79,7 +89,9 @@ export const routes: Routes = [
       {
         path: 'transactions',
         loadComponent: () =>
-          import('./features/cashier/transactions/transactions.page').then((m) => m.TransactionsPage),
+          import('./features/cashier/transactions/transactions.page').then(
+            (m) => m.TransactionsPage,
+          ),
         title: 'My transactions — MaxPOS',
       },
     ],

@@ -3,7 +3,10 @@ package com.maxpos.sale;
 import com.maxpos.common.ConflictException;
 import com.maxpos.common.NotFoundException;
 import com.maxpos.product.Product;
+import com.maxpos.product.ProductBatch;
+import com.maxpos.product.ProductBatchRepository;
 import com.maxpos.product.ProductRepository;
+import com.maxpos.product.ProductService;
 import com.maxpos.sale.dto.CreateSaleRequest;
 import com.maxpos.sale.dto.SaleDto;
 import com.maxpos.settings.StoreSettings;
@@ -29,15 +32,21 @@ public class SaleService {
 
     private final SaleRepository sales;
     private final ProductRepository products;
+    private final ProductBatchRepository batches;
+    private final ProductService productService;
     private final UserRepository users;
     private final StoreSettingsRepository settings;
 
     public SaleService(SaleRepository sales,
                        ProductRepository products,
+                       ProductBatchRepository batches,
+                       ProductService productService,
                        UserRepository users,
                        StoreSettingsRepository settings) {
         this.sales = sales;
         this.products = products;
+        this.batches = batches;
+        this.productService = productService;
         this.users = users;
         this.settings = settings;
     }
@@ -56,7 +65,8 @@ public class SaleService {
     }
 
     /**
-     * Create a sale atomically: validates stock for every line, deducts stock,
+     * Create a sale atomically: validates salable stock for every line, deducts
+     * from batches in FEFO order (earliest expiry first, with NULL expiry last),
      * and writes the sale + line items in a single transaction. Any failure
      * rolls back the entire operation.
      */
@@ -92,7 +102,8 @@ public class SaleService {
                                 + " (have " + product.getStock() + ", need " + line.quantity() + ")");
             }
 
-            product.setStock(product.getStock() - line.quantity());
+            // Deduct from batches FEFO (throws ConflictException if insufficient).
+            productService.deductStockFefo(product.getId(), line.quantity());
 
             SaleItem item = new SaleItem();
             item.setProduct(product);
@@ -126,9 +137,18 @@ public class SaleService {
             throw new ConflictException("Sale already refunded");
         }
         sale.setStatus(SaleStatus.REFUNDED);
+
+        // Replenish inventory by creating a "refund" batch for each line item.
+        // We don't track which original batch the units came from (sale_items
+        // are product-granular), so the refund becomes a fresh batch without
+        // expiry — the admin can write it off if appropriate.
         for (SaleItem item : sale.getItems()) {
-            Product p = item.getProduct();
-            p.setStock(p.getStock() + item.getQuantity());
+            ProductBatch refundBatch = new ProductBatch();
+            refundBatch.setProduct(item.getProduct());
+            refundBatch.setQuantityReceived(item.getQuantity());
+            refundBatch.setQuantityRemaining(item.getQuantity());
+            refundBatch.setNote("Refund from sale " + sale.getReference());
+            batches.save(refundBatch);
         }
         return SaleDto.from(sale);
     }

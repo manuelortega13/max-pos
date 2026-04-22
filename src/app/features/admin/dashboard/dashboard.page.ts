@@ -7,6 +7,7 @@ import { MatChipsModule } from '@angular/material/chips';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDividerModule } from '@angular/material/divider';
 import { RouterLink } from '@angular/router';
+import { NotificationService } from '../../../core/services/notification.service';
 import { ProductService } from '../../../core/services/product.service';
 import { SaleService } from '../../../core/services/sale.service';
 import { UserService } from '../../../core/services/user.service';
@@ -35,6 +36,7 @@ export class DashboardPage {
   private readonly saleService = inject(SaleService);
   private readonly productService = inject(ProductService);
   private readonly userService = inject(UserService);
+  private readonly notifications = inject(NotificationService);
 
   protected readonly todayRevenue = this.saleService.todayRevenue;
   protected readonly todayTransactions = this.saleService.todayTransactionCount;
@@ -42,6 +44,15 @@ export class DashboardPage {
   protected readonly activeCashiers = computed(() => this.userService.activeCashiers().length);
   protected readonly lowStock = this.productService.lowStockProducts;
   protected readonly recentSales = computed(() => this.saleService.sales().slice(0, 5));
+  protected readonly expiringBatches = this.notifications.expiring;
+  protected readonly expiringCount = this.notifications.count;
+  protected readonly alreadyExpiredCount = this.notifications.alreadyExpiredCount;
 
   protected readonly saleColumns = ['id', 'date', 'cashier', 'items', 'total', 'status'] as const;
+
+  constructor() {
+    // Ensure the notification poller is running even if the user landed here
+    // without bouncing through the shell (e.g. direct URL after login).
+    this.notifications.start();
+  }
 }

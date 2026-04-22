@@ -1,0 +1,161 @@
+<h2 mat-dialog-title class="form-dialog__title">
+  <mat-icon>inventory_2</mat-icon>
+  {{ title }}
+</h2>
+
+<form [formGroup]="form" (ngSubmit)="submit()">
+  <mat-dialog-content class="form-dialog__content">
+    <div class="form-dialog__media">
+      <div class="image-picker">
+        <div class="image-picker__preview">
+          @if (imageUrl(); as url) {
+            <img [src]="url" alt="Product" />
+          } @else if (form.controls.image.value) {
+            <span class="image-picker__emoji">{{ form.controls.image.value }}</span>
+          } @else {
+            <mat-icon class="image-picker__placeholder">image</mat-icon>
+          }
+        </div>
+        <div class="image-picker__controls">
+          <input
+            #fileInput
+            type="file"
+            accept="image/*"
+            hidden
+            (change)="onImagePicked($event)"
+          />
+          <button
+            type="button"
+            mat-stroked-button
+            (click)="fileInput.click()"
+            [disabled]="processingImage()"
+          >
+            <mat-icon>{{ processingImage() ? 'hourglass_empty' : 'upload' }}</mat-icon>
+            {{ imageUrl() ? 'Replace image' : 'Upload image' }}
+          </button>
+          @if (imageUrl()) {
+            <button type="button" mat-button color="warn" (click)="clearImage()">
+              <mat-icon>delete</mat-icon>
+              Remove
+            </button>
+          }
+          <small class="image-picker__hint">
+            Image is resized to 400px and takes priority over the icon.
+          </small>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-dialog__row">
+      <mat-form-field appearance="outline" class="form-dialog__grow">
+        <mat-label>Name</mat-label>
+        <input matInput formControlName="name" autocomplete="off" />
+        @if (form.controls.name.touched && form.controls.name.invalid) {
+          <mat-error>Name is required</mat-error>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="form-dialog__image">
+        <mat-label>Icon fallback</mat-label>
+        <input matInput formControlName="image" placeholder="🥤" maxlength="16" />
+      </mat-form-field>
+    </div>
+
+    <mat-form-field appearance="outline" class="form-dialog__full">
+      <mat-label>Category</mat-label>
+      <mat-select formControlName="categoryId">
+        @for (category of categories(); track category.id) {
+          <mat-option [value]="category.id">{{ category.name }}</mat-option>
+        }
+      </mat-select>
+      @if (form.controls.categoryId.touched && form.controls.categoryId.invalid) {
+        <mat-error>Select a category</mat-error>
+      }
+    </mat-form-field>
+
+    <div class="form-dialog__row">
+      <mat-form-field appearance="outline" class="form-dialog__grow">
+        <mat-label>SKU</mat-label>
+        <input
+          matInput
+          formControlName="sku"
+          autocomplete="off"
+          (input)="onSkuUserInput()"
+        />
+        <mat-hint>Suggested from category. Edit to override.</mat-hint>
+        @if (form.controls.sku.touched && form.controls.sku.invalid) {
+          <mat-error>SKU is required</mat-error>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="form-dialog__grow">
+        <mat-label>Barcode</mat-label>
+        <input matInput formControlName="barcode" autocomplete="off" />
+        <mat-hint>Optional</mat-hint>
+      </mat-form-field>
+    </div>
+
+    <div class="form-dialog__row">
+      <mat-form-field appearance="outline">
+        <mat-label>Cost</mat-label>
+        <span matTextPrefix>$&nbsp;</span>
+        <input matInput type="number" min="0" step="0.01" formControlName="cost" />
+        @if (form.controls.cost.touched && form.controls.cost.invalid) {
+          <mat-error>Must be ≥ 0</mat-error>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Markup</mat-label>
+        <input matInput type="number" step="0.1" formControlName="markup" />
+        <span matTextSuffix>%</span>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Selling price</mat-label>
+        <span matTextPrefix>$&nbsp;</span>
+        <input matInput type="number" min="0" step="0.01" formControlName="price" />
+        @if (form.controls.price.touched && form.controls.price.invalid) {
+          <mat-error>Must be ≥ 0</mat-error>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Stock</mat-label>
+        <input matInput type="number" min="0" step="1" formControlName="stock" />
+        @if (form.controls.stock.touched && form.controls.stock.invalid) {
+          <mat-error>Must be ≥ 0</mat-error>
+        }
+      </mat-form-field>
+    </div>
+
+    <mat-form-field appearance="outline" class="form-dialog__full">
+      <mat-label>Description</mat-label>
+      <textarea matInput rows="3" formControlName="description"></textarea>
+    </mat-form-field>
+
+    <mat-slide-toggle formControlName="active">Active</mat-slide-toggle>
+
+    @if (error(); as message) {
+      <div class="form-dialog__error" role="alert">
+        <mat-icon>error_outline</mat-icon>
+        <span>{{ message }}</span>
+      </div>
+    }
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <button type="button" mat-stroked-button mat-dialog-close [disabled]="submitting()">
+      Cancel
+    </button>
+    <button
+      type="submit"
+      mat-flat-button
+      color="primary"
+      [disabled]="submitting()"
+    >
+      <mat-icon>{{ submitting() ? 'hourglass_empty' : 'check' }}</mat-icon>
+      {{ submitting() ? 'Saving…' : submitLabel }}
+    </button>
+  </mat-dialog-actions>
+</form>

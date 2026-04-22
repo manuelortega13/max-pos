@@ -32,23 +32,27 @@
 
     <span class="cashier-shell__spacer"></span>
 
-    @if (currentUser(); as user) {
-      <div class="cashier-shell__user">
+    <div class="cashier-shell__user">
+      @if (currentUser(); as user) {
         <div class="cashier-shell__user-text">
           <strong>{{ user.name }}</strong>
-          <small>Cashier</small>
+          <small>{{ user.role | titlecase }}</small>
         </div>
-        <button mat-icon-button [matMenuTriggerFor]="userMenu" aria-label="Account menu">
-          <mat-icon>account_circle</mat-icon>
+      }
+      <button mat-icon-button [matMenuTriggerFor]="userMenu" aria-label="Account menu">
+        <mat-icon>account_circle</mat-icon>
+      </button>
+      <mat-menu #userMenu="matMenu">
+        <button mat-menu-item (click)="goHome()">
+          <mat-icon>home</mat-icon>
+          <span>Home</span>
         </button>
-        <mat-menu #userMenu="matMenu">
-          <button mat-menu-item (click)="exit()">
-            <mat-icon>logout</mat-icon>
-            <span>End shift</span>
-          </button>
-        </mat-menu>
-      </div>
-    }
+        <button mat-menu-item (click)="logout()">
+          <mat-icon>logout</mat-icon>
+          <span>Sign out</span>
+        </button>
+      </mat-menu>
+    </div>
   </mat-toolbar>
 
   <main class="cashier-shell__main">

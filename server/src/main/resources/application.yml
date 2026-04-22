@@ -39,6 +39,11 @@ server:
   error:
     include-message: always
     include-binding-errors: always
+  # Product images travel as base64 data URLs in JSON bodies; allow enough
+  # headroom for a resized ~100KB JPEG plus the rest of the product fields.
+  tomcat:
+    max-http-form-post-size: 4MB
+    max-swallow-size: 4MB
 
 # ────────────────────────────────────────────────────────────────
 # App-level config — override in an application-local.yml that
@@ -53,8 +58,11 @@ maxpos:
     # Access token lifetime in minutes
     ttl-minutes: ${JWT_TTL_MINUTES:480}
   cors:
+    # Patterns, not literal URLs. "http://localhost:*" matches any dev port
+    # (4200, 4201, …) so running a second Angular app doesn't break CORS.
+    # In production, replace with specific frontend origins.
     allowed-origins:
-      - http://localhost:4200
+      - http://localhost:*
 
 logging:
   level:

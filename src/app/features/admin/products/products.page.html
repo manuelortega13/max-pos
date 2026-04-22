@@ -4,11 +4,31 @@
       <h1 class="page__title">Products</h1>
       <p class="page__subtitle">Manage your product catalog</p>
     </div>
-    <button mat-flat-button color="primary">
+    <button mat-flat-button color="primary" (click)="openCreate()">
       <mat-icon>add</mat-icon>
       New product
     </button>
   </header>
+
+  @if (loading()) {
+    <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+  }
+
+  @if (error(); as message) {
+    <mat-card appearance="outlined" class="error-card">
+      <mat-card-content class="error-card__content">
+        <mat-icon class="error-card__icon">error_outline</mat-icon>
+        <div class="error-card__body">
+          <strong>Couldn't load products</strong>
+          <small>{{ message }}</small>
+        </div>
+        <button mat-stroked-button (click)="retry()">
+          <mat-icon>refresh</mat-icon>
+          Retry
+        </button>
+      </mat-card-content>
+    </mat-card>
+  }
 
   <mat-card appearance="outlined">
     <mat-card-content>
@@ -39,7 +59,13 @@
         <table mat-table [dataSource]="filtered()" class="w-full">
           <ng-container matColumnDef="image">
             <th mat-header-cell *matHeaderCellDef></th>
-            <td mat-cell *matCellDef="let p" class="cell-image">{{ p.image }}</td>
+            <td mat-cell *matCellDef="let p" class="cell-image">
+              @if (p.imageUrl) {
+                <img [src]="p.imageUrl" [alt]="p.name" class="cell-image__photo" />
+              } @else {
+                <span class="cell-image__emoji">{{ p.image }}</span>
+              }
+            </td>
           </ng-container>
 
           <ng-container matColumnDef="name">
@@ -63,7 +89,7 @@
           </ng-container>
 
           <ng-container matColumnDef="price">
-            <th mat-header-cell *matHeaderCellDef>Price</th>
+            <th mat-header-cell *matHeaderCellDef>Selling price</th>
             <td mat-cell *matCellDef="let p"><strong>{{ p.price | money }}</strong></td>
           </ng-container>
 
@@ -92,15 +118,15 @@
                 <mat-icon>more_vert</mat-icon>
               </button>
               <mat-menu #rowMenu="matMenu">
-                <button mat-menu-item>
+                <button mat-menu-item (click)="openEdit(p)">
                   <mat-icon>edit</mat-icon>
                   <span>Edit</span>
                 </button>
-                <button mat-menu-item>
+                <button mat-menu-item (click)="openDuplicate(p)">
                   <mat-icon>content_copy</mat-icon>
                   <span>Duplicate</span>
                 </button>
-                <button mat-menu-item>
+                <button mat-menu-item class="menu-danger" (click)="confirmDelete(p)">
                   <mat-icon>delete</mat-icon>
                   <span>Delete</span>
                 </button>

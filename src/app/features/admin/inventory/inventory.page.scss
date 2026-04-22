@@ -47,7 +47,18 @@
 
 .table-wrap { overflow-x: auto; }
 
-.cell-image { font-size: 1.5rem; width: 3rem; }
+.cell-image {
+  width: 3.5rem;
+
+  &__emoji { font-size: 1.5rem; }
+  &__photo {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 0.5rem;
+    object-fit: cover;
+    display: block;
+  }
+}
 
 .cell-title {
   display: flex;
@@ -60,6 +71,11 @@
   display: flex;
   align-items: center;
   gap: 0.75rem;
+}
+
+.row-actions {
+  display: flex;
+  gap: 0.5rem;
 }
 
 .no-data {

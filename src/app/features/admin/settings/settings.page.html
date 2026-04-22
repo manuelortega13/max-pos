@@ -6,6 +6,26 @@
     </div>
   </header>
 
+  @if (loading()) {
+    <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+  }
+
+  @if (loadError(); as message) {
+    <mat-card appearance="outlined" class="error-card">
+      <mat-card-content class="error-card__content">
+        <mat-icon class="error-card__icon">error_outline</mat-icon>
+        <div class="error-card__body">
+          <strong>Couldn't load settings</strong>
+          <small>{{ message }}</small>
+        </div>
+        <button mat-stroked-button (click)="retry()">
+          <mat-icon>refresh</mat-icon>
+          Retry
+        </button>
+      </mat-card-content>
+    </mat-card>
+  }
+
   <form [formGroup]="form" (ngSubmit)="save()" class="settings-form">
     <mat-card appearance="outlined">
       <mat-card-header>
@@ -71,11 +91,30 @@
       </mat-card-content>
     </mat-card>
 
+    @if (saveError(); as message) {
+      <div class="settings-form__error" role="alert">
+        <mat-icon>error_outline</mat-icon>
+        <span>{{ message }}</span>
+      </div>
+    }
+
     <div class="actions">
-      <button mat-stroked-button type="button" (click)="reset()">Reset</button>
-      <button mat-flat-button color="primary" type="submit" [disabled]="form.invalid || form.pristine">
-        <mat-icon>save</mat-icon>
-        Save changes
+      <button
+        mat-stroked-button
+        type="button"
+        (click)="reset()"
+        [disabled]="saving() || form.pristine"
+      >
+        Reset
+      </button>
+      <button
+        mat-flat-button
+        color="primary"
+        type="submit"
+        [disabled]="form.invalid || form.pristine || saving()"
+      >
+        <mat-icon>{{ saving() ? 'hourglass_empty' : 'save' }}</mat-icon>
+        {{ saving() ? 'Saving…' : 'Save changes' }}
       </button>
     </div>
   </form>

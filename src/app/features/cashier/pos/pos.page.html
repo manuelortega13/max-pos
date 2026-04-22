@@ -70,7 +70,11 @@
           (click)="addToCart(product)"
           [disabled]="product.stock === 0"
         >
-          <span class="product-tile__image">{{ product.image }}</span>
+          @if (product.imageUrl) {
+            <img [src]="product.imageUrl" [alt]="product.name" class="product-tile__photo" />
+          } @else {
+            <span class="product-tile__image">{{ product.image }}</span>
+          }
           <span class="product-tile__name">{{ product.name }}</span>
           <span class="product-tile__price">{{ product.price | money }}</span>
           <span class="product-tile__stock">{{ product.stock }} in stock</span>
@@ -113,7 +117,11 @@
         <ul class="cart-list">
           @for (line of cart(); track line.product.id) {
             <li class="cart-line">
-              <span class="cart-line__image">{{ line.product.image }}</span>
+              @if (line.product.imageUrl) {
+                <img [src]="line.product.imageUrl" [alt]="line.product.name" class="cart-line__photo" />
+              } @else {
+                <span class="cart-line__image">{{ line.product.image }}</span>
+              }
               <div class="cart-line__info">
                 <strong>{{ line.product.name }}</strong>
                 <small>{{ line.product.price | money }} each</small>

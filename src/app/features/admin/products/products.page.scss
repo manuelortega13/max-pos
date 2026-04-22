@@ -37,8 +37,19 @@
 }
 
 .cell-image {
-  font-size: 1.5rem;
-  width: 3rem;
+  width: 3.5rem;
+
+  &__emoji {
+    font-size: 1.5rem;
+  }
+
+  &__photo {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 0.5rem;
+    object-fit: cover;
+    display: block;
+  }
 }
 
 .cell-title {
@@ -61,6 +72,32 @@
   padding: 2rem;
   text-align: center;
   color: var(--mat-sys-on-surface-variant);
+}
+
+.error-card {
+  border-color: var(--mat-sys-error) !important;
+
+  &__content {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  &__icon {
+    color: var(--mat-sys-error);
+    font-size: 2rem;
+    width: 2rem;
+    height: 2rem;
+  }
+
+  &__body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    line-height: 1.2;
+
+    small { color: var(--mat-sys-on-surface-variant); }
+  }
 }
 
 .status-chip {

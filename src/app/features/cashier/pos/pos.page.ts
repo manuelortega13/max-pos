@@ -67,7 +67,7 @@ export class PosPage {
       if (!term) return true;
       return (
         product.name.toLowerCase().includes(term) ||
-        product.barcode.includes(term) ||
+        (product.barcode?.includes(term) ?? false) ||
         product.sku.toLowerCase().includes(term)
       );
     });

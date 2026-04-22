@@ -57,7 +57,9 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration cfg = new CorsConfiguration();
-        cfg.setAllowedOrigins(properties.cors().allowedOrigins());
+        // Patterns (vs setAllowedOrigins) so wildcards like "http://localhost:*"
+        // work alongside setAllowCredentials(true).
+        cfg.setAllowedOriginPatterns(properties.cors().allowedOrigins());
         cfg.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         cfg.setAllowedHeaders(List.of("*"));
         cfg.setExposedHeaders(List.of("Authorization"));

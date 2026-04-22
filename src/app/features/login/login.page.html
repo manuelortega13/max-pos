@@ -1,0 +1,81 @@
+<div class="login">
+  <mat-card appearance="outlined" class="login__card">
+    @if (loading()) {
+      <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+    }
+
+    <mat-card-content class="login__body">
+      <div class="login__brand">
+        <mat-icon class="login__brand-icon">point_of_sale</mat-icon>
+        <div>
+          <strong>MaxPOS</strong>
+          <small>Sign in to continue</small>
+        </div>
+      </div>
+
+      <form [formGroup]="form" (ngSubmit)="submit()" class="login__form">
+        <mat-form-field appearance="outline">
+          <mat-label>Email</mat-label>
+          <mat-icon matPrefix>mail</mat-icon>
+          <input
+            matInput
+            type="email"
+            autocomplete="email"
+            formControlName="email"
+            autofocus
+          />
+          @if (form.controls.email.touched && form.controls.email.invalid) {
+            <mat-error>
+              @if (form.controls.email.hasError('required')) {
+                Email is required
+              } @else {
+                Enter a valid email address
+              }
+            </mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Password</mat-label>
+          <mat-icon matPrefix>lock</mat-icon>
+          <input
+            matInput
+            [type]="hidePassword() ? 'password' : 'text'"
+            autocomplete="current-password"
+            formControlName="password"
+          />
+          <button
+            type="button"
+            mat-icon-button
+            matSuffix
+            (click)="togglePasswordVisibility()"
+            [attr.aria-label]="hidePassword() ? 'Show password' : 'Hide password'"
+          >
+            <mat-icon>{{ hidePassword() ? 'visibility' : 'visibility_off' }}</mat-icon>
+          </button>
+          @if (form.controls.password.touched && form.controls.password.invalid) {
+            <mat-error>Password is required</mat-error>
+          }
+        </mat-form-field>
+
+        @if (error(); as message) {
+          <div class="login__error" role="alert">
+            <mat-icon>error_outline</mat-icon>
+            <span>{{ message }}</span>
+          </div>
+        }
+
+        <button
+          type="submit"
+          mat-flat-button
+          color="primary"
+          class="login__submit"
+          [disabled]="loading()"
+        >
+          <mat-icon>{{ loading() ? 'hourglass_empty' : 'login' }}</mat-icon>
+          {{ loading() ? 'Signing in…' : 'Sign in' }}
+        </button>
+      </form>
+    </mat-card-content>
+  </mat-card>
+</div>

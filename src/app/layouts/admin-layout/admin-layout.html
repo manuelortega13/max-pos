@@ -36,20 +36,67 @@
         <mat-icon>menu</mat-icon>
       </button>
       <span class="admin-shell__toolbar-spacer"></span>
-      <button mat-icon-button aria-label="Notifications">
+      <button
+        mat-icon-button
+        [matMenuTriggerFor]="notifMenu"
+        aria-label="Expiry notifications"
+        [matBadge]="expiringCount()"
+        [matBadgeHidden]="expiringCount() === 0"
+        matBadgeColor="warn"
+        matBadgeSize="small"
+      >
         <mat-icon>notifications</mat-icon>
       </button>
+      <mat-menu #notifMenu="matMenu" class="notif-menu">
+        <div class="notif-menu__header" (click)="$event.stopPropagation()">
+          <strong>Expiring soon</strong>
+          <small>
+            @if (expiringCount() === 0) {
+              Nothing expiring in the next 30 days
+            } @else {
+              {{ expiringCount() }} batch(es) expiring within 30 days
+            }
+          </small>
+        </div>
+        @if (expiringCount() === 0) {
+          <div class="notif-menu__empty">
+            <mat-icon>check_circle</mat-icon>
+            <span>All good</span>
+          </div>
+        } @else {
+          @for (batch of expiringBatches(); track batch.batchId) {
+            <button mat-menu-item class="notif-menu__item" (click)="goToInventory()">
+              <div class="expiring-item" [class]="expiryClass(batch)">
+                <div class="expiring-item__head">
+                  <strong>{{ batch.productName }}</strong>
+                  <span class="expiring-item__days">{{ expiryLabel(batch) }}</span>
+                </div>
+                <small>
+                  {{ batch.quantityRemaining }} units · expires {{ batch.expiryDate }}
+                </small>
+              </div>
+            </button>
+          }
+        }
+      </mat-menu>
       <button mat-icon-button [matMenuTriggerFor]="userMenu" aria-label="Account menu">
         <mat-icon>account_circle</mat-icon>
       </button>
       <mat-menu #userMenu="matMenu">
-        <button mat-menu-item>
-          <mat-icon>person</mat-icon>
-          <span>Profile</span>
+        @if (currentUser(); as user) {
+          <div class="admin-shell__user-info" disabled>
+            <strong>{{ user.name }}</strong>
+            <small>{{ user.email }}</small>
+          </div>
+          <mat-divider></mat-divider>
+        }
+        <button mat-menu-item (click)="goHome()">
+          <mat-icon>home</mat-icon>
+          <span>Home</span>
         </button>
-        <button mat-menu-item (click)="exit()">
+        <button mat-menu-item (click)="logout()">
           <mat-icon>logout</mat-icon>
-          <span>Exit to home</span>
+          <span>Sign out</span>
         </button>
       </mat-menu>
     </mat-toolbar>

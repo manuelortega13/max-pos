@@ -1,0 +1,109 @@
+<h2 mat-dialog-title class="restock__title">
+  <mat-icon>inventory</mat-icon>
+  Restock
+</h2>
+<form (ngSubmit)="confirm()">
+  <mat-dialog-content class="restock">
+    <div class="restock__product">
+      @if (data.product.imageUrl) {
+        <img [src]="data.product.imageUrl" [alt]="data.product.name" class="restock__photo" />
+      } @else {
+        <span class="restock__emoji">{{ data.product.image }}</span>
+      }
+      <div class="restock__info">
+        <strong>{{ data.product.name }}</strong>
+        <small>{{ data.product.sku }}</small>
+      </div>
+    </div>
+
+    <div class="restock__summary">
+      <div class="restock__summary-row">
+        <span>Current stock</span>
+        <strong>{{ data.product.stock }}</strong>
+      </div>
+      <div class="restock__summary-row restock__summary-row--add">
+        <span>Adding</span>
+        <strong>+{{ quantity() || 0 }}</strong>
+      </div>
+      <div class="restock__summary-row restock__summary-row--total">
+        <span>New stock</span>
+        <strong>{{ newStock() }}</strong>
+      </div>
+    </div>
+
+    <div class="restock__row">
+      <mat-form-field appearance="outline" class="restock__field">
+        <mat-label>Add quantity</mat-label>
+        <input
+          #qtyInput
+          matInput
+          type="number"
+          min="1"
+          step="1"
+          [ngModel]="quantity()"
+          (ngModelChange)="quantity.set($event)"
+          [ngModelOptions]="{ standalone: true }"
+        />
+        <span matTextSuffix>units</span>
+        @if (quantity() !== null && quantity()! < 1) {
+          <mat-hint class="restock__hint-error">Must be at least 1</mat-hint>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="restock__field">
+        <mat-label>Expiry date</mat-label>
+        <input
+          matInput
+          [matDatepicker]="picker"
+          [min]="minExpiry"
+          [ngModel]="expiryDate()"
+          (ngModelChange)="expiryDate.set($event)"
+          [ngModelOptions]="{ standalone: true }"
+        />
+        <mat-datepicker-toggle matIconSuffix [for]="picker"></mat-datepicker-toggle>
+        <mat-datepicker #picker></mat-datepicker>
+        <mat-hint>Optional</mat-hint>
+      </mat-form-field>
+    </div>
+
+    <div class="restock__row">
+      <mat-form-field appearance="outline" class="restock__field">
+        <mat-label>Cost per unit</mat-label>
+        <span matTextPrefix>{{ currencySymbol() }}&nbsp;</span>
+        <input
+          matInput
+          type="number"
+          min="0"
+          step="0.01"
+          [ngModel]="costPerUnit()"
+          (ngModelChange)="costPerUnit.set($event)"
+          [ngModelOptions]="{ standalone: true }"
+        />
+        <mat-hint>Optional — overrides the product default for this batch</mat-hint>
+      </mat-form-field>
+    </div>
+
+    <mat-form-field appearance="outline" class="restock__field">
+      <mat-label>Note</mat-label>
+      <input
+        matInput
+        [ngModel]="note()"
+        (ngModelChange)="note.set($event)"
+        [ngModelOptions]="{ standalone: true }"
+        placeholder="e.g. Invoice #4521"
+      />
+    </mat-form-field>
+  </mat-dialog-content>
+  <mat-dialog-actions align="end">
+    <button type="button" mat-stroked-button mat-dialog-close>Cancel</button>
+    <button
+      type="submit"
+      mat-flat-button
+      color="primary"
+      [disabled]="!isValid()"
+    >
+      <mat-icon>add</mat-icon>
+      Add to stock
+    </button>
+  </mat-dialog-actions>
+</form>

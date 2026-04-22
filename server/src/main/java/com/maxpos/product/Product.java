@@ -2,8 +2,10 @@ package com.maxpos.product;
 
 import com.maxpos.category.Category;
 import jakarta.persistence.*;
+import org.hibernate.annotations.Formula;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.UUID;
 
 @Entity
@@ -20,7 +22,7 @@ public class Product {
     @Column(nullable = false, unique = true, length = 64)
     private String sku;
 
-    @Column(nullable = false, unique = true, length = 64)
+    @Column(unique = true, length = 64)
     private String barcode;
 
     @Column(nullable = false, precision = 12, scale = 2)
@@ -29,7 +31,21 @@ public class Product {
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal cost;
 
-    @Column(nullable = false)
+    /**
+     * Salable stock, computed as the sum of quantity_remaining across batches
+     * that are not written off and not past expiry. Read-only from the entity's
+     * perspective: physical stock changes happen through batch inserts (restock)
+     * or batch decrements (sale/write-off), not by mutating this field.
+     */
+    @Formula("""
+        COALESCE((
+            SELECT SUM(b.quantity_remaining)
+              FROM product_batches b
+             WHERE b.product_id = id
+               AND b.written_off_at IS NULL
+               AND (b.expiry_date IS NULL OR b.expiry_date >= current_date)
+        ), 0)
+        """)
     private int stock;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
@@ -39,11 +55,24 @@ public class Product {
     @Column(length = 16)
     private String image;
 
+    @Column(name = "image_url", columnDefinition = "text")
+    private String imageUrl;
+
     @Column(columnDefinition = "text")
     private String description;
 
     @Column(nullable = false)
     private boolean active = true;
+
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private Instant createdAt;
+
+    @PrePersist
+    void onCreate() {
+        if (createdAt == null) {
+            createdAt = Instant.now();
+        }
+    }
 
     public UUID getId() { return id; }
     public String getName() { return name; }
@@ -56,14 +85,17 @@ public class Product {
     public void setPrice(BigDecimal price) { this.price = price; }
     public BigDecimal getCost() { return cost; }
     public void setCost(BigDecimal cost) { this.cost = cost; }
+    /** Computed from batches. No setter — do not try to mutate directly. */
     public int getStock() { return stock; }
-    public void setStock(int stock) { this.stock = stock; }
     public Category getCategory() { return category; }
     public void setCategory(Category category) { this.category = category; }
     public String getImage() { return image; }
     public void setImage(String image) { this.image = image; }
+    public String getImageUrl() { return imageUrl; }
+    public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
     public String getDescription() { return description; }
     public void setDescription(String description) { this.description = description; }
     public boolean isActive() { return active; }
     public void setActive(boolean active) { this.active = active; }
+    public Instant getCreatedAt() { return createdAt; }
 }
