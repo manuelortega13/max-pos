@@ -2,6 +2,7 @@ package com.maxpos.config;
 
 import com.maxpos.notification.push.PushProperties;
 import com.maxpos.security.JwtAuthenticationFilter;
+import jakarta.servlet.DispatcherType;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -43,6 +44,12 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        // Async/error dispatches re-enter the filter chain after the
+                        // original request has long since been authorized. With SSE the
+                        // response is already committed, so a re-check here cannot write
+                        // a 401/403 and produces a noisy "response is already committed"
+                        // ServletException. Short-circuit those dispatches.
+                        .dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR).permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
                         .requestMatchers(HttpMethod.GET, "/actuator/health").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/push/vapid-public-key").permitAll()
