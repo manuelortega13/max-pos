@@ -58,6 +58,10 @@
     top: 0;
     z-index: 2;
     gap: 0.5rem;
+    // Respect the iOS notch / status bar in standalone PWA mode so the
+    // logo/buttons don't hide behind the front camera cutout.
+    padding-top: env(safe-area-inset-top, 0px);
+    height: calc(64px + env(safe-area-inset-top, 0px));
   }
 
   &__toolbar-logo {

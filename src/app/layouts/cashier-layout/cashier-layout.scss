@@ -10,6 +10,9 @@
     position: sticky;
     top: 0;
     z-index: 2;
+    // Respect the iOS notch / status bar in standalone PWA mode.
+    padding-top: env(safe-area-inset-top, 0px);
+    height: calc(64px + env(safe-area-inset-top, 0px));
   }
 
   &__brand-logo {

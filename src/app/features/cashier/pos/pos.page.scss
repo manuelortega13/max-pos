@@ -370,7 +370,8 @@
     min-height: calc(100dvh - 56px);
 
     &__catalog {
-      padding: 0.75rem 0.75rem 84px; // leave room for the fixed cart bar
+      // Leave room for the fixed cart bar + iOS home-indicator clearance.
+      padding: 0.75rem 0.75rem calc(84px + env(safe-area-inset-bottom, 0px));
     }
 
     &__catalog-header {
@@ -412,13 +413,15 @@
 
     &__cart {
       // Fixed bottom bar by default; expands to full-height overlay when
-      // the cashier taps the summary pill.
+      // the cashier taps the summary pill. Extra bottom padding matches
+      // the iOS home-indicator so the Charge CTA never lands on the bar.
       position: fixed !important;
       left: 0;
       right: 0;
       bottom: 0;
       top: auto;
-      height: 64px;
+      height: calc(64px + env(safe-area-inset-bottom, 0px));
+      padding-bottom: env(safe-area-inset-bottom, 0px);
       border: none;
       border-top: 1px solid var(--mat-sys-outline-variant);
       box-shadow: 0 -6px 16px rgba(0, 0, 0, 0.08);

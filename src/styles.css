@@ -76,8 +76,15 @@ mat-icon {
   .dialog-fullscreen-mobile .mat-mdc-dialog-content {
     max-height: none !important;
   }
+  /* Respect the iOS notch + home indicator when the dialog covers the
+     whole screen as a PWA — otherwise the title sits under the camera
+     cutout and the confirm button under the bottom home bar. */
   .dialog-fullscreen-mobile .mat-mdc-dialog-title {
     font-size: 1.1rem !important;
+    padding-top: calc(0.75rem + env(safe-area-inset-top, 0px)) !important;
+  }
+  .dialog-fullscreen-mobile .mat-mdc-dialog-actions {
+    padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px)) !important;
   }
 
   /* Buttons in the action bar stretch to fill on mobile — much easier to
