@@ -87,6 +87,7 @@ export class UsersPage {
       width: '520px',
       maxWidth: '95vw',
       autoFocus: 'first-tabbable',
+      panelClass: 'dialog-fullscreen-mobile',
       data: { mode: 'create' },
     });
   }
@@ -96,6 +97,7 @@ export class UsersPage {
       width: '520px',
       maxWidth: '95vw',
       autoFocus: 'first-tabbable',
+      panelClass: 'dialog-fullscreen-mobile',
       data: { mode: 'edit', user },
     });
   }
@@ -105,6 +107,7 @@ export class UsersPage {
       width: '520px',
       maxWidth: '95vw',
       autoFocus: 'first-tabbable',
+      panelClass: 'dialog-fullscreen-mobile',
       data: { mode: 'reset-password', user },
     });
   }

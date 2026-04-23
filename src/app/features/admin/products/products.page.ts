@@ -99,6 +99,7 @@ export class ProductsPage {
       width: '820px',
       maxWidth: '95vw',
       autoFocus: 'first-tabbable',
+      panelClass: 'dialog-fullscreen-mobile',
       data: { mode: 'create' },
     });
   }
@@ -108,6 +109,7 @@ export class ProductsPage {
       width: '820px',
       maxWidth: '95vw',
       autoFocus: 'first-tabbable',
+      panelClass: 'dialog-fullscreen-mobile',
       data: { mode: 'edit', product },
     });
   }
@@ -117,6 +119,7 @@ export class ProductsPage {
       width: '820px',
       maxWidth: '95vw',
       autoFocus: 'first-tabbable',
+      panelClass: 'dialog-fullscreen-mobile',
       data: { mode: 'duplicate', product },
     });
   }

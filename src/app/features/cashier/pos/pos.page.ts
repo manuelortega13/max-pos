@@ -63,6 +63,8 @@ export class PosPage {
   protected readonly pendingQuantity = signal<number | null>(null);
   /** Index into filteredProducts() of the tile currently highlighted via keyboard. */
   protected readonly activeIndex = signal<number>(-1);
+  /** Mobile-only: whether the bottom-sheet cart is expanded to full-screen. */
+  protected readonly cartExpanded = signal<boolean>(false);
   private readonly gridRef = viewChild<ElementRef<HTMLElement>>('productGrid');
   private readonly searchInputRef = viewChild<ElementRef<HTMLInputElement>>('searchInput');
   private readonly catGroupRef = viewChild('catGroup', { read: ElementRef });
@@ -276,6 +278,7 @@ export class PosPage {
       width: '460px',
       maxWidth: '95vw',
       autoFocus: false,
+      panelClass: 'dialog-fullscreen-mobile',
       data: { initial: this.pendingQuantity() ?? 1 },
     });
     ref.afterClosed().subscribe((quantity) => {
@@ -320,6 +323,16 @@ export class PosPage {
 
   protected clearCart(): void {
     this.cartService.clear();
+    this.cartExpanded.set(false);
+  }
+
+  protected toggleCart(): void {
+    if (this.isEmpty()) return;
+    this.cartExpanded.update((v) => !v);
+  }
+
+  protected closeCart(): void {
+    this.cartExpanded.set(false);
   }
 
   @HostListener('document:keydown', ['$event'])
@@ -345,7 +358,7 @@ export class PosPage {
     const ref = this.dialog.open(CheckoutDialog, {
       width: '800px',
       maxWidth: '95vw',
-      panelClass: 'checkout-dialog-panel',
+      panelClass: ['checkout-dialog-panel', 'dialog-fullscreen-mobile'],
       autoFocus: false,
       data: {
         subtotal: this.subtotal(),
@@ -360,6 +373,7 @@ export class PosPage {
         // cart-event notifications are only for mid-sale removals.
         this.cartService.clear({ silent: true });
         this.snackBar.open('Sale completed', 'Dismiss', { duration: 2500 });
+        this.cartExpanded.set(false);
       }
     });
   }

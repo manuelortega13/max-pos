@@ -74,3 +74,34 @@
     background: var(--mat-sys-surface-container-lowest);
   }
 }
+
+/* ─── Mobile: compact toolbar that fits a 360-400px screen ─── */
+@media (max-width: 640px) {
+  .cashier-shell__toolbar {
+    padding: 0 0.5rem;
+    gap: 0.25rem;
+    min-height: 56px;
+  }
+
+  .cashier-shell__brand-logo {
+    width: 1.75rem;
+    height: 1.75rem;
+  }
+
+  .cashier-shell__title {
+    display: none; // free horizontal space; logo carries the brand
+  }
+
+  .cashier-shell__nav {
+    gap: 0.1rem;
+
+    a {
+      padding: 0 0.65rem;
+      min-width: 0;
+    }
+  }
+
+  .cashier-shell__user-text {
+    display: none; // account menu icon still opens name + sign out
+  }
+}

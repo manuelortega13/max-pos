@@ -197,7 +197,7 @@ export class TransactionsPage {
     };
     const ref = this.dialog.open<RefundDialog, RefundDialogData, RefundDialogResult>(
       RefundDialog,
-      { width: '480px', data },
+      { width: '480px', panelClass: 'dialog-fullscreen-mobile', data },
     );
     ref.afterClosed().subscribe((result) => {
       if (!result) return;

@@ -34,3 +34,72 @@ mat-icon {
   padding: 1rem 2rem 1.5rem;
   gap: 0.5rem;
 }
+
+/* ──────────────────────────────────────────────────────────────────
+   Mobile full-screen dialogs.
+   Any dialog opened with panelClass containing "dialog-fullscreen-mobile"
+   expands to fill the viewport below 640px. Above that the class is a
+   no-op so desktop layouts render unchanged.
+   Alert-style dialogs (confirm, stock-limit) deliberately DO NOT get
+   this class — they stay compact so the user can still see the context
+   behind the modal.
+   ────────────────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .cdk-overlay-pane.dialog-fullscreen-mobile {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    height: 100vh !important;
+    height: 100dvh !important;
+    max-height: 100vh !important;
+    max-height: 100dvh !important;
+  }
+
+  .dialog-fullscreen-mobile .mat-mdc-dialog-surface,
+  .dialog-fullscreen-mobile .mat-mdc-dialog-container {
+    border-radius: 0 !important;
+    max-height: 100vh !important;
+    max-height: 100dvh !important;
+    height: 100vh !important;
+    height: 100dvh !important;
+  }
+
+  /* Tighten the default Material dialog chrome — default padding is 24px on
+     each side, which swallows ~48px of a 360-400px viewport for no reason. */
+  .dialog-fullscreen-mobile .mat-mdc-dialog-title,
+  .dialog-fullscreen-mobile .mat-mdc-dialog-content,
+  .dialog-fullscreen-mobile .mat-mdc-dialog-actions {
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+  }
+  .dialog-fullscreen-mobile .mat-mdc-dialog-content {
+    max-height: none !important;
+  }
+  .dialog-fullscreen-mobile .mat-mdc-dialog-title {
+    font-size: 1.1rem !important;
+  }
+
+  /* Buttons in the action bar stretch to fill on mobile — much easier to
+     tap than two small right-aligned buttons, and avoids awkward
+     half-a-row layouts when labels are long. */
+  .dialog-fullscreen-mobile .mat-mdc-dialog-actions {
+    flex-wrap: wrap;
+  }
+  .dialog-fullscreen-mobile .mat-mdc-dialog-actions > button,
+  .dialog-fullscreen-mobile .mat-mdc-dialog-actions > a {
+    flex: 1 1 auto;
+  }
+
+  /* Override the checkout panel's heavier desktop paddings so the
+     dialog-fullscreen-mobile rules above actually apply. */
+  .checkout-dialog-panel.dialog-fullscreen-mobile .mat-mdc-dialog-title,
+  .dialog-fullscreen-mobile.checkout-dialog-panel .mat-mdc-dialog-title,
+  .checkout-dialog-panel.dialog-fullscreen-mobile .mat-mdc-dialog-content,
+  .dialog-fullscreen-mobile.checkout-dialog-panel .mat-mdc-dialog-content,
+  .checkout-dialog-panel.dialog-fullscreen-mobile .mat-mdc-dialog-actions,
+  .dialog-fullscreen-mobile.checkout-dialog-panel .mat-mdc-dialog-actions {
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+  }
+}

@@ -2,9 +2,14 @@
   display: flex;
   flex-direction: column;
   gap: 1.75rem;
-  min-width: 640px;
   padding-top: 1rem;
   padding-bottom: 1rem;
+
+  // Desktop only — without this, mobile forces 640px of horizontal overflow
+  // inside a full-screen dialog on a ~400px viewport.
+  @media (min-width: 641px) {
+    min-width: 640px;
+  }
 }
 
 h2[mat-dialog-title] {
@@ -84,6 +89,11 @@ h2[mat-dialog-title] {
   border: 1px solid rgba(16, 185, 129, 0.25);
   border-radius: 0.75rem;
 
+  @media (max-width: 640px) {
+    padding: 1rem 1.1rem;
+    gap: 0.85rem;
+  }
+
   &__badge {
     flex-shrink: 0;
     width: 3.5rem;
@@ -124,6 +134,11 @@ h2[mat-dialog-title] {
   flex-direction: column;
   gap: 1rem;
   font-family: 'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  @media (max-width: 640px) {
+    padding: 1rem;
+    gap: 0.75rem;
+  }
 
   &__header {
     display: flex;
@@ -236,4 +251,8 @@ h2[mat-dialog-title] {
   background: rgba(239, 68, 68, 0.1);
   color: var(--mat-sys-error);
   font-size: 0.9rem;
+
+  @media (max-width: 640px) {
+    margin: 0 1rem 0.5rem;
+  }
 }

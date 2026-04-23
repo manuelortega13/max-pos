@@ -1,9 +1,10 @@
-<mat-sidenav-container class="admin-shell">
+<mat-sidenav-container class="admin-shell" [class.admin-shell--handset]="isHandset()">
   <mat-sidenav
     class="admin-shell__sidenav"
     [mode]="isHandset() ? 'over' : 'side'"
     [opened]="!isHandset() && sidenavOpen()"
     [fixedInViewport]="isHandset()"
+    [disableClose]="isHandset()"
   >
     <div class="admin-shell__brand">
       <img src="/icons/icon-192.png" alt="" class="admin-shell__brand-logo" aria-hidden="true" />
@@ -32,9 +33,14 @@
 
   <mat-sidenav-content class="admin-shell__content">
     <mat-toolbar class="admin-shell__toolbar">
-      <button mat-icon-button aria-label="Toggle menu" (click)="toggleSidenav()">
-        <mat-icon>menu</mat-icon>
-      </button>
+      @if (!isHandset()) {
+        <button mat-icon-button aria-label="Toggle menu" (click)="toggleSidenav()">
+          <mat-icon>menu</mat-icon>
+        </button>
+      } @else {
+        <img src="/icons/icon-192.png" alt="" class="admin-shell__toolbar-logo" aria-hidden="true" />
+        <span class="admin-shell__toolbar-title">MaxPOS</span>
+      }
       <span class="admin-shell__toolbar-spacer"></span>
       <button
         mat-icon-button
@@ -112,5 +118,60 @@
     <main class="admin-shell__main">
       <router-outlet></router-outlet>
     </main>
+
+    @if (isHandset()) {
+      <nav class="admin-shell__bottom-nav" aria-label="Primary">
+        <a
+          class="admin-shell__bottom-link"
+          routerLink="dashboard"
+          routerLinkActive="admin-shell__bottom-link--active"
+        >
+          <mat-icon>dashboard</mat-icon>
+          <span>Dashboard</span>
+        </a>
+        <a
+          class="admin-shell__bottom-link"
+          routerLink="inventory"
+          routerLinkActive="admin-shell__bottom-link--active"
+        >
+          <mat-icon>warehouse</mat-icon>
+          <span>Inventory</span>
+        </a>
+        <a
+          class="admin-shell__bottom-link"
+          routerLink="sales"
+          routerLinkActive="admin-shell__bottom-link--active"
+        >
+          <mat-icon>receipt_long</mat-icon>
+          <span>Sales</span>
+        </a>
+        <button
+          type="button"
+          class="admin-shell__bottom-link"
+          [matMenuTriggerFor]="moreMenu"
+          aria-label="More sections"
+        >
+          <mat-icon>more_horiz</mat-icon>
+          <span>More</span>
+        </button>
+        <mat-menu #moreMenu="matMenu" yPosition="above" xPosition="before" class="admin-shell__more-menu">
+          <a mat-menu-item routerLink="products">
+            <mat-icon>inventory_2</mat-icon><span>Products</span>
+          </a>
+          <a mat-menu-item routerLink="categories">
+            <mat-icon>category</mat-icon><span>Categories</span>
+          </a>
+          <a mat-menu-item routerLink="users">
+            <mat-icon>group</mat-icon><span>Users</span>
+          </a>
+          <a mat-menu-item routerLink="reports">
+            <mat-icon>bar_chart</mat-icon><span>Reports</span>
+          </a>
+          <a mat-menu-item routerLink="settings">
+            <mat-icon>settings</mat-icon><span>Settings</span>
+          </a>
+        </mat-menu>
+      </nav>
+    }
   </mat-sidenav-content>
 </mat-sidenav-container>

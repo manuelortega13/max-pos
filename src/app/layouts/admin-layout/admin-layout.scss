@@ -57,6 +57,21 @@
     position: sticky;
     top: 0;
     z-index: 2;
+    gap: 0.5rem;
+  }
+
+  &__toolbar-logo {
+    width: 1.75rem;
+    height: 1.75rem;
+    object-fit: contain;
+    border-radius: 0.35rem;
+    flex-shrink: 0;
+  }
+
+  &__toolbar-title {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--mat-sys-on-surface);
   }
 
   &__toolbar-spacer {
@@ -67,6 +82,55 @@
     padding: 1.5rem;
     min-height: calc(100vh - 64px);
     background: var(--mat-sys-surface-container-lowest);
+  }
+
+  /* Mobile-only fixed bottom nav (Facebook-style primary tab bar) */
+  &__bottom-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 64px;
+    background: var(--mat-sys-surface);
+    border-top: 1px solid var(--mat-sys-outline-variant);
+    box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.06);
+    z-index: 20;
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+
+  &__bottom-link {
+    flex: 1 1 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.2rem;
+    padding: 0.4rem 0.25rem;
+    color: var(--mat-sys-on-surface-variant);
+    text-decoration: none;
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.68rem;
+    line-height: 1;
+    letter-spacing: 0.01em;
+
+    mat-icon {
+      font-size: 1.35rem;
+      width: 1.35rem;
+      height: 1.35rem;
+    }
+
+    &--active {
+      color: var(--mat-sys-primary);
+      font-weight: 600;
+    }
+
+    &:active {
+      background: var(--mat-sys-surface-container);
+    }
   }
 
   &__user-info {
@@ -129,6 +193,22 @@
 
   ::ng-deep .mat-mdc-menu-item-text {
     width: 100%;
+  }
+}
+
+/* ─── Mobile layout adjustments ─── */
+@media (max-width: 768px) {
+  .admin-shell {
+    &__main {
+      padding: 0.85rem;
+      padding-bottom: calc(64px + env(safe-area-inset-bottom, 0) + 0.5rem);
+    }
+  }
+}
+
+::ng-deep .admin-shell__more-menu {
+  .mat-mdc-menu-content {
+    min-width: 220px;
   }
 }
 

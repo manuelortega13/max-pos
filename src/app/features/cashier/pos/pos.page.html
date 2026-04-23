@@ -92,106 +92,149 @@
     </div>
   </section>
 
-  <aside class="pos__cart">
-    <header class="pos__cart-header">
-      <div>
-        <strong>Current sale</strong>
-        <small>{{ itemCount() }} item(s)</small>
-      </div>
-      <button
-        mat-icon-button
-        matTooltip="Clear cart"
-        (click)="clearCart()"
-        [disabled]="isEmpty()"
-      >
-        <mat-icon>delete_sweep</mat-icon>
-      </button>
-    </header>
+  <aside
+    class="pos__cart"
+    [class.pos__cart--expanded]="cartExpanded()"
+  >
+    <!-- Mobile-only collapsed summary bar. Tap to expand the cart. -->
+    <button
+      type="button"
+      class="pos__cart-summary"
+      (click)="toggleCart()"
+      [disabled]="isEmpty()"
+      aria-label="Open cart"
+    >
+      <mat-icon class="pos__cart-summary-icon">shopping_cart</mat-icon>
+      <span class="pos__cart-summary-label">
+        @if (isEmpty()) {
+          Cart is empty
+        } @else {
+          {{ itemCount() }} {{ itemCount() === 1 ? 'item' : 'items' }}
+          <span class="pos__cart-summary-total">· {{ total() | money }}</span>
+        }
+      </span>
+      <mat-icon class="pos__cart-summary-caret">expand_less</mat-icon>
+    </button>
 
-    <mat-divider></mat-divider>
-
-    <div class="pos__cart-body">
-      @if (isEmpty()) {
-        <div class="pos__cart-empty">
-          <mat-icon>shopping_cart</mat-icon>
-          <p>Cart is empty</p>
-          <small>Tap a product to add it</small>
+    <div class="pos__cart-inner">
+      <header class="pos__cart-header">
+        <div>
+          <strong>Current sale</strong>
+          <small>{{ itemCount() }} item(s)</small>
         </div>
-      } @else {
-        <ul class="cart-list">
-          @for (line of cart(); track line.product.id) {
-            <li class="cart-line">
-              @if (line.product.imageUrl) {
-                <img [src]="line.product.imageUrl" [alt]="line.product.name" class="cart-line__photo" />
-              } @else {
-                <span class="cart-line__image">{{ line.product.image }}</span>
-              }
-              <div class="cart-line__info">
-                <strong>{{ line.product.name }}</strong>
-                <small>{{ line.product.price | money }} each</small>
-              </div>
-              <div class="cart-line__qty">
-                <button mat-icon-button (click)="decrement(line.product.id)" aria-label="Decrease">
-                  <mat-icon>remove</mat-icon>
-                </button>
-                <span>{{ line.quantity }}</span>
+        <div class="pos__cart-header-actions">
+          <button
+            mat-icon-button
+            matTooltip="Clear cart"
+            (click)="clearCart()"
+            [disabled]="isEmpty()"
+          >
+            <mat-icon>delete_sweep</mat-icon>
+          </button>
+          <button
+            mat-icon-button
+            class="pos__cart-close"
+            (click)="closeCart()"
+            aria-label="Close cart"
+          >
+            <mat-icon>expand_more</mat-icon>
+          </button>
+        </div>
+      </header>
+
+      <mat-divider></mat-divider>
+
+      <div class="pos__cart-body">
+        @if (isEmpty()) {
+          <div class="pos__cart-empty">
+            <mat-icon>shopping_cart</mat-icon>
+            <p>Cart is empty</p>
+            <small>Tap a product to add it</small>
+          </div>
+        } @else {
+          <ul class="cart-list">
+            @for (line of cart(); track line.product.id) {
+              <li class="cart-line">
+                @if (line.product.imageUrl) {
+                  <img [src]="line.product.imageUrl" [alt]="line.product.name" class="cart-line__photo" />
+                } @else {
+                  <span class="cart-line__image">{{ line.product.image }}</span>
+                }
+                <div class="cart-line__info">
+                  <strong>{{ line.product.name }}</strong>
+                  <small>{{ line.product.price | money }} each</small>
+                </div>
+                <div class="cart-line__qty">
+                  <button mat-icon-button (click)="decrement(line.product.id)" aria-label="Decrease">
+                    <mat-icon>remove</mat-icon>
+                  </button>
+                  <span>{{ line.quantity }}</span>
+                  <button
+                    mat-icon-button
+                    (click)="increment(line.product.id)"
+                    [disabled]="isAtMaxStock(line.product.id, line.quantity)"
+                    [matTooltip]="isAtMaxStock(line.product.id, line.quantity) ? 'At stock limit' : ''"
+                    aria-label="Increase"
+                  >
+                    <mat-icon>add</mat-icon>
+                  </button>
+                </div>
+                <strong class="cart-line__total">
+                  {{ line.product.price * line.quantity | money }}
+                </strong>
                 <button
                   mat-icon-button
-                  (click)="increment(line.product.id)"
-                  [disabled]="isAtMaxStock(line.product.id, line.quantity)"
-                  [matTooltip]="isAtMaxStock(line.product.id, line.quantity) ? 'At stock limit' : ''"
-                  aria-label="Increase"
+                  class="cart-line__remove"
+                  (click)="remove(line.product.id)"
+                  aria-label="Remove"
                 >
-                  <mat-icon>add</mat-icon>
+                  <mat-icon>close</mat-icon>
                 </button>
-              </div>
-              <strong class="cart-line__total">
-                {{ line.product.price * line.quantity | money }}
-              </strong>
-              <button
-                mat-icon-button
-                class="cart-line__remove"
-                (click)="remove(line.product.id)"
-                aria-label="Remove"
-              >
-                <mat-icon>close</mat-icon>
-              </button>
-            </li>
-          }
-        </ul>
-      }
-    </div>
-
-    <mat-divider></mat-divider>
-
-    <footer class="pos__cart-footer">
-      <div class="totals">
-        <div class="totals__row">
-          <span>Subtotal</span>
-          <span>{{ subtotal() | money }}</span>
-        </div>
-        <div class="totals__row">
-          <span>Tax</span>
-          <span>{{ tax() | money }}</span>
-        </div>
-        <div class="totals__row totals__row--grand">
-          <span>Total</span>
-          <span>{{ total() | money }}</span>
-        </div>
+              </li>
+            }
+          </ul>
+        }
       </div>
 
-      <button
-        mat-flat-button
-        color="primary"
-        class="pos__checkout"
-        [disabled]="isEmpty()"
-        matTooltip="Ctrl / ⌘ + Enter"
-        (click)="checkout()"
-      >
-        <mat-icon>point_of_sale</mat-icon>
-        <span>Charge {{ total() | money }}</span>
-        <kbd class="pos__shortcut">Ctrl&nbsp;+&nbsp;⏎</kbd>
-      </button>
-    </footer>
+      <mat-divider></mat-divider>
+
+      <footer class="pos__cart-footer">
+        <div class="totals">
+          <div class="totals__row">
+            <span>Subtotal</span>
+            <span>{{ subtotal() | money }}</span>
+          </div>
+          <div class="totals__row">
+            <span>Tax</span>
+            <span>{{ tax() | money }}</span>
+          </div>
+          <div class="totals__row totals__row--grand">
+            <span>Total</span>
+            <span>{{ total() | money }}</span>
+          </div>
+        </div>
+
+        <button
+          mat-flat-button
+          color="primary"
+          class="pos__checkout"
+          [disabled]="isEmpty()"
+          matTooltip="Ctrl / ⌘ + Enter"
+          (click)="checkout()"
+        >
+          <mat-icon>point_of_sale</mat-icon>
+          <span>Charge {{ total() | money }}</span>
+          <kbd class="pos__shortcut">Ctrl&nbsp;+&nbsp;⏎</kbd>
+        </button>
+      </footer>
+    </div>
   </aside>
+
+  <!-- Mobile-only backdrop for the expanded bottom-sheet cart. -->
+  <div
+    class="pos__cart-backdrop"
+    [class.pos__cart-backdrop--visible]="cartExpanded()"
+    (click)="closeCart()"
+    aria-hidden="true"
+  ></div>
 </div>

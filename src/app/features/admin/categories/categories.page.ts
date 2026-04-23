@@ -43,6 +43,7 @@ export class CategoriesPage {
       width: '560px',
       maxWidth: '95vw',
       autoFocus: 'first-tabbable',
+      panelClass: 'dialog-fullscreen-mobile',
       data: { mode: 'create' },
     });
   }
@@ -52,6 +53,7 @@ export class CategoriesPage {
       width: '560px',
       maxWidth: '95vw',
       autoFocus: 'first-tabbable',
+      panelClass: 'dialog-fullscreen-mobile',
       data: { mode: 'edit', category },
     });
   }

@@ -128,6 +128,7 @@ export class InventoryPage {
       width: '620px',
       maxWidth: '95vw',
       autoFocus: false,
+      panelClass: 'dialog-fullscreen-mobile',
       data: { product },
     });
 
@@ -157,6 +158,7 @@ export class InventoryPage {
       width: '860px',
       maxWidth: '95vw',
       autoFocus: false,
+      panelClass: 'dialog-fullscreen-mobile',
       data: { product },
     });
   }

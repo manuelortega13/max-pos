@@ -87,8 +87,12 @@ export interface QuantityDialogData {
         display: flex;
         flex-direction: column;
         gap: 1rem;
-        min-width: 420px;
         padding-top: 0.5rem;
+      }
+      @media (min-width: 641px) {
+        .qty-dialog {
+          min-width: 420px;
+        }
       }
       .qty-dialog__help {
         margin: 0;
