@@ -1,5 +1,6 @@
 import {
   ApplicationConfig,
+  isDevMode,
   provideBrowserGlobalErrorListeners,
   provideZonelessChangeDetection,
 } from '@angular/core';
@@ -7,6 +8,7 @@ import { provideRouter, withComponentInputBinding, withViewTransitions } from '@
 import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
 import { provideHttpClient, withFetch, withInterceptors } from '@angular/common/http';
 import { provideNativeDateAdapter } from '@angular/material/core';
+import { provideServiceWorker } from '@angular/service-worker';
 
 import { routes } from './app.routes';
 import { apiBaseUrlInterceptor } from './core/interceptors/api-base-url.interceptor';
@@ -29,5 +31,9 @@ export const appConfig: ApplicationConfig = {
       withInterceptors([authInterceptor, unauthorizedInterceptor, apiBaseUrlInterceptor]),
     ),
     provideNativeDateAdapter(),
+    provideServiceWorker('ngsw-worker.js', {
+      enabled: !isDevMode(),
+      registrationStrategy: 'registerWhenStable:30000',
+    }),
   ],
 };

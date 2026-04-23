@@ -19,7 +19,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.security.GeneralSecurityException;
 import java.security.Security;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -120,16 +122,25 @@ public class PushService implements PushDeliveryService {
         }
     }
 
-    /** Leaner shape for the push wire — no timestamp bloat, just what the SW renders. */
-    private PushPayload toPayload(NotificationEvent event) {
-        return new PushPayload(
-                event.title(),
-                event.body(),
-                event.data(),
-                event.url(),
-                event.type()
-        );
+    /**
+     * Angular's ngsw-worker auto-displays a push whose JSON payload has a
+     * top-level {@code notification} key. Wrap the event in that shape and
+     * stash the deep-link URL inside {@code data.url}; the frontend reads it
+     * back in PushService's notificationClicks handler to route on tap.
+     */
+    private Map<String, Object> toPayload(NotificationEvent event) {
+        Map<String, Object> data = new HashMap<>(event.data() == null ? Map.of() : event.data());
+        if (event.url() != null) {
+            data.put("url", event.url());
+        }
+        Map<String, Object> notification = new HashMap<>();
+        notification.put("title", event.title());
+        notification.put("body", event.body());
+        notification.put("icon", "/icons/icon-192.png");
+        notification.put("badge", "/icons/icon-192.png");
+        notification.put("tag", event.type());
+        notification.put("renotify", Boolean.TRUE);
+        notification.put("data", data);
+        return Map.of("notification", notification);
     }
-
-    private record PushPayload(String title, String body, Object data, String url, String tag) {}
 }

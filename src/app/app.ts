@@ -1,6 +1,5 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
-import { PwaService } from './core/services/pwa.service';
 
 @Component({
   selector: 'app-root',
@@ -9,10 +8,4 @@ import { PwaService } from './core/services/pwa.service';
   templateUrl: './app.html',
   styleUrl: './app.css',
 })
-export class App {
-  private readonly pwa = inject(PwaService);
-
-  constructor() {
-    this.pwa.register();
-  }
-}
+export class App {}

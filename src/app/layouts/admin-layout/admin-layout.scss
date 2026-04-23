@@ -14,11 +14,12 @@
     padding: 1.25rem 1rem;
   }
 
-  &__brand-icon {
-    font-size: 2rem;
-    width: 2rem;
-    height: 2rem;
-    color: var(--mat-sys-primary);
+  &__brand-logo {
+    width: 2.25rem;
+    height: 2.25rem;
+    object-fit: contain;
+    border-radius: 0.4rem;
+    flex-shrink: 0;
   }
 
   &__brand-text {

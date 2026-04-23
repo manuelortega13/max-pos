@@ -1,22 +1,30 @@
 import { HttpClient } from '@angular/common/http';
-import { Injectable, inject, signal } from '@angular/core';
+import { DestroyRef, Injectable, inject, signal } from '@angular/core';
+import { SwPush } from '@angular/service-worker';
+import { Router } from '@angular/router';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { firstValueFrom } from 'rxjs';
 import { AuthService } from './auth.service';
-import { PwaService } from './pwa.service';
 
 type PermissionState = 'default' | 'granted' | 'denied' | 'unsupported';
 
 /**
- * Wraps the browser's Push API. The typical flow:
- *   1. permission() — see current permission
- *   2. subscribe()  — prompts the user, registers with the backend
- *   3. unsubscribe() — cleanup on sign-out or opt-out
+ * Web Push wrapper built on Angular's SwPush. The browser's ngsw-worker is
+ * registered by app.config.ts; here we just handle the subscribe/unsubscribe
+ * handshake with the backend and react to notification clicks.
+ *
+ * Usage from the admin UI:
+ *   1. refreshState() to see current permission + whether we're subscribed
+ *   2. enable()      — prompts permission, registers with backend
+ *   3. disable()     — opt-out + cleanup on sign-out
  */
 @Injectable({ providedIn: 'root' })
 export class PushService {
   private readonly http = inject(HttpClient);
   private readonly authService = inject(AuthService);
-  private readonly pwa = inject(PwaService);
+  private readonly swPush = inject(SwPush);
+  private readonly router = inject(Router);
+  private readonly destroyRef = inject(DestroyRef);
 
   private readonly _permission = signal<PermissionState>(this.detectPermission());
   private readonly _subscribed = signal<boolean>(false);
@@ -24,26 +32,39 @@ export class PushService {
   readonly permission = this._permission.asReadonly();
   readonly subscribed = this._subscribed.asReadonly();
 
+  constructor() {
+    // Keep the local `subscribed` signal in lockstep with the real SW subscription
+    // — matters when the user enables push in another tab, or the SW re-registers.
+    this.swPush.subscription
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((sub) => this._subscribed.set(!!sub));
+
+    // Route to the target URL encoded in the notification's `data.url` when
+    // the admin clicks a push notification (fires even after app was closed).
+    this.swPush.notificationClicks
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(({ notification }) => {
+        const target = (notification.data as { url?: string } | undefined)?.url;
+        if (target) this.router.navigateByUrl(target);
+      });
+  }
+
   /**
    * Attempt to enable push notifications for the current admin. Returns true
-   * on success; caller can toast the result. Fails silently (with a console
-   * warning) if the browser denied permission or the backend has no VAPID.
+   * on success; caller can toast the result. Fails (with console warning) if
+   * the browser denied permission, the SW isn't active, or the backend has
+   * no VAPID keys configured.
    */
   async enable(): Promise<boolean> {
     if (!this.authService.isAdmin()) return false;
-    const reg = await this.ensureRegistration();
-    if (!reg) return false;
+    if (!this.swPush.isEnabled) {
+      console.warn('[maxpos] Service worker not enabled; run a production build');
+      return false;
+    }
 
     if (Notification.permission === 'denied') {
       this._permission.set('denied');
       return false;
-    }
-    if (Notification.permission !== 'granted') {
-      const res = await Notification.requestPermission();
-      this._permission.set(res as PermissionState);
-      if (res !== 'granted') return false;
-    } else {
-      this._permission.set('granted');
     }
 
     const keyResponse = await firstValueFrom(
@@ -54,30 +75,35 @@ export class PushService {
       return false;
     }
 
-    const existing = await reg.pushManager.getSubscription();
-    const subscription =
-      existing ??
-      (await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        // Uint8Array → ArrayBuffer via .buffer keeps the Push API type happy
-        applicationServerKey: urlBase64ToUint8Array(keyResponse.publicKey).buffer as ArrayBuffer,
-      }));
+    try {
+      const subscription = await this.swPush.requestSubscription({
+        serverPublicKey: keyResponse.publicKey,
+      });
+      this._permission.set('granted');
 
-    await firstValueFrom(
-      this.http.post('/api/push/subscribe', {
-        endpoint: subscription.endpoint,
-        p256dh: arrayBufferToBase64(subscription.getKey('p256dh')),
-        auth: arrayBufferToBase64(subscription.getKey('auth')),
-      }),
-    );
-    this._subscribed.set(true);
-    return true;
+      await firstValueFrom(
+        this.http.post('/api/push/subscribe', {
+          endpoint: subscription.endpoint,
+          p256dh: arrayBufferToBase64(subscription.getKey('p256dh')),
+          auth: arrayBufferToBase64(subscription.getKey('auth')),
+        }),
+      );
+      this._subscribed.set(true);
+      return true;
+    } catch (err) {
+      // requestSubscription rejects on permission denial or SW failure
+      this._permission.set(this.detectPermission());
+      console.warn('[maxpos] Push subscription failed', err);
+      return false;
+    }
   }
 
   async disable(): Promise<void> {
-    const reg = this.pwa.registration();
-    if (!reg) return;
-    const sub = await reg.pushManager.getSubscription();
+    if (!this.swPush.isEnabled) {
+      this._subscribed.set(false);
+      return;
+    }
+    const sub = await firstValueFrom(this.swPush.subscription);
     if (!sub) {
       this._subscribed.set(false);
       return;
@@ -89,40 +115,28 @@ export class PushService {
     } catch {
       /* still unsubscribe locally even if server call fails */
     }
-    await sub.unsubscribe();
+    try {
+      await this.swPush.unsubscribe();
+    } catch {
+      /* browser may have already dropped the subscription */
+    }
     this._subscribed.set(false);
   }
 
   async refreshState(): Promise<void> {
     this._permission.set(this.detectPermission());
-    const reg = this.pwa.registration();
-    if (!reg) {
+    if (!this.swPush.isEnabled) {
       this._subscribed.set(false);
       return;
     }
-    const sub = await reg.pushManager.getSubscription();
+    const sub = await firstValueFrom(this.swPush.subscription);
     this._subscribed.set(!!sub);
-  }
-
-  private async ensureRegistration(): Promise<ServiceWorkerRegistration | null> {
-    const existing = this.pwa.registration();
-    if (existing) return existing;
-    return this.pwa.register();
   }
 
   private detectPermission(): PermissionState {
     if (typeof Notification === 'undefined') return 'unsupported';
     return Notification.permission as PermissionState;
   }
-}
-
-function urlBase64ToUint8Array(base64: string): Uint8Array {
-  const padding = '='.repeat((4 - (base64.length % 4)) % 4);
-  const normalised = (base64 + padding).replace(/-/g, '+').replace(/_/g, '/');
-  const raw = atob(normalised);
-  const bytes = new Uint8Array(raw.length);
-  for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
-  return bytes;
 }
 
 function arrayBufferToBase64(buffer: ArrayBuffer | null): string {

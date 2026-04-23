@@ -12,11 +12,12 @@
     z-index: 2;
   }
 
-  &__brand-icon {
-    color: var(--mat-sys-primary);
-    font-size: 1.75rem;
-    width: 1.75rem;
-    height: 1.75rem;
+  &__brand-logo {
+    width: 2rem;
+    height: 2rem;
+    object-fit: contain;
+    border-radius: 0.35rem;
+    flex-shrink: 0;
   }
 
   &__title {
