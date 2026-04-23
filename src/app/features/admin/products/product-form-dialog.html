@@ -17,6 +17,11 @@
           }
         </div>
         <div class="image-picker__controls">
+          <!--
+            Two hidden inputs: the first is a generic library picker, the
+            second forces the rear-facing camera via `capture`. On desktop
+            `capture` is ignored, so we hide the camera button up there.
+          -->
           <input
             #fileInput
             type="file"
@@ -24,6 +29,24 @@
             hidden
             (change)="onImagePicked($event)"
           />
+          <input
+            #cameraInput
+            type="file"
+            accept="image/*"
+            capture="environment"
+            hidden
+            (change)="onImagePicked($event)"
+          />
+          <button
+            type="button"
+            mat-stroked-button
+            class="image-picker__camera-btn"
+            (click)="cameraInput.click()"
+            [disabled]="processingImage()"
+          >
+            <mat-icon>photo_camera</mat-icon>
+            Take photo
+          </button>
           <button
             type="button"
             mat-stroked-button

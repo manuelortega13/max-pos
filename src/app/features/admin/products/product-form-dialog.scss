@@ -104,4 +104,13 @@
     color: var(--mat-sys-on-surface-variant);
     font-size: 0.75rem;
   }
+
+  /* `capture="environment"` only opens the rear camera on mobile browsers;
+     on desktop it degrades to a plain file picker and becomes a duplicate
+     of the Upload button, so hide it above the mobile breakpoint. */
+  &__camera-btn {
+    @media (min-width: 768px) {
+      display: none;
+    }
+  }
 }

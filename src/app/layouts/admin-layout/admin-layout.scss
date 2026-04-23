@@ -95,12 +95,16 @@
     bottom: 0;
     left: 0;
     right: 0;
-    height: 64px;
+    // Grow total height by the iOS home-indicator height so the icons +
+    // labels still get a full 64px of usable space above it; padding-bottom
+    // reserves that indicator clearance. Without the calc() the padding
+    // would eat into the 64px (border-box) and squish the content.
+    height: calc(64px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
     background: var(--mat-sys-surface);
     border-top: 1px solid var(--mat-sys-outline-variant);
     box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.06);
     z-index: 20;
-    padding-bottom: env(safe-area-inset-bottom, 0);
   }
 
   &__bottom-link {
