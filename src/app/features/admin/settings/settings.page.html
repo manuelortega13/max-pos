@@ -80,8 +80,8 @@
 
     <mat-card appearance="outlined">
       <mat-card-header>
-        <mat-card-title>Inventory</mat-card-title>
-        <mat-card-subtitle>How the register behaves when stock runs out</mat-card-subtitle>
+        <mat-card-title>Inventory &amp; offline</mat-card-title>
+        <mat-card-subtitle>How the register behaves when stock or the network runs out</mat-card-subtitle>
       </mat-card-header>
       <mat-card-content class="settings-form__inventory">
         <mat-slide-toggle formControlName="allowNegativeStock">
@@ -91,6 +91,20 @@
           When on, cashiers can still ring up a product after it hits zero
           stock — batches are driven negative and the sale goes through. Turn
           this off to enforce hard stock limits (the default).
+        </small>
+
+        <mat-slide-toggle
+          formControlName="offlineModeEnabled"
+          [disabled]="!form.controls.allowNegativeStock.value"
+        >
+          Offline mode
+        </mat-slide-toggle>
+        <small class="settings-form__hint">
+          Lets the cashier POS keep working on flaky or no Wi-Fi: sales are
+          queued locally and replayed when the network returns.
+          <strong>Requires &quot;Allow negative stock&quot;</strong> — queued
+          sales may land against zero stock on replay. Enabling offline mode
+          also enables that setting automatically.
         </small>
       </mat-card-content>
     </mat-card>

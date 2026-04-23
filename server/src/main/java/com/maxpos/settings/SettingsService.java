@@ -1,5 +1,6 @@
 package com.maxpos.settings;
 
+import com.maxpos.common.ConflictException;
 import com.maxpos.common.NotFoundException;
 import com.maxpos.settings.dto.StoreSettingsDto;
 import com.maxpos.settings.dto.StoreSettingsUpdateRequest;
@@ -24,6 +25,16 @@ public class SettingsService {
 
     @Transactional
     public StoreSettingsDto update(StoreSettingsUpdateRequest req) {
+        // Invariant: offline mode requires allow-negative-stock, because
+        // queued sales replayed after a network outage may land against
+        // zero/negative stock on the backend. Without the allowance, the
+        // backend would reject those replays and sales would pile up stuck
+        // in the cashier's local queue.
+        if (req.offlineModeEnabled() && !req.allowNegativeStock()) {
+            throw new ConflictException(
+                    "Offline mode requires 'Allow negative stock' to be enabled");
+        }
+
         StoreSettings s = repo.findById(1)
                 .orElseThrow(() -> new NotFoundException("Store settings not initialized"));
         s.setStoreName(req.storeName());
@@ -34,6 +45,7 @@ public class SettingsService {
         s.setAddress(req.address());
         s.setPhone(req.phone());
         s.setAllowNegativeStock(req.allowNegativeStock());
+        s.setOfflineModeEnabled(req.offlineModeEnabled());
         return StoreSettingsDto.from(s);
     }
 }

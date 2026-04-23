@@ -12,5 +12,6 @@ public record StoreSettingsUpdateRequest(
         @Size(max = 2048) String receiptFooter,
         @Size(max = 255) String address,
         @Size(max = 64) String phone,
-        boolean allowNegativeStock
+        boolean allowNegativeStock,
+        boolean offlineModeEnabled
 ) {}

@@ -12,7 +12,8 @@ public record StoreSettingsDto(
         String receiptFooter,
         String address,
         String phone,
-        boolean allowNegativeStock
+        boolean allowNegativeStock,
+        boolean offlineModeEnabled
 ) {
     public static StoreSettingsDto from(StoreSettings s) {
         return new StoreSettingsDto(
@@ -23,7 +24,8 @@ public record StoreSettingsDto(
                 s.getReceiptFooter(),
                 s.getAddress(),
                 s.getPhone(),
-                s.isAllowNegativeStock()
+                s.isAllowNegativeStock(),
+                s.isOfflineModeEnabled()
         );
     }
 }

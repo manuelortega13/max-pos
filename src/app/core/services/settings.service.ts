@@ -15,6 +15,7 @@ const SETTINGS_FALLBACK: StoreSettings = {
   address: '',
   phone: '',
   allowNegativeStock: false,
+  offlineModeEnabled: false,
 };
 
 @Injectable({ providedIn: 'root' })

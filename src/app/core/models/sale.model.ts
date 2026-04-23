@@ -27,4 +27,10 @@ export interface Sale {
 export interface CreateSaleRequest {
   readonly items: readonly { productId: string; quantity: number }[];
   readonly paymentMethod: PaymentMethod;
+  /**
+   * Client-generated UUID carried with every sale so the backend can
+   * idempotently skip duplicates when the offline queue replays a sale
+   * that actually landed on a previous attempt.
+   */
+  readonly clientRef?: string;
 }

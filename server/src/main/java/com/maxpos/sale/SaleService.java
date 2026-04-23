@@ -80,6 +80,16 @@ public class SaleService {
      */
     @Transactional
     public SaleDto create(CreateSaleRequest req, UUID cashierId) {
+        // Idempotent replay: if the caller supplied a clientRef (from the
+        // offline queue) and a sale with that reference already exists,
+        // return the existing record instead of creating a duplicate.
+        if (req.clientRef() != null && !req.clientRef().isBlank()) {
+            var existing = sales.findByReference(req.clientRef().trim());
+            if (existing.isPresent()) {
+                return SaleDto.from(existing.get());
+            }
+        }
+
         User cashier = users.findById(cashierId)
                 .orElseThrow(() -> new NotFoundException("Cashier not found"));
 
@@ -88,8 +98,12 @@ public class SaleService {
         BigDecimal taxRate = storeSettings.getTaxRate();
         boolean allowNegative = storeSettings.isAllowNegativeStock();
 
+        String reference = (req.clientRef() != null && !req.clientRef().isBlank())
+                ? req.clientRef().trim()
+                : generateReference();
+
         Sale sale = new Sale();
-        sale.setReference(generateReference());
+        sale.setReference(reference);
         sale.setDate(Instant.now());
         sale.setCashier(cashier);
         sale.setCashierName(cashier.getName());

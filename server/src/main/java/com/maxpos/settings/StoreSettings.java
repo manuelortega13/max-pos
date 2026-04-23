@@ -36,6 +36,9 @@ public class StoreSettings {
     @Column(name = "allow_negative_stock", nullable = false)
     private boolean allowNegativeStock = false;
 
+    @Column(name = "offline_mode_enabled", nullable = false)
+    private boolean offlineModeEnabled = false;
+
     public Integer getId() { return id; }
     public String getStoreName() { return storeName; }
     public void setStoreName(String storeName) { this.storeName = storeName; }
@@ -53,4 +56,6 @@ public class StoreSettings {
     public void setPhone(String phone) { this.phone = phone; }
     public boolean isAllowNegativeStock() { return allowNegativeStock; }
     public void setAllowNegativeStock(boolean allowNegativeStock) { this.allowNegativeStock = allowNegativeStock; }
+    public boolean isOfflineModeEnabled() { return offlineModeEnabled; }
+    public void setOfflineModeEnabled(boolean offlineModeEnabled) { this.offlineModeEnabled = offlineModeEnabled; }
 }

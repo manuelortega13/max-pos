@@ -57,6 +57,7 @@ export class SettingsPage {
     address: [''],
     phone: [''],
     allowNegativeStock: [false],
+    offlineModeEnabled: [false],
   });
 
   constructor() {
@@ -76,6 +77,7 @@ export class SettingsPage {
           address: s.address ?? '',
           phone: s.phone ?? '',
           allowNegativeStock: s.allowNegativeStock,
+          offlineModeEnabled: s.offlineModeEnabled,
         },
         { emitEvent: false },
       );
@@ -87,6 +89,20 @@ export class SettingsPage {
       const currency = this.currencies.find((c) => c.code === code);
       if (currency) {
         this.form.controls.currencySymbol.setValue(currency.symbol, { emitEvent: false });
+      }
+    });
+
+    // Paired-toggle invariant: offline mode requires allow-negative-stock.
+    // Enabling offline flips allow-negative on automatically (help); turning
+    // allow-negative off pulls offline off with it (enforce).
+    this.form.controls.offlineModeEnabled.valueChanges.subscribe((on) => {
+      if (on && !this.form.controls.allowNegativeStock.value) {
+        this.form.controls.allowNegativeStock.setValue(true, { emitEvent: false });
+      }
+    });
+    this.form.controls.allowNegativeStock.valueChanges.subscribe((on) => {
+      if (!on && this.form.controls.offlineModeEnabled.value) {
+        this.form.controls.offlineModeEnabled.setValue(false, { emitEvent: false });
       }
     });
   }
@@ -111,6 +127,7 @@ export class SettingsPage {
         address: value.address,
         phone: value.phone,
         allowNegativeStock: value.allowNegativeStock,
+        offlineModeEnabled: value.offlineModeEnabled,
       })
       .subscribe({
         next: () => {
@@ -136,6 +153,7 @@ export class SettingsPage {
       address: s.address ?? '',
       phone: s.phone ?? '',
       allowNegativeStock: s.allowNegativeStock,
+      offlineModeEnabled: s.offlineModeEnabled,
     });
     this.saveError.set(null);
   }

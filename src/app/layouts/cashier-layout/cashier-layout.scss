@@ -76,6 +76,57 @@
     overflow: auto;
     background: var(--mat-sys-surface-container-lowest);
   }
+
+  &__sync {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    height: 34px;
+    padding: 0 0.75rem;
+    border-radius: 999px;
+    border: 1px solid var(--mat-sys-outline-variant);
+    background: var(--mat-sys-secondary-container);
+    color: var(--mat-sys-on-secondary-container);
+    font: inherit;
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+
+    &:hover:not([disabled]) {
+      background: var(--mat-sys-primary-container);
+    }
+
+    &[disabled] {
+      cursor: default;
+      opacity: 0.85;
+    }
+
+    mat-icon {
+      font-size: 1.1rem;
+      width: 1.1rem;
+      height: 1.1rem;
+    }
+
+    &--offline {
+      background: rgba(239, 68, 68, 0.15);
+      color: #b91c1c;
+      border-color: rgba(239, 68, 68, 0.4);
+
+      &:hover:not([disabled]) {
+        background: rgba(239, 68, 68, 0.22);
+      }
+    }
+
+    &--syncing mat-icon {
+      animation: cashier-sync-spin 1.2s linear infinite;
+    }
+  }
+}
+
+@keyframes cashier-sync-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
 }
 
 /* ─── Mobile: compact toolbar that fits a 360-400px screen ─── */
@@ -106,5 +157,14 @@
 
   .cashier-shell__user-text {
     display: none; // account menu icon still opens name + sign out
+  }
+
+  .cashier-shell__sync {
+    padding: 0 0.5rem;
+    height: 32px;
+  }
+
+  .cashier-shell__sync-label {
+    display: none; // icon alone on narrow screens; tooltip carries the detail
   }
 }

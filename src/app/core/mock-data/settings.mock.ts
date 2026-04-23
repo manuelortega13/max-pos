@@ -9,4 +9,5 @@ export const SETTINGS_MOCK: StoreSettings = {
   address: '123 Main Street, Springfield',
   phone: '+1 (555) 010-2026',
   allowNegativeStock: false,
+  offlineModeEnabled: false,
 };

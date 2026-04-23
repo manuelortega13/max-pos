@@ -32,6 +32,35 @@
 
     <span class="cashier-shell__spacer"></span>
 
+    @if (showSyncBadge()) {
+      <button
+        type="button"
+        class="cashier-shell__sync"
+        [class.cashier-shell__sync--offline]="!online()"
+        [class.cashier-shell__sync--syncing]="syncing()"
+        [matTooltip]="
+          !online()
+            ? 'Offline — sales are queued locally and will sync when you reconnect'
+            : pendingSync() + ' pending sale(s). Tap to retry now.'
+        "
+        (click)="retrySync()"
+        [disabled]="syncing()"
+      >
+        <mat-icon>
+          {{ !online() ? 'cloud_off' : syncing() ? 'sync' : 'sync_problem' }}
+        </mat-icon>
+        <span class="cashier-shell__sync-label">
+          @if (!online()) {
+            Offline
+          } @else if (syncing()) {
+            Syncing…
+          } @else {
+            {{ pendingSync() }} pending
+          }
+        </span>
+      </button>
+    }
+
     <div class="cashier-shell__user">
       @if (currentUser(); as user) {
         <div class="cashier-shell__user-text">
