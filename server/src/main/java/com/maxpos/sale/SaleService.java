@@ -86,6 +86,7 @@ public class SaleService {
         StoreSettings storeSettings = settings.findById(1)
                 .orElseThrow(() -> new IllegalStateException("Store settings missing"));
         BigDecimal taxRate = storeSettings.getTaxRate();
+        boolean allowNegative = storeSettings.isAllowNegativeStock();
 
         Sale sale = new Sale();
         sale.setReference(generateReference());
@@ -104,14 +105,17 @@ public class SaleService {
             if (!product.isActive()) {
                 throw new ConflictException("Product is inactive: " + product.getName());
             }
-            if (product.getStock() < line.quantity()) {
+            // When the store allows negative stock, cashiers may oversell past the
+            // current batch total. deductStockFefo will drive the last touched
+            // batch's quantity_remaining negative; the @Formula sum on Product.stock
+            // reflects the oversell as a negative count.
+            if (!allowNegative && product.getStock() < line.quantity()) {
                 throw new ConflictException(
                         "Insufficient stock for " + product.getName()
                                 + " (have " + product.getStock() + ", need " + line.quantity() + ")");
             }
 
-            // Deduct from batches FEFO (throws ConflictException if insufficient).
-            productService.deductStockFefo(product.getId(), line.quantity());
+            productService.deductStockFefo(product, line.quantity(), allowNegative);
 
             SaleItem item = new SaleItem();
             item.setProduct(product);

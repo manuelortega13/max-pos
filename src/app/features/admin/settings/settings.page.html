@@ -80,6 +80,23 @@
 
     <mat-card appearance="outlined">
       <mat-card-header>
+        <mat-card-title>Inventory</mat-card-title>
+        <mat-card-subtitle>How the register behaves when stock runs out</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content class="settings-form__inventory">
+        <mat-slide-toggle formControlName="allowNegativeStock">
+          Allow negative stock
+        </mat-slide-toggle>
+        <small class="settings-form__hint">
+          When on, cashiers can still ring up a product after it hits zero
+          stock — batches are driven negative and the sale goes through. Turn
+          this off to enforce hard stock limits (the default).
+        </small>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card appearance="outlined">
+      <mat-card-header>
         <mat-card-title>Receipt</mat-card-title>
         <mat-card-subtitle>What prints at the bottom of every receipt</mat-card-subtitle>
       </mat-card-header>

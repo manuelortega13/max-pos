@@ -89,6 +89,7 @@ table.mat-mdc-table {
   &--refunded { background: rgba(239, 68, 68, 0.15) !important; color: #b91c1c !important; }
   &--pending { background: rgba(245, 158, 11, 0.15) !important; color: #b45309 !important; }
   &--warn { background: rgba(245, 158, 11, 0.15) !important; color: #b45309 !important; }
+  &--oversold { background: rgba(190, 18, 60, 0.18) !important; color: #9f1239 !important; }
 }
 
 .low-stock {

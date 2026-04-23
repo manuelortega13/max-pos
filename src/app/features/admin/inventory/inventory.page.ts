@@ -69,7 +69,9 @@ export class InventoryPage {
       totalUnits,
       totalValue,
       lowStock: products.filter((p) => p.stock > 0 && p.stock <= 10).length,
-      outOfStock: products.filter((p) => p.stock === 0).length,
+      // "Out of stock" tile includes negatives so oversold products aren't
+      // silently dropped from the count.
+      outOfStock: products.filter((p) => p.stock <= 0).length,
     };
   });
 
@@ -90,7 +92,7 @@ export class InventoryPage {
       }
       switch (stock) {
         case 'low': return p.stock > 0 && p.stock <= 10;
-        case 'out': return p.stock === 0;
+        case 'out': return p.stock <= 0; // includes oversold / negative
         case 'ok':  return p.stock > 10;
         case 'all':
         default:    return true;
@@ -112,12 +114,14 @@ export class InventoryPage {
   }
 
   protected chipClass(stock: number): string {
+    if (stock < 0) return 'status-chip--oversold';
     if (stock === 0) return 'status-chip--refunded';
     if (stock <= 10) return 'status-chip--warn';
     return 'status-chip--completed';
   }
 
   protected chipLabel(stock: number): string {
+    if (stock < 0) return 'Oversold';
     if (stock === 0) return 'Out of stock';
     if (stock <= 10) return 'Low';
     return 'In stock';

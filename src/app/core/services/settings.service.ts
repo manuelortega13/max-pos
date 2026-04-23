@@ -14,6 +14,7 @@ const SETTINGS_FALLBACK: StoreSettings = {
   receiptFooter: '',
   address: '',
   phone: '',
+  allowNegativeStock: false,
 };
 
 @Injectable({ providedIn: 'root' })

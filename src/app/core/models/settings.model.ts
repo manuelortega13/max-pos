@@ -6,4 +6,9 @@ export interface StoreSettings {
   receiptFooter: string;
   address: string;
   phone: string;
+  /**
+   * When true the POS lets cashiers ring up products past their available
+   * stock, driving batches negative so the sale still goes through.
+   */
+  allowNegativeStock: boolean;
 }

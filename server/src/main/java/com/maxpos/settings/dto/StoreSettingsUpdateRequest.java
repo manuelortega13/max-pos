@@ -11,5 +11,6 @@ public record StoreSettingsUpdateRequest(
         @NotNull @DecimalMin("0.0000") @DecimalMax("1.0000") BigDecimal taxRate,
         @Size(max = 2048) String receiptFooter,
         @Size(max = 255) String address,
-        @Size(max = 64) String phone
+        @Size(max = 64) String phone,
+        boolean allowNegativeStock
 ) {}

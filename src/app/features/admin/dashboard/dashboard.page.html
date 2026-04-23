@@ -142,7 +142,7 @@
           @if (outOfStock().length === 0) {
             Every active product has stock
           } @else {
-            {{ outOfStock().length }} product(s) with zero units
+            {{ outOfStock().length }} product(s) at zero or oversold
           }
         </mat-card-subtitle>
       </mat-card-header>
@@ -165,8 +165,11 @@
                   <strong>{{ product.name }}</strong>
                   <small>{{ product.sku }}</small>
                 </div>
-                <mat-chip class="status-chip status-chip--refunded" disableRipple>
-                  0 left
+                <mat-chip
+                  [class]="'status-chip ' + (product.stock < 0 ? 'status-chip--oversold' : 'status-chip--refunded')"
+                  disableRipple
+                >
+                  {{ product.stock < 0 ? 'Oversold (' + product.stock + ')' : '0 left' }}
                 </mat-chip>
               </li>
             }

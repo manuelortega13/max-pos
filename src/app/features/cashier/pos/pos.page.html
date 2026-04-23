@@ -69,10 +69,10 @@
           type="button"
           class="product-tile"
           [class.product-tile--low]="product.stock > 0 && product.stock <= 10"
-          [class.product-tile--out]="product.stock === 0"
+          [class.product-tile--out]="product.stock <= 0"
           [class.product-tile--active]="i === activeIndex()"
           (click)="addToCart(product)"
-          [disabled]="product.stock === 0"
+          [disabled]="product.stock === 0 && !allowNegativeStock()"
         >
           @if (product.imageUrl) {
             <img [src]="product.imageUrl" [alt]="product.name" class="product-tile__photo" />

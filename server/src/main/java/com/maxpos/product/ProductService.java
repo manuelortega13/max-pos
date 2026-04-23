@@ -199,21 +199,60 @@ public class ProductService {
         return result;
     }
 
+    /**
+     * FEFO (first-expired-first-out) deduction. Walks salable batches from
+     * earliest-expiring and takes from each until the order quantity is
+     * satisfied. When {@code allowNegative} is on, any shortfall is applied
+     * to the last touched batch (driving its quantity_remaining negative), or
+     * — if the product has no batches at all — a new oversell batch is
+     * created so the Product.stock @Formula reflects the negative count.
+     */
     @Transactional
-    public void deductStockFefo(UUID productId, int quantity) {
+    public void deductStockFefo(Product product, int quantity, boolean allowNegative) {
         if (quantity <= 0) return;
-        List<ProductBatch> salable = batches.findSalableByProductFefo(productId);
+        List<ProductBatch> salable = batches.findSalableByProductFefo(product.getId());
 
         int remaining = quantity;
+        ProductBatch lastTouched = null;
         for (ProductBatch b : salable) {
             if (remaining <= 0) break;
             int take = Math.min(b.getQuantityRemaining(), remaining);
             b.setQuantityRemaining(b.getQuantityRemaining() - take);
             remaining -= take;
+            lastTouched = b;
         }
+
         if (remaining > 0) {
-            throw new ConflictException("Insufficient stock for product " + productId);
+            if (!allowNegative) {
+                throw new ConflictException("Insufficient stock for product " + product.getId());
+            }
+            if (lastTouched != null) {
+                // Drive the last touched batch negative.
+                lastTouched.setQuantityRemaining(lastTouched.getQuantityRemaining() - remaining);
+            } else {
+                // Product has no salable batches at all — record the oversell
+                // as its own batch so Product.stock @Formula sees it.
+                ProductBatch oversell = new ProductBatch();
+                oversell.setProduct(product);
+                oversell.setQuantityReceived(remaining);
+                oversell.setQuantityRemaining(-remaining);
+                oversell.setNote("Oversold (allow-negative-stock enabled)");
+                batches.save(oversell);
+            }
         }
+    }
+
+    /**
+     * @deprecated Use {@link #deductStockFefo(Product, int, boolean)} instead.
+     * Kept for any external callers that still pass a raw product id; always
+     * rejects the overshoot (no allow-negative behavior).
+     */
+    @Deprecated
+    @Transactional
+    public void deductStockFefo(UUID productId, int quantity) {
+        Product p = products.findById(productId)
+                .orElseThrow(() -> new NotFoundException("Product not found"));
+        deductStockFefo(p, quantity, false);
     }
 
     private void apply(Product p, ProductUpsertRequest req, Category category) {

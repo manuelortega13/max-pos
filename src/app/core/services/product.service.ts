@@ -29,7 +29,9 @@ export class ProductService {
   readonly lowStockProducts = computed(() =>
     this._products().filter((p) => p.active && p.stock > 0 && p.stock <= 10),
   );
-  readonly outOfStockProducts = computed(() => this._products().filter((p) => p.stock === 0));
+  // Includes oversold products (stock < 0) so the dashboard panel surfaces
+  // them alongside exact-zero stock — both need admin attention.
+  readonly outOfStockProducts = computed(() => this._products().filter((p) => p.stock <= 0));
 
   constructor() {
     this.load();

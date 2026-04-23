@@ -24,6 +24,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { CartService } from '../../../core/services/cart.service';
 import { CategoryService } from '../../../core/services/category.service';
 import { ProductService } from '../../../core/services/product.service';
+import { SettingsService } from '../../../core/services/settings.service';
 import { Product } from '../../../core/models';
 import { MoneyPipe } from '../../../shared/pipes/currency-symbol.pipe';
 import { CheckoutDialog } from './checkout-dialog';
@@ -54,8 +55,14 @@ export class PosPage {
   private readonly productService = inject(ProductService);
   private readonly categoryService = inject(CategoryService);
   private readonly cartService = inject(CartService);
+  private readonly settingsService = inject(SettingsService);
   private readonly dialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
+
+  /** Store-level override: lets the cashier oversell past zero stock. */
+  protected readonly allowNegativeStock = computed(
+    () => this.settingsService.settings().allowNegativeStock,
+  );
 
   protected readonly categories = this.categoryService.categories;
   protected readonly activeCategory = signal<string>('all');
@@ -218,7 +225,10 @@ export class PosPage {
     // Always consult the live ProductService signal — stock may have changed
     // via realtime updates since the tile was rendered.
     const fresh = this.productService.getById(product.id) ?? product;
-    if (fresh.stock === 0) {
+    const allowNegative = this.allowNegativeStock();
+
+    // Hard-stop on zero stock unless the store has opted in to oversells.
+    if (fresh.stock === 0 && !allowNegative) {
       this.showStockLimit({ reason: 'out-of-stock', productName: fresh.name, stock: 0 });
       return;
     }
@@ -226,16 +236,18 @@ export class PosPage {
     const existing = this.cart().find((l) => l.product.id === fresh.id);
     const inCart = existing?.quantity ?? 0;
     const available = fresh.stock - inCart;
-    if (available <= 0) {
+    if (!allowNegative && available <= 0) {
       this.showStockLimit({ reason: 'at-limit', productName: fresh.name, stock: fresh.stock });
       return;
     }
 
     const requested = this.pendingQuantity() ?? 1;
-    const toAdd = Math.min(requested, available);
+    // With allowNegative on, add the full requested quantity regardless of
+    // available batches — the backend will drive batches negative.
+    const toAdd = allowNegative ? requested : Math.min(requested, available);
     this.cartService.add(fresh, toAdd);
 
-    if (toAdd < requested) {
+    if (!allowNegative && toAdd < requested) {
       this.showStockLimit({
         reason: 'partial',
         productName: fresh.name,
@@ -296,7 +308,7 @@ export class PosPage {
     const fresh = this.productService.getById(productId);
     const line = this.cart().find((l) => l.product.id === productId);
     if (!fresh || !line) return;
-    if (line.quantity >= fresh.stock) {
+    if (!this.allowNegativeStock() && line.quantity >= fresh.stock) {
       this.showStockLimit({
         reason: 'at-limit',
         productName: fresh.name,
@@ -309,6 +321,7 @@ export class PosPage {
 
   /** Per-line helper for the template: is the cart already at max stock? */
   protected isAtMaxStock(productId: string, currentQty: number): boolean {
+    if (this.allowNegativeStock()) return false;
     const fresh = this.productService.getById(productId);
     return fresh ? currentQty >= fresh.stock : false;
   }

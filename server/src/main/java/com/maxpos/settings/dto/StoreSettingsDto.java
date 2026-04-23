@@ -11,7 +11,8 @@ public record StoreSettingsDto(
         BigDecimal taxRate,
         String receiptFooter,
         String address,
-        String phone
+        String phone,
+        boolean allowNegativeStock
 ) {
     public static StoreSettingsDto from(StoreSettings s) {
         return new StoreSettingsDto(
@@ -21,7 +22,8 @@ public record StoreSettingsDto(
                 s.getTaxRate(),
                 s.getReceiptFooter(),
                 s.getAddress(),
-                s.getPhone()
+                s.getPhone(),
+                s.isAllowNegativeStock()
         );
     }
 }

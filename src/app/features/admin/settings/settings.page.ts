@@ -56,6 +56,7 @@ export class SettingsPage {
     receiptFooter: [''],
     address: [''],
     phone: [''],
+    allowNegativeStock: [false],
   });
 
   constructor() {
@@ -74,6 +75,7 @@ export class SettingsPage {
           receiptFooter: s.receiptFooter ?? '',
           address: s.address ?? '',
           phone: s.phone ?? '',
+          allowNegativeStock: s.allowNegativeStock,
         },
         { emitEvent: false },
       );
@@ -108,6 +110,7 @@ export class SettingsPage {
         receiptFooter: value.receiptFooter,
         address: value.address,
         phone: value.phone,
+        allowNegativeStock: value.allowNegativeStock,
       })
       .subscribe({
         next: () => {
@@ -132,6 +135,7 @@ export class SettingsPage {
       receiptFooter: s.receiptFooter ?? '',
       address: s.address ?? '',
       phone: s.phone ?? '',
+      allowNegativeStock: s.allowNegativeStock,
     });
     this.saveError.set(null);
   }

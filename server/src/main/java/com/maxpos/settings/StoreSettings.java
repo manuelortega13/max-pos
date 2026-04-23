@@ -33,6 +33,9 @@ public class StoreSettings {
     private String address;
     private String phone;
 
+    @Column(name = "allow_negative_stock", nullable = false)
+    private boolean allowNegativeStock = false;
+
     public Integer getId() { return id; }
     public String getStoreName() { return storeName; }
     public void setStoreName(String storeName) { this.storeName = storeName; }
@@ -48,4 +51,6 @@ public class StoreSettings {
     public void setAddress(String address) { this.address = address; }
     public String getPhone() { return phone; }
     public void setPhone(String phone) { this.phone = phone; }
+    public boolean isAllowNegativeStock() { return allowNegativeStock; }
+    public void setAllowNegativeStock(boolean allowNegativeStock) { this.allowNegativeStock = allowNegativeStock; }
 }

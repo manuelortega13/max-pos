@@ -33,6 +33,7 @@ public class SettingsService {
         s.setReceiptFooter(req.receiptFooter());
         s.setAddress(req.address());
         s.setPhone(req.phone());
+        s.setAllowNegativeStock(req.allowNegativeStock());
         return StoreSettingsDto.from(s);
     }
 }
