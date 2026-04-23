@@ -9,6 +9,7 @@ import { provideHttpClient, withFetch, withInterceptors } from '@angular/common/
 import { provideNativeDateAdapter } from '@angular/material/core';
 
 import { routes } from './app.routes';
+import { apiBaseUrlInterceptor } from './core/interceptors/api-base-url.interceptor';
 import { authInterceptor } from './core/interceptors/auth.interceptor';
 import { unauthorizedInterceptor } from './core/interceptors/unauthorized.interceptor';
 
@@ -20,9 +21,12 @@ export const appConfig: ApplicationConfig = {
     provideAnimationsAsync(),
     provideHttpClient(
       withFetch(),
-      // Order matters: auth runs first (attaches bearer), then the
-      // unauthorized handler wraps the response so it sees resulting 401s.
-      withInterceptors([authInterceptor, unauthorizedInterceptor]),
+      // Order matters. Requests flow top→bottom:
+      //   1. authInterceptor stamps the bearer on relative /api/* paths.
+      //   2. unauthorizedInterceptor wraps the response to catch 401s.
+      //   3. apiBaseUrlInterceptor rewrites /api/* to the absolute backend
+      //      URL last, so earlier passes still see the relative form.
+      withInterceptors([authInterceptor, unauthorizedInterceptor, apiBaseUrlInterceptor]),
     ),
     provideNativeDateAdapter(),
   ],

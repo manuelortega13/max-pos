@@ -1,5 +1,6 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { environment } from '../../../environments/environment';
 import { AuthService } from './auth.service';
 
 export interface RealtimeEvent {
@@ -66,7 +67,9 @@ export class RealtimeService {
     const controller = new AbortController();
     this.abortController = controller;
 
-    fetch('/api/notifications/stream', {
+    // SSE uses raw fetch (EventSource can't send Authorization headers),
+    // so the apiBaseUrl interceptor doesn't apply here — prepend manually.
+    fetch(environment.apiBaseUrl + '/api/notifications/stream', {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${token}`,
