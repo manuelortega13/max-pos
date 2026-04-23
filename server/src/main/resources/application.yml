@@ -35,7 +35,9 @@ spring:
     baseline-on-migrate: true
 
 server:
-  port: ${SERVER_PORT:8080}
+  # Render injects PORT; local dev uses SERVER_PORT (see server/.env.example).
+  # Falls back to 8080 when neither is set.
+  port: ${PORT:${SERVER_PORT:8080}}
   error:
     include-message: always
     include-binding-errors: always

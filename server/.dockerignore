@@ -1,0 +1,32 @@
+# Keep the Docker build context small and, critically, never bake secrets
+# or local tooling state into the image.
+build
+.gradle
+bin
+out
+target
+
+# Secrets and local overrides
+.env
+.env.local
+application-local.yml
+application-local.yaml
+
+# IDE / editor state
+.idea
+.vscode
+*.iml
+*.iws
+.settings
+.project
+.classpath
+
+# Git and CI
+.git
+.gitignore
+.gitattributes
+
+# Misc
+*.log
+*.md
+!README.md
