@@ -63,7 +63,8 @@
               "buildTarget": "pos-temp:build:production"
             },
             "development": {
-              "buildTarget": "pos-temp:build:development"
+              "buildTarget": "pos-temp:build:development",
+              "port": 4201
             }
           },
           "defaultConfiguration": "development"

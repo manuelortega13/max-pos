@@ -38,6 +38,14 @@
       <span class="admin-shell__toolbar-spacer"></span>
       <button
         mat-icon-button
+        aria-label="Toggle push notifications"
+        [matTooltip]="pushSubscribed() ? 'Disable push notifications' : 'Enable push notifications'"
+        (click)="togglePush()"
+      >
+        <mat-icon>{{ pushSubscribed() ? 'notifications_active' : 'notifications_off' }}</mat-icon>
+      </button>
+      <button
+        mat-icon-button
         [matMenuTriggerFor]="notifMenu"
         aria-label="Expiry notifications"
         [matBadge]="expiringCount()"

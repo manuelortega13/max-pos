@@ -35,16 +35,59 @@
 
   <mat-card appearance="outlined">
     <mat-card-content>
-      <mat-button-toggle-group
-        [value]="filter()"
-        (change)="filter.set($event.value)"
-        class="stock-filter"
-      >
-        <mat-button-toggle value="all">All</mat-button-toggle>
-        <mat-button-toggle value="ok">In stock</mat-button-toggle>
-        <mat-button-toggle value="low">Low</mat-button-toggle>
-        <mat-button-toggle value="out">Out</mat-button-toggle>
-      </mat-button-toggle-group>
+      <div class="filters">
+        <mat-form-field appearance="outline" class="filters__search" subscriptSizing="dynamic">
+          <mat-icon matPrefix>search</mat-icon>
+          <input
+            matInput
+            placeholder="Search by name, SKU, or barcode"
+            [ngModel]="search()"
+            (ngModelChange)="search.set($event)"
+          />
+          @if (search()) {
+            <button
+              matSuffix
+              mat-icon-button
+              aria-label="Clear search"
+              (click)="search.set('')"
+            >
+              <mat-icon>close</mat-icon>
+            </button>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="filters__category" subscriptSizing="dynamic">
+          <mat-label>Category</mat-label>
+          <mat-select
+            [ngModel]="categoryFilter()"
+            (ngModelChange)="categoryFilter.set($event)"
+          >
+            <mat-option value="all">All categories</mat-option>
+            @for (c of categories(); track c.id) {
+              <mat-option [value]="c.id">{{ c.name }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+
+        <mat-button-toggle-group
+          [value]="filter()"
+          (change)="filter.set($event.value)"
+          class="filters__stock"
+          hideSingleSelectionIndicator
+        >
+          <mat-button-toggle value="all">All</mat-button-toggle>
+          <mat-button-toggle value="ok">In stock</mat-button-toggle>
+          <mat-button-toggle value="low">Low</mat-button-toggle>
+          <mat-button-toggle value="out">Out</mat-button-toggle>
+        </mat-button-toggle-group>
+
+        @if (hasActiveFilters()) {
+          <button mat-stroked-button class="filters__clear" (click)="clearFilters()">
+            <mat-icon>clear</mat-icon>
+            Clear
+          </button>
+        }
+      </div>
 
       <div class="table-wrap">
         <table mat-table [dataSource]="rows()" class="w-full">
@@ -112,7 +155,13 @@
           <tr mat-header-row *matHeaderRowDef="columns"></tr>
           <tr mat-row *matRowDef="let row; columns: columns"></tr>
           <tr *matNoDataRow>
-            <td [attr.colspan]="columns.length" class="no-data">Nothing matches this filter.</td>
+            <td [attr.colspan]="columns.length" class="no-data">
+              @if (hasActiveFilters()) {
+                No products match the current filters.
+              } @else {
+                No products yet — add one from the Products page.
+              }
+            </td>
           </tr>
         </table>
       </div>

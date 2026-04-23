@@ -29,22 +29,22 @@
           name="paymentMethod"
           class="methods"
         >
-          <mat-button-toggle value="cash">
+          <mat-button-toggle value="CASH">
             <mat-icon>payments</mat-icon>
             Cash
           </mat-button-toggle>
-          <mat-button-toggle value="card">
+          <mat-button-toggle value="CARD">
             <mat-icon>credit_card</mat-icon>
             Card
           </mat-button-toggle>
-          <mat-button-toggle value="transfer">
+          <mat-button-toggle value="TRANSFER">
             <mat-icon>account_balance</mat-icon>
             Transfer
           </mat-button-toggle>
         </mat-button-toggle-group>
       </div>
 
-      @if (paymentMethod() === 'cash') {
+      @if (paymentMethod() === 'CASH') {
         <mat-form-field appearance="outline">
           <mat-label>Cash received</mat-label>
           <input
@@ -68,17 +68,25 @@
         </div>
       }
     </mat-dialog-content>
+    @if (submitError(); as message) {
+      <div class="checkout__error" role="alert">
+        <mat-icon>error_outline</mat-icon>
+        <span>{{ message }}</span>
+      </div>
+    }
     <mat-dialog-actions align="end">
-      <button type="button" mat-stroked-button mat-dialog-close>Cancel</button>
+      <button type="button" mat-stroked-button mat-dialog-close [disabled]="submitting()">
+        Cancel
+      </button>
       <button
         #confirmBtn
         type="submit"
         mat-flat-button
         color="primary"
-        [disabled]="insufficientCash()"
+        [disabled]="insufficientCash() || submitting()"
       >
-        <mat-icon>check</mat-icon>
-        Confirm payment
+        <mat-icon>{{ submitting() ? 'hourglass_empty' : 'check' }}</mat-icon>
+        {{ submitting() ? 'Processing…' : 'Confirm payment' }}
       </button>
     </mat-dialog-actions>
     </form>
@@ -92,7 +100,7 @@
         </div>
         <div>
           <h2 class="success__title">Payment received</h2>
-          <p class="success__subtitle">{{ data.total | money }} · {{ saleId }}</p>
+          <p class="success__subtitle">{{ data.total | money }} · {{ saleId() }}</p>
         </div>
       </div>
 
@@ -108,11 +116,11 @@
         <div class="receipt__meta">
           <div>
             <span class="receipt__label">Sale #</span>
-            <strong>{{ saleId }}</strong>
+            <strong>{{ saleId() }}</strong>
           </div>
           <div>
             <span class="receipt__label">Date</span>
-            <strong>{{ completedAt | date: 'short' }}</strong>
+            <strong>{{ completedAt() | date: 'short' }}</strong>
           </div>
           @if (cashier(); as user) {
             <div>
@@ -156,7 +164,7 @@
             <span>{{ data.total | money }}</span>
           </div>
 
-          @if (paymentMethod() === 'cash') {
+          @if (paymentMethod() === 'CASH') {
             <mat-divider></mat-divider>
             <div class="receipt__row">
               <span>Cash received</span>

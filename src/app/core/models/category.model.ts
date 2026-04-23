@@ -5,3 +5,10 @@ export interface Category {
   color: string;
   icon: string;
 }
+
+export interface CategoryUpsertRequest {
+  name: string;
+  description: string;
+  color: string;
+  icon: string;
+}

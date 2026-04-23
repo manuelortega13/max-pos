@@ -20,6 +20,7 @@ public record SaleDto(
         BigDecimal total,
         PaymentMethod paymentMethod,
         SaleStatus status,
+        String refundReason,
         List<SaleItemDto> items
 ) {
     public static SaleDto from(Sale s) {
@@ -34,6 +35,7 @@ public record SaleDto(
                 s.getTotal(),
                 s.getPaymentMethod(),
                 s.getStatus(),
+                s.getRefundReason(),
                 s.getItems().stream().map(SaleItemDto::from).toList()
         );
     }

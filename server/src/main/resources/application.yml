@@ -50,6 +50,10 @@ server:
 # you DO NOT commit, or via env vars.
 # ────────────────────────────────────────────────────────────────
 maxpos:
+  push:
+    public-key: ${VAPID_PUBLIC_KEY:}
+    private-key: ${VAPID_PRIVATE_KEY:}
+    subject: ${VAPID_SUBJECT:mailto:admin@maxpos.com}
   jwt:
     # Must be at least 256 bits (32 chars) of random entropy. Generate with:
     #   openssl rand -base64 48

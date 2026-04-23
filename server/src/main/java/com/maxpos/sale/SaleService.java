@@ -2,6 +2,8 @@ package com.maxpos.sale;
 
 import com.maxpos.common.ConflictException;
 import com.maxpos.common.NotFoundException;
+import com.maxpos.notification.NotificationEvent;
+import com.maxpos.notification.NotificationPublisher;
 import com.maxpos.product.Product;
 import com.maxpos.product.ProductBatch;
 import com.maxpos.product.ProductBatchRepository;
@@ -13,6 +15,7 @@ import com.maxpos.settings.StoreSettings;
 import com.maxpos.settings.StoreSettingsRepository;
 import com.maxpos.user.User;
 import com.maxpos.user.UserRepository;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,8 +24,10 @@ import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -36,19 +41,22 @@ public class SaleService {
     private final ProductService productService;
     private final UserRepository users;
     private final StoreSettingsRepository settings;
+    private final NotificationPublisher notifications;
 
     public SaleService(SaleRepository sales,
                        ProductRepository products,
                        ProductBatchRepository batches,
                        ProductService productService,
                        UserRepository users,
-                       StoreSettingsRepository settings) {
+                       StoreSettingsRepository settings,
+                       NotificationPublisher notifications) {
         this.sales = sales;
         this.products = products;
         this.batches = batches;
         this.productService = productService;
         this.users = users;
         this.settings = settings;
+        this.notifications = notifications;
     }
 
     public List<SaleDto> list() {
@@ -126,17 +134,32 @@ public class SaleService {
         sale.setTax(tax);
         sale.setTotal(total);
 
-        return SaleDto.from(sales.save(sale));
+        Sale saved = sales.save(sale);
+        notifications.publishInventoryChanged();
+        return SaleDto.from(saved);
     }
 
+    /**
+     * Admins can refund any sale; cashiers can only refund their own. Ownership
+     * is checked server-side even though the UI filters by cashier, so a
+     * hand-crafted request can't refund someone else's transaction.
+     *
+     * The optional {@code reason} is persisted on the sale and included in the
+     * admin notification so managers can see why something was reversed.
+     */
     @Transactional
-    public SaleDto refund(UUID id) {
+    public SaleDto refund(UUID id, UUID requesterId, boolean isAdmin, String reason) {
         Sale sale = sales.findById(id)
                 .orElseThrow(() -> new NotFoundException("Sale not found"));
+        if (!isAdmin && !sale.getCashier().getId().equals(requesterId)) {
+            throw new AccessDeniedException("Cannot refund another cashier's sale");
+        }
         if (sale.getStatus() == SaleStatus.REFUNDED) {
             throw new ConflictException("Sale already refunded");
         }
         sale.setStatus(SaleStatus.REFUNDED);
+        String trimmed = reason == null ? null : reason.trim();
+        sale.setRefundReason(trimmed == null || trimmed.isEmpty() ? null : trimmed);
 
         // Replenish inventory by creating a "refund" batch for each line item.
         // We don't track which original batch the units came from (sale_items
@@ -150,7 +173,44 @@ public class SaleService {
             refundBatch.setNote("Refund from sale " + sale.getReference());
             batches.save(refundBatch);
         }
+
+        User requester = users.findById(requesterId).orElse(null);
+        publishRefundNotification(sale, requester);
+        notifications.publishInventoryChanged();
         return SaleDto.from(sale);
+    }
+
+    private void publishRefundNotification(Sale sale, User requester) {
+        String requesterName = requester != null ? requester.getName() : "Someone";
+        String originalCashier = sale.getCashierName();
+        boolean selfRefund = requester != null && requester.getId().equals(sale.getCashier().getId());
+
+        String subject = selfRefund
+                ? String.format(Locale.ROOT, "%s refunded their sale %s", requesterName, sale.getReference())
+                : String.format(Locale.ROOT, "%s refunded %s's sale %s",
+                        requesterName, originalCashier, sale.getReference());
+        String reason = sale.getRefundReason();
+        String body = reason == null
+                ? String.format(Locale.ROOT, "%s (%s)", subject, sale.getTotal().toPlainString())
+                : String.format(Locale.ROOT, "%s (%s) — %s", subject, sale.getTotal().toPlainString(), reason);
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("saleId", sale.getId());
+        data.put("reference", sale.getReference());
+        data.put("cashierId", sale.getCashier().getId());
+        data.put("cashierName", originalCashier);
+        data.put("refundedBy", requesterName);
+        data.put("total", sale.getTotal());
+        data.put("itemCount", sale.getItems().size());
+        if (reason != null) data.put("reason", reason);
+
+        notifications.publishToAdmins(NotificationEvent.of(
+                "sale.refunded",
+                "Sale refunded",
+                body,
+                data,
+                "/admin/sales"
+        ));
     }
 
     private String generateReference() {

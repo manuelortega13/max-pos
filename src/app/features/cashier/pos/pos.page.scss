@@ -248,6 +248,14 @@
 
   &--low { border-color: #f59e0b; }
   &--out { border-color: #ef4444; }
+
+  &--active {
+    border-color: var(--mat-sys-primary);
+    box-shadow:
+      0 0 0 2px var(--mat-sys-primary),
+      var(--mat-sys-level2);
+    transform: translateY(-2px);
+  }
 }
 
 .cart-list {

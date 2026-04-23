@@ -1,5 +1,12 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
@@ -13,6 +20,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { Product, ProductUpsertRequest } from '../../../core/models';
 import { CategoryService } from '../../../core/services/category.service';
 import { ProductService } from '../../../core/services/product.service';
+import { SettingsService } from '../../../core/services/settings.service';
 import { fileToResizedDataUrl } from '../../../shared/utils/image';
 
 export type ProductFormMode = 'create' | 'edit' | 'duplicate';
@@ -44,12 +52,16 @@ export class ProductFormDialog {
   private readonly fb = inject(FormBuilder);
   private readonly productService = inject(ProductService);
   private readonly categoryService = inject(CategoryService);
+  private readonly settingsService = inject(SettingsService);
   private readonly dialogRef = inject(MatDialogRef<ProductFormDialog>);
   private readonly snackBar = inject(MatSnackBar);
   private readonly destroyRef = inject(DestroyRef);
   protected readonly data = inject<ProductFormData>(MAT_DIALOG_DATA);
 
   protected readonly categories = this.categoryService.categories;
+  protected readonly currencySymbol = computed(
+    () => this.settingsService.settings().currencySymbol,
+  );
   protected readonly submitting = signal(false);
   protected readonly processingImage = signal(false);
   protected readonly error = signal<string | null>(null);

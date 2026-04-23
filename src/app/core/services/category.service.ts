@@ -1,6 +1,7 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, computed, inject, signal } from '@angular/core';
-import { Category } from '../models';
+import { Observable, tap } from 'rxjs';
+import { Category, CategoryUpsertRequest } from '../models';
 import { ProductService } from './product.service';
 
 @Injectable({ providedIn: 'root' })
@@ -48,11 +49,32 @@ export class CategoryService {
     return this._categories().find((c) => c.id === id);
   }
 
+  create(request: CategoryUpsertRequest): Observable<Category> {
+    return this.http.post<Category>('/api/categories', request).pipe(
+      tap((category) => this._categories.update((list) => [...list, category])),
+    );
+  }
+
+  update(id: string, request: CategoryUpsertRequest): Observable<Category> {
+    return this.http.put<Category>(`/api/categories/${id}`, request).pipe(
+      tap((updated) =>
+        this._categories.update((list) => list.map((c) => (c.id === id ? updated : c))),
+      ),
+    );
+  }
+
+  delete(id: string): Observable<void> {
+    return this.http.delete<void>(`/api/categories/${id}`).pipe(
+      tap(() => this._categories.update((list) => list.filter((c) => c.id !== id))),
+    );
+  }
+
   private describe(err: HttpErrorResponse): string {
     if (err.status === 0) return 'Cannot reach the server.';
-    const apiMessage = (err.error && typeof err.error === 'object' && 'message' in err.error)
-      ? String((err.error as { message?: unknown }).message)
-      : null;
+    const apiMessage =
+      err.error && typeof err.error === 'object' && 'message' in err.error
+        ? String((err.error as { message?: unknown }).message)
+        : null;
     return apiMessage ?? `Request failed (${err.status})`;
   }
 }

@@ -78,6 +78,10 @@ Services in `core/services/` own all state. Components inject them and read sign
 
 Prettier config lives in `package.json`: `printWidth: 100`, `singleQuote: true`, HTML uses the `angular` parser. There's no Prettier CLI script — rely on editor integration or `npx prettier`.
 
+## Working with this repo
+
+- **Explain changes briefly after every edit.** After making code changes, write a short summary (bullet list is fine) that covers: which file(s) changed, what the change does, and *why* — enough context for a reviewer to understand the diff without reading every line. Do this in the chat reply, not in code comments. Keep it tight: match the size of the explanation to the size of the change (one-line fix → one sentence; multi-file feature → a few grouped bullets).
+
 ## Git conventions
 
 - **Do not add a `Co-Authored-By: Claude …` trailer to commit messages.** Commits should be authored solely by the human contributor.

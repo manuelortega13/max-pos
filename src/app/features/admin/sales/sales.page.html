@@ -10,6 +10,26 @@
     </button>
   </header>
 
+  @if (loading()) {
+    <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+  }
+
+  @if (error(); as message) {
+    <mat-card appearance="outlined" class="error-card">
+      <mat-card-content class="error-card__content">
+        <mat-icon class="error-card__icon">error_outline</mat-icon>
+        <div class="error-card__body">
+          <strong>Couldn't load sales</strong>
+          <small>{{ message }}</small>
+        </div>
+        <button mat-stroked-button (click)="retry()">
+          <mat-icon>refresh</mat-icon>
+          Retry
+        </button>
+      </mat-card-content>
+    </mat-card>
+  }
+
   <mat-card appearance="outlined">
     <mat-card-content>
       <div class="filters">
@@ -28,9 +48,9 @@
           <mat-label>Status</mat-label>
           <mat-select [ngModel]="status()" (ngModelChange)="status.set($event)">
             <mat-option value="all">All statuses</mat-option>
-            <mat-option value="completed">Completed</mat-option>
-            <mat-option value="pending">Pending</mat-option>
-            <mat-option value="refunded">Refunded</mat-option>
+            <mat-option value="COMPLETED">Completed</mat-option>
+            <mat-option value="PENDING">Pending</mat-option>
+            <mat-option value="REFUNDED">Refunded</mat-option>
           </mat-select>
         </mat-form-field>
 
@@ -49,7 +69,7 @@
         <table mat-table [dataSource]="rows()" class="w-full">
           <ng-container matColumnDef="id">
             <th mat-header-cell *matHeaderCellDef>Sale #</th>
-            <td mat-cell *matCellDef="let s"><strong>{{ s.id }}</strong></td>
+            <td mat-cell *matCellDef="let s"><strong>{{ s.reference }}</strong></td>
           </ng-container>
           <ng-container matColumnDef="date">
             <th mat-header-cell *matHeaderCellDef>Date</th>
@@ -74,7 +94,7 @@
           <ng-container matColumnDef="status">
             <th mat-header-cell *matHeaderCellDef>Status</th>
             <td mat-cell *matCellDef="let s">
-              <mat-chip [class]="'status-chip status-chip--' + s.status" disableRipple>
+              <mat-chip [class]="'status-chip status-chip--' + s.status.toLowerCase()" disableRipple>
                 {{ s.status | titlecase }}
               </mat-chip>
             </td>
@@ -86,9 +106,14 @@
                 <mat-icon>more_vert</mat-icon>
               </button>
               <mat-menu #menu="matMenu">
-                <button mat-menu-item><mat-icon>visibility</mat-icon><span>View receipt</span></button>
-                <button mat-menu-item><mat-icon>undo</mat-icon><span>Refund</span></button>
-                <button mat-menu-item><mat-icon>print</mat-icon><span>Print</span></button>
+                <button
+                  mat-menu-item
+                  [disabled]="s.status === 'REFUNDED'"
+                  (click)="confirmRefund(s)"
+                >
+                  <mat-icon>undo</mat-icon>
+                  <span>Refund</span>
+                </button>
               </mat-menu>
             </td>
           </ng-container>

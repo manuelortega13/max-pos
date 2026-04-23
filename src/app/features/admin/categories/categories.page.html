@@ -4,11 +4,45 @@
       <h1 class="page__title">Categories</h1>
       <p class="page__subtitle">Group your products</p>
     </div>
-    <button mat-flat-button color="primary">
+    <button mat-flat-button color="primary" (click)="openCreate()">
       <mat-icon>add</mat-icon>
       New category
     </button>
   </header>
+
+  @if (loading()) {
+    <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+  }
+
+  @if (error(); as message) {
+    <mat-card appearance="outlined" class="error-card">
+      <mat-card-content class="error-card__content">
+        <mat-icon class="error-card__icon">error_outline</mat-icon>
+        <div class="error-card__body">
+          <strong>Couldn't load categories</strong>
+          <small>{{ message }}</small>
+        </div>
+        <button mat-stroked-button (click)="retry()">
+          <mat-icon>refresh</mat-icon>
+          Retry
+        </button>
+      </mat-card-content>
+    </mat-card>
+  }
+
+  @if (!loading() && categories().length === 0) {
+    <mat-card appearance="outlined" class="empty-card">
+      <mat-card-content class="empty-card__content">
+        <mat-icon>category</mat-icon>
+        <strong>No categories yet</strong>
+        <p>Create one to start grouping your products.</p>
+        <button mat-flat-button color="primary" (click)="openCreate()">
+          <mat-icon>add</mat-icon>
+          New category
+        </button>
+      </mat-card-content>
+    </mat-card>
+  }
 
   <div class="category-grid">
     @for (category of categories(); track category.id) {
@@ -29,8 +63,18 @@
             <mat-icon>more_vert</mat-icon>
           </button>
           <mat-menu #menu="matMenu">
-            <button mat-menu-item><mat-icon>edit</mat-icon><span>Edit</span></button>
-            <button mat-menu-item><mat-icon>delete</mat-icon><span>Delete</span></button>
+            <button mat-menu-item (click)="openEdit(category)">
+              <mat-icon>edit</mat-icon>
+              <span>Edit</span>
+            </button>
+            <button
+              mat-menu-item
+              [disabled]="category.productCount > 0"
+              (click)="confirmDelete(category)"
+            >
+              <mat-icon>delete</mat-icon>
+              <span>Delete</span>
+            </button>
           </mat-menu>
         </mat-card-actions>
       </mat-card>

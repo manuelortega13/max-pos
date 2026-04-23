@@ -1,5 +1,6 @@
 package com.maxpos.config;
 
+import com.maxpos.notification.push.PushProperties;
 import com.maxpos.security.JwtAuthenticationFilter;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -24,7 +25,7 @@ import java.util.List;
 
 @Configuration
 @EnableMethodSecurity
-@EnableConfigurationProperties(MaxPosProperties.class)
+@EnableConfigurationProperties({ MaxPosProperties.class, PushProperties.class })
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtFilter;
@@ -44,6 +45,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
                         .requestMatchers(HttpMethod.GET, "/actuator/health").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/push/vapid-public-key").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .anyRequest().authenticated()
                 )

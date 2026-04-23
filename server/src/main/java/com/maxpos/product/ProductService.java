@@ -4,15 +4,20 @@ import com.maxpos.category.Category;
 import com.maxpos.category.CategoryRepository;
 import com.maxpos.common.ConflictException;
 import com.maxpos.common.NotFoundException;
+import com.maxpos.notification.NotificationPublisher;
 import com.maxpos.product.dto.ExpiringBatchDto;
 import com.maxpos.product.dto.ProductBatchDto;
 import com.maxpos.product.dto.ProductDto;
 import com.maxpos.product.dto.ProductUpsertRequest;
 import com.maxpos.product.dto.RestockRequest;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -31,13 +36,31 @@ public class ProductService {
     private final ProductRepository products;
     private final ProductBatchRepository batches;
     private final CategoryRepository categories;
+    private final NotificationPublisher notifications;
+
+    @PersistenceContext
+    private EntityManager em;
 
     public ProductService(ProductRepository products,
                           ProductBatchRepository batches,
-                          CategoryRepository categories) {
+                          CategoryRepository categories,
+                          NotificationPublisher notifications) {
         this.products = products;
         this.batches = batches;
         this.categories = categories;
+        this.notifications = notifications;
+    }
+
+    /**
+     * Flush pending writes and re-read the product from the DB so its
+     * @Formula-backed `stock` reflects batches we just inserted/updated.
+     * Without this, Hibernate returns the cached entity from L1 with the
+     * stale computed value.
+     */
+    private Product refreshed(Product p) {
+        em.flush();
+        em.refresh(p);
+        return p;
     }
 
     public List<ProductDto> list(Optional<UUID> categoryId, Optional<Boolean> activeOnly) {
@@ -84,7 +107,9 @@ public class ProductService {
             batches.save(opening);
         }
 
-        return ProductDto.from(products.findById(saved.getId()).orElseThrow());
+        ProductDto result = ProductDto.from(refreshed(saved));
+        notifications.publishInventoryChanged();
+        return result;
     }
 
     @Transactional
@@ -94,6 +119,7 @@ public class ProductService {
         Category category = categories.findById(req.categoryId())
                 .orElseThrow(() -> new NotFoundException("Category not found"));
         apply(p, req, category);
+        notifications.publishInventoryChanged();
         return ProductDto.from(p);
     }
 
@@ -101,6 +127,7 @@ public class ProductService {
     public void delete(UUID id) {
         if (!products.existsById(id)) throw new NotFoundException("Product not found");
         products.deleteById(id);
+        notifications.publishInventoryChanged();
     }
 
     @Transactional
@@ -120,7 +147,27 @@ public class ProductService {
         batch.setNote(req.note());
         batches.save(batch);
 
-        return ProductDto.from(products.findById(id).orElseThrow());
+        // Option B: restock's optional cost overrides the product's stored
+        // cost going forward (batch's cost_per_unit still holds history).
+        // Selling price is re-scaled to preserve the existing markup ratio so
+        // margins stay stable when supplier prices drift.
+        if (req.costPerUnit() != null) {
+            BigDecimal oldCost = p.getCost();
+            BigDecimal oldPrice = p.getPrice();
+            BigDecimal newCost = req.costPerUnit();
+
+            p.setCost(newCost);
+
+            if (oldCost.signum() > 0 && oldPrice.signum() > 0) {
+                BigDecimal ratio = oldPrice.divide(oldCost, 6, RoundingMode.HALF_UP);
+                BigDecimal newPrice = newCost.multiply(ratio).setScale(2, RoundingMode.HALF_UP);
+                p.setPrice(newPrice);
+            }
+        }
+
+        ProductDto result = ProductDto.from(refreshed(p));
+        notifications.publishInventoryChanged();
+        return result;
     }
 
     public List<ProductBatchDto> listBatches(UUID productId) {
@@ -147,7 +194,9 @@ public class ProductService {
             throw new ConflictException("Batch already written off");
         }
         b.setWrittenOffAt(Instant.now());
-        return ProductBatchDto.from(b);
+        ProductBatchDto result = ProductBatchDto.from(b);
+        notifications.publishInventoryChanged();
+        return result;
     }
 
     @Transactional

@@ -41,8 +41,30 @@
   }
 }
 
-.stock-filter {
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
   margin-bottom: 1rem;
+
+  &__search {
+    flex: 1 1 260px;
+    max-width: 360px;
+  }
+
+  &__category {
+    flex: 0 1 220px;
+  }
+
+  &__stock {
+    flex: 0 0 auto;
+  }
+
+  &__clear {
+    margin-left: auto;
+    height: 40px;
+  }
 }
 
 .table-wrap { overflow-x: auto; }

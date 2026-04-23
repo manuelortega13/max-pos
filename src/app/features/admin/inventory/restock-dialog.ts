@@ -52,7 +52,10 @@ export class RestockDialog {
 
   protected readonly quantity = signal<number | null>(1);
   protected readonly expiryDate = signal<Date | null>(null);
-  protected readonly costPerUnit = signal<number | null>(null);
+  // Pre-fill with the product's current cost; admin only changes it when the
+  // supplier price drifted. Option B (cost overrides product cost) is wired
+  // on the backend, so this is the one field to update if the cost changed.
+  protected readonly costPerUnit = signal<number | null>(this.data.product.cost);
   protected readonly note = signal<string>('');
 
   protected readonly newStock = computed(

@@ -47,6 +47,9 @@ public class Sale {
     @Column(nullable = false, length = 16)
     private SaleStatus status;
 
+    @Column(name = "refund_reason", columnDefinition = "TEXT")
+    private String refundReason;
+
     @OneToMany(mappedBy = "sale", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<SaleItem> items = new ArrayList<>();
 
@@ -74,5 +77,7 @@ public class Sale {
     public void setPaymentMethod(PaymentMethod paymentMethod) { this.paymentMethod = paymentMethod; }
     public SaleStatus getStatus() { return status; }
     public void setStatus(SaleStatus status) { this.status = status; }
+    public String getRefundReason() { return refundReason; }
+    public void setRefundReason(String refundReason) { this.refundReason = refundReason; }
     public List<SaleItem> getItems() { return items; }
 }

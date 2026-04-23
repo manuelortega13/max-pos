@@ -1,5 +1,5 @@
-export type PaymentMethod = 'cash' | 'card' | 'transfer';
-export type SaleStatus = 'completed' | 'refunded' | 'pending';
+export type PaymentMethod = 'CASH' | 'CARD' | 'TRANSFER';
+export type SaleStatus = 'COMPLETED' | 'REFUNDED' | 'PENDING';
 
 export interface SaleItem {
   readonly productId: string;
@@ -11,13 +11,20 @@ export interface SaleItem {
 
 export interface Sale {
   readonly id: string;
+  readonly reference: string;
   readonly date: string;
-  readonly items: readonly SaleItem[];
+  readonly cashierId: string;
+  readonly cashierName: string;
   readonly subtotal: number;
   readonly tax: number;
   readonly total: number;
-  readonly cashierId: string;
-  readonly cashierName: string;
   readonly paymentMethod: PaymentMethod;
   readonly status: SaleStatus;
+  readonly refundReason: string | null;
+  readonly items: readonly SaleItem[];
+}
+
+export interface CreateSaleRequest {
+  readonly items: readonly { productId: string; quantity: number }[];
+  readonly paymentMethod: PaymentMethod;
 }

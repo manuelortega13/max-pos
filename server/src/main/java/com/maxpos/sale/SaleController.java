@@ -46,8 +46,12 @@ public class SaleController {
     }
 
     @PostMapping("/{id}/refund")
-    @PreAuthorize("hasRole('ADMIN')")
-    public SaleDto refund(@PathVariable UUID id) {
-        return service.refund(id);
+    public SaleDto refund(@PathVariable UUID id,
+                          @RequestBody(required = false) RefundRequest body,
+                          @AuthenticationPrincipal AppUserDetails principal) {
+        String reason = body == null ? null : body.reason();
+        return service.refund(id, principal.getId(), principal.isAdmin(), reason);
     }
+
+    public record RefundRequest(String reason) {}
 }

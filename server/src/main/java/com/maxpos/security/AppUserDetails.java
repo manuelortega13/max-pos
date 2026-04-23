@@ -1,6 +1,7 @@
 package com.maxpos.security;
 
 import com.maxpos.user.User;
+import com.maxpos.user.UserRole;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -13,6 +14,7 @@ public class AppUserDetails implements UserDetails {
 
     private final UUID id;
     private final String email;
+    private final UserRole role;
     private final String passwordHash;
     private final boolean active;
     private final List<GrantedAuthority> authorities;
@@ -20,12 +22,19 @@ public class AppUserDetails implements UserDetails {
     public AppUserDetails(User user) {
         this.id = user.getId();
         this.email = user.getEmail();
+        this.role = user.getRole();
         this.passwordHash = user.getPasswordHash();
         this.active = user.isActive();
         this.authorities = List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole().name()));
     }
 
     public UUID getId() { return id; }
+
+    public UserRole getRole() { return role; }
+
+    public boolean isAdmin() {
+        return role == UserRole.ADMIN;
+    }
 
     @Override public Collection<? extends GrantedAuthority> getAuthorities() { return authorities; }
     @Override public String getPassword() { return passwordHash; }

@@ -1,7 +1,8 @@
-import { Injectable, computed, inject, signal } from '@angular/core';
+import { Injectable, computed, effect, inject, signal } from '@angular/core';
 import { ExpiringBatch } from '../models';
 import { AuthService } from './auth.service';
 import { ProductService } from './product.service';
+import { RealtimeService } from './realtime.service';
 
 const POLL_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 const WITHIN_DAYS = 30;
@@ -15,6 +16,7 @@ const WITHIN_DAYS = 30;
 export class NotificationService {
   private readonly productService = inject(ProductService);
   private readonly authService = inject(AuthService);
+  private readonly realtime = inject(RealtimeService);
 
   private readonly _expiring = signal<ExpiringBatch[]>([]);
   private readonly _loaded = signal<boolean>(false);
@@ -26,6 +28,18 @@ export class NotificationService {
   readonly alreadyExpiredCount = computed(
     () => this._expiring().filter((b) => b.daysUntilExpiry < 0).length,
   );
+
+  constructor() {
+    // Pair the 5-minute poller with realtime sync — any inventory mutation
+    // (restock, write-off, sale) invalidates the expiring cache, so refresh
+    // immediately instead of waiting for the next tick.
+    effect(() => {
+      const event = this.realtime.latestEvent();
+      if (event && event.type === 'inventory.changed' && this._loaded()) {
+        this.refresh();
+      }
+    });
+  }
 
   /** Kick off polling. Safe to call repeatedly — de-dupes itself. */
   start(): void {

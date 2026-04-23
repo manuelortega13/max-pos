@@ -24,9 +24,6 @@ export const appConfig: ApplicationConfig = {
       // unauthorized handler wraps the response so it sees resulting 401s.
       withInterceptors([authInterceptor, unauthorizedInterceptor]),
     ),
-    // DateAdapter is required by mat-datepicker; its calendar opens in a CDK
-    // overlay that resolves providers from the root injector, so this has to
-    // live here (importing MatNativeDateModule inside a component isn't enough).
     provideNativeDateAdapter(),
   ],
 };

@@ -17,9 +17,11 @@ import { MatDividerModule } from '@angular/material/divider';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
-import { CartLine, PaymentMethod } from '../../../core/models';
+import { HttpErrorResponse } from '@angular/common/http';
+import { CartLine, PaymentMethod, Sale } from '../../../core/models';
 import { SettingsService } from '../../../core/services/settings.service';
-import { UserService } from '../../../core/services/user.service';
+import { AuthService } from '../../../core/services/auth.service';
+import { SaleService } from '../../../core/services/sale.service';
 import { MoneyPipe } from '../../../shared/pipes/currency-symbol.pipe';
 
 export interface CheckoutData {
@@ -50,16 +52,21 @@ type Step = 'payment' | 'receipt';
   styleUrl: './checkout-dialog.scss',
 })
 export class CheckoutDialog {
-  private readonly dialogRef = inject(MatDialogRef<CheckoutDialog>);
+  private readonly dialogRef = inject(MatDialogRef<CheckoutDialog, boolean>);
   private readonly settingsService = inject(SettingsService);
-  private readonly userService = inject(UserService);
+  private readonly authService = inject(AuthService);
+  private readonly saleService = inject(SaleService);
   protected readonly data = inject<CheckoutData>(MAT_DIALOG_DATA);
 
   protected readonly settings = this.settingsService.settings;
-  protected readonly cashier = this.userService.currentUser;
+  protected readonly cashier = this.authService.user;
 
   protected readonly step = signal<Step>('payment');
-  protected readonly paymentMethod = signal<PaymentMethod>('cash');
+  protected readonly paymentMethod = signal<PaymentMethod>('CASH');
+  protected readonly submitting = signal<boolean>(false);
+  protected readonly submitError = signal<string | null>(null);
+  /** The persisted sale — populated once the backend accepts the POST. */
+  protected readonly persistedSale = signal<Sale | null>(null);
   protected readonly cashReceivedText = signal<string>(this.data.total.toFixed(2));
   protected readonly cashReceived = computed(() => {
     const parsed = parseFloat(this.cashReceivedText());
@@ -71,7 +78,7 @@ export class CheckoutDialog {
   );
 
   protected readonly insufficientCash = computed(() => {
-    if (this.paymentMethod() !== 'cash') return false;
+    if (this.paymentMethod() !== 'CASH') return false;
     // Round both sides to 2 decimals to avoid floating-point drift
     // (e.g. 0.1 + 0.2 === 0.30000000000000004), then compare as numbers.
     const received = Math.round(this.cashReceived() * 100);
@@ -83,10 +90,12 @@ export class CheckoutDialog {
     this.cashReceivedText.set(this.cashReceived().toFixed(2));
   }
 
-  protected readonly saleId = `S-${new Date().getFullYear()}-${String(
-    Math.floor(Math.random() * 99999),
-  ).padStart(5, '0')}`;
-  protected readonly completedAt = new Date();
+  /** Receipt details — prefer the backend's canonical values, fall back to
+   *  local approximations if the dialog is shown pre-persist (shouldn't happen). */
+  protected readonly saleId = computed(() => this.persistedSale()?.reference ?? '—');
+  protected readonly completedAt = computed(
+    () => (this.persistedSale()?.date ? new Date(this.persistedSale()!.date) : new Date()),
+  );
 
   private readonly cashInputRef = viewChild('cashInput', { read: ElementRef });
   private readonly confirmBtnRef = viewChild('confirmBtn', { read: ElementRef });
@@ -99,7 +108,7 @@ export class CheckoutDialog {
       if (step === 'payment') {
         const method = this.paymentMethod();
         setTimeout(() => {
-          if (method === 'cash') {
+          if (method === 'CASH') {
             const input = this.cashInputRef()?.nativeElement as HTMLInputElement | undefined;
             if (!input) return;
             input.focus();
@@ -118,12 +127,43 @@ export class CheckoutDialog {
   }
 
   protected confirm(): void {
-    if (this.insufficientCash()) return;
-    this.dialogRef.disableClose = true;
-    this.step.set('receipt');
+    if (this.insufficientCash() || this.submitting()) return;
+
+    this.submitting.set(true);
+    this.submitError.set(null);
+
+    this.saleService
+      .create({
+        items: this.data.lines.map((l) => ({
+          productId: l.product.id,
+          quantity: l.quantity,
+        })),
+        paymentMethod: this.paymentMethod(),
+      })
+      .subscribe({
+        next: (sale) => {
+          this.submitting.set(false);
+          this.persistedSale.set(sale);
+          this.dialogRef.disableClose = true;
+          this.step.set('receipt');
+        },
+        error: (err: HttpErrorResponse) => {
+          this.submitting.set(false);
+          this.submitError.set(this.describeError(err));
+        },
+      });
   }
 
   protected done(): void {
     this.dialogRef.close(true);
+  }
+
+  private describeError(err: HttpErrorResponse): string {
+    if (err.status === 0) return 'Cannot reach the server.';
+    const apiMessage =
+      err.error && typeof err.error === 'object' && 'message' in err.error
+        ? String((err.error as { message?: unknown }).message)
+        : null;
+    return apiMessage ?? 'Could not complete sale. Please try again.';
   }
 }

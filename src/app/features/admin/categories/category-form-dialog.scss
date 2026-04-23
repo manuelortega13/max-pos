@@ -1,0 +1,143 @@
+.cat-form__title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+}
+
+.cat-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 480px;
+  padding-top: 0.5rem;
+}
+
+.cat-form__preview {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  background: var(--mat-sys-surface-container-low);
+  border-radius: 0.75rem;
+
+  &-avatar {
+    width: 3rem;
+    height: 3rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    flex-shrink: 0;
+
+    mat-icon {
+      color: white;
+    }
+  }
+
+  &-text {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.2;
+
+    strong { font-size: 1rem; }
+    small { color: var(--mat-sys-on-surface-variant); font-size: 0.75rem; }
+  }
+}
+
+.cat-form__field {
+  width: 100%;
+}
+
+.cat-form__group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.cat-form__label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.cat-form__colors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.cat-form__color {
+  all: unset;
+  cursor: pointer;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+
+  &:hover { transform: scale(1.1); }
+
+  &--selected {
+    border-color: var(--mat-sys-on-surface);
+  }
+
+  mat-icon {
+    color: white;
+    font-size: 1rem;
+    width: 1rem;
+    height: 1rem;
+  }
+}
+
+.cat-form__icons {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(2.5rem, 1fr));
+  gap: 0.35rem;
+  max-width: 100%;
+}
+
+.cat-form__icon {
+  all: unset;
+  cursor: pointer;
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: 0.5rem;
+  transition: background 0.15s ease, border-color 0.15s ease;
+  color: var(--mat-sys-on-surface-variant);
+
+  &:hover {
+    background: var(--mat-sys-surface-container);
+    color: var(--mat-sys-on-surface);
+  }
+
+  &--selected {
+    background: var(--mat-sys-primary-container);
+    border-color: var(--mat-sys-primary);
+    color: var(--mat-sys-on-primary-container);
+  }
+
+  mat-icon { font-size: 1.25rem; width: 1.25rem; height: 1.25rem; }
+}
+
+.cat-form__hex {
+  max-width: 180px;
+}
+
+.cat-form__error {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--mat-sys-error);
+  font-size: 0.9rem;
+}

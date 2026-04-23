@@ -1,10 +1,13 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  ElementRef,
   HostListener,
   computed,
+  effect,
   inject,
   signal,
+  viewChild,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -25,6 +28,7 @@ import { Product } from '../../../core/models';
 import { MoneyPipe } from '../../../shared/pipes/currency-symbol.pipe';
 import { CheckoutDialog } from './checkout-dialog';
 import { QuantityDialog } from './quantity-dialog';
+import { StockLimitDialog, StockLimitDialogData } from './stock-limit-dialog';
 
 @Component({
   selector: 'app-pos-page',
@@ -57,6 +61,11 @@ export class PosPage {
   protected readonly activeCategory = signal<string>('all');
   protected readonly search = signal('');
   protected readonly pendingQuantity = signal<number | null>(null);
+  /** Index into filteredProducts() of the tile currently highlighted via keyboard. */
+  protected readonly activeIndex = signal<number>(-1);
+  private readonly gridRef = viewChild<ElementRef<HTMLElement>>('productGrid');
+  private readonly searchInputRef = viewChild<ElementRef<HTMLInputElement>>('searchInput');
+  private readonly catGroupRef = viewChild('catGroup', { read: ElementRef });
 
   protected readonly filteredProducts = computed(() => {
     const term = this.search().trim().toLowerCase();
@@ -80,16 +89,181 @@ export class PosPage {
   protected readonly itemCount = this.cartService.itemCount;
   protected readonly isEmpty = this.cartService.isEmpty;
 
-  protected addToCart(product: Product): void {
-    if (product.stock === 0) {
-      this.snackBar.open(`${product.name} is out of stock`, 'Dismiss', { duration: 2000 });
+  constructor() {
+    // Whenever the filtered list changes (cashier types a new search term,
+    // clicks a different category, or the product list reloads from the
+    // backend), snap the highlighted tile back to index 0 so the next Enter
+    // always lands on the first match. -1 when there are no results.
+    effect(() => {
+      const count = this.filteredProducts().length;
+      this.activeIndex.set(count > 0 ? 0 : -1);
+    });
+
+    // Capture-phase keydown on the category toggle group so we run *before*
+    // Material's own host listener advances the toggle on ArrowDown/ArrowUp.
+    // stopImmediatePropagation prevents the key from reaching the Material
+    // FocusKeyManager at all — only Left/Right remain as category-switchers.
+    effect((onCleanup) => {
+      const group = this.catGroupRef()?.nativeElement as HTMLElement | undefined;
+      if (!group) return;
+      const handler = (event: KeyboardEvent) => {
+        if (event.key === 'ArrowDown') {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          this.jumpToGrid(event);
+        } else if (event.key === 'ArrowUp') {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          this.jumpToSearch(event);
+        }
+      };
+      group.addEventListener('keydown', handler, true);
+      onCleanup(() => group.removeEventListener('keydown', handler, true));
+    });
+  }
+
+  /**
+   * Keyboard navigation from the search input:
+   *   ←/→     — previous / next tile
+   *   ↑/↓     — move one grid row up/down (column count detected from DOM)
+   *   Enter   — add the highlighted product (fallback: first visible)
+   * Other keys (typing, shortcuts) pass through unchanged.
+   */
+  protected onSearchKeydown(event: KeyboardEvent): void {
+    const products = this.filteredProducts();
+    if (products.length === 0) return;
+
+    const key = event.key;
+    if (key === 'Enter') {
+      // Ctrl/Cmd+Enter is the Complete Sale shortcut — let it bubble to the
+      // document-level handler without adding the highlighted product first.
+      if (event.ctrlKey || event.metaKey) return;
+      const idx = this.activeIndex();
+      const target = products[idx >= 0 ? idx : 0];
+      if (target) {
+        event.preventDefault();
+        this.addToCart(target);
+      }
       return;
     }
-    const quantity = this.pendingQuantity() ?? 1;
-    this.cartService.add(product, quantity);
+
+    if (key !== 'ArrowLeft' && key !== 'ArrowRight'
+        && key !== 'ArrowUp' && key !== 'ArrowDown') return;
+
+    event.preventDefault();
+    const cols = this.detectColumnCount();
+    const current = Math.max(0, this.activeIndex());
+    let next = current;
+    switch (key) {
+      case 'ArrowRight': next = current + 1; break;
+      case 'ArrowLeft':  next = current - 1; break;
+      case 'ArrowDown':  next = current + cols + 1; break;
+      case 'ArrowUp':    next = current - cols - 1; break;
+    }
+    next = Math.max(0, Math.min(products.length - 1, next));
+    if (next !== current || this.activeIndex() < 0) {
+      this.activeIndex.set(next);
+      this.scrollActiveIntoView(next);
+    }
+  }
+
+  /**
+   * ArrowDown from a focused category toggle: highlight the first visible
+   * product tile and return keyboard focus to the search input so that
+   * subsequent arrow keys / Enter use the same nav model the cashier is
+   * already familiar with.
+   */
+  protected jumpToGrid(event: Event): void {
+    if (this.filteredProducts().length === 0) return;
+    event.preventDefault();
+    this.activeIndex.set(0);
+    this.scrollActiveIntoView(0);
+    this.searchInputRef()?.nativeElement.focus();
+  }
+
+  /** ArrowUp from a focused category toggle: return focus to the search input
+   *  (without selecting a product tile). Left/Right keep switching categories
+   *  via Material's built-in toggle-group key manager. */
+  protected jumpToSearch(event: Event): void {
+    event.preventDefault();
+    this.searchInputRef()?.nativeElement.focus();
+  }
+
+  private detectColumnCount(): number {
+    const grid = this.gridRef()?.nativeElement;
+    if (!grid) return 1;
+    const tile = grid.querySelector<HTMLElement>('.product-tile');
+    if (!tile) return 1;
+    const style = getComputedStyle(grid);
+    const gapPx = parseFloat(style.columnGap || style.gap || '0') || 0;
+    const inner = grid.clientWidth - (parseFloat(style.paddingLeft || '0') || 0)
+      - (parseFloat(style.paddingRight || '0') || 0);
+    const tileWidth = tile.offsetWidth || 150;
+    const cols = Math.floor((inner + gapPx) / (tileWidth + gapPx));
+    return Math.max(1, cols);
+  }
+
+  private scrollActiveIntoView(index: number): void {
+    // Defer so Angular has rendered the class change before we query the DOM.
+    queueMicrotask(() => {
+      const grid = this.gridRef()?.nativeElement;
+      const tile = grid?.querySelectorAll<HTMLElement>('.product-tile')[index];
+      tile?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    });
+  }
+
+  protected addToCart(product: Product): void {
+    // Always consult the live ProductService signal — stock may have changed
+    // via realtime updates since the tile was rendered.
+    const fresh = this.productService.getById(product.id) ?? product;
+    if (fresh.stock === 0) {
+      this.showStockLimit({ reason: 'out-of-stock', productName: fresh.name, stock: 0 });
+      return;
+    }
+
+    const existing = this.cart().find((l) => l.product.id === fresh.id);
+    const inCart = existing?.quantity ?? 0;
+    const available = fresh.stock - inCart;
+    if (available <= 0) {
+      this.showStockLimit({ reason: 'at-limit', productName: fresh.name, stock: fresh.stock });
+      return;
+    }
+
+    const requested = this.pendingQuantity() ?? 1;
+    const toAdd = Math.min(requested, available);
+    this.cartService.add(fresh, toAdd);
+
+    if (toAdd < requested) {
+      this.showStockLimit({
+        reason: 'partial',
+        productName: fresh.name,
+        stock: fresh.stock,
+        requested,
+        added: toAdd,
+      });
+    }
     if (this.pendingQuantity() !== null) {
       this.pendingQuantity.set(null);
     }
+  }
+
+  /**
+   * Open the stock-limit modal instead of surfacing a snackbar: cashiers
+   * glance past toasts at the bottom of the screen, but a modal forces an
+   * acknowledgement and prevents ringing up the wrong quantity by accident.
+   * De-duped so rapid clicks can't stack modals on top of each other.
+   */
+  private showStockLimit(data: StockLimitDialogData): void {
+    const alreadyOpen = this.dialog.openDialogs.some(
+      (d) => d.componentInstance instanceof StockLimitDialog,
+    );
+    if (alreadyOpen) return;
+    this.dialog.open(StockLimitDialog, {
+      width: '440px',
+      maxWidth: '95vw',
+      autoFocus: true,
+      data,
+    });
   }
 
   protected clearPendingQuantity(): void {
@@ -108,11 +282,32 @@ export class PosPage {
       if (typeof quantity === 'number' && quantity > 0) {
         this.pendingQuantity.set(quantity);
       }
+      // Return focus to the search input so the cashier can immediately
+      // scan/type the product the quantity should apply to — whether they
+      // confirmed a value or cancelled out.
+      this.searchInputRef()?.nativeElement.focus();
     });
   }
 
   protected increment(productId: string): void {
+    const fresh = this.productService.getById(productId);
+    const line = this.cart().find((l) => l.product.id === productId);
+    if (!fresh || !line) return;
+    if (line.quantity >= fresh.stock) {
+      this.showStockLimit({
+        reason: 'at-limit',
+        productName: fresh.name,
+        stock: fresh.stock,
+      });
+      return;
+    }
     this.cartService.increment(productId);
+  }
+
+  /** Per-line helper for the template: is the cart already at max stock? */
+  protected isAtMaxStock(productId: string, currentQty: number): boolean {
+    const fresh = this.productService.getById(productId);
+    return fresh ? currentQty >= fresh.stock : false;
   }
 
   protected decrement(productId: string): void {
@@ -161,7 +356,9 @@ export class PosPage {
     });
     ref.afterClosed().subscribe((confirmed) => {
       if (confirmed) {
-        this.cartService.clear();
+        // Silent so admins don't get a "cart cleared" ping for every sale —
+        // cart-event notifications are only for mid-sale removals.
+        this.cartService.clear({ silent: true });
         this.snackBar.open('Sale completed', 'Dismiss', { duration: 2500 });
       }
     });

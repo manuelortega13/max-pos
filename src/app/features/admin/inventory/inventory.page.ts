@@ -6,7 +6,10 @@ import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatCardModule } from '@angular/material/card';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatDialog } from '@angular/material/dialog';
+import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
+import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
@@ -28,7 +31,10 @@ type StockFilter = 'all' | 'low' | 'out' | 'ok';
     MatButtonToggleModule,
     MatCardModule,
     MatChipsModule,
+    MatFormFieldModule,
     MatIconModule,
+    MatInputModule,
+    MatSelectModule,
     MatTableModule,
     MatTooltipModule,
     MoneyPipe,
@@ -44,7 +50,16 @@ export class InventoryPage {
   private readonly snackBar = inject(MatSnackBar);
 
   protected readonly filter = signal<StockFilter>('all');
+  protected readonly search = signal<string>('');
+  protected readonly categoryFilter = signal<string>('all');
 
+  protected readonly categories = this.categoryService.categories;
+
+  /**
+   * Summary cards describe the whole catalog, not the filtered subset —
+   * otherwise "low stock" and "out of stock" counts collapse to 0 the moment
+   * the cashier searches for something, which defeats the at-a-glance purpose.
+   */
   protected readonly totals = computed(() => {
     const products = this.productService.products();
     const totalUnits = products.reduce((sum, p) => sum + p.stock, 0);
@@ -60,18 +75,35 @@ export class InventoryPage {
 
   protected readonly rows = computed(() => {
     const products = this.productService.products();
-    switch (this.filter()) {
-      case 'low':
-        return products.filter((p) => p.stock > 0 && p.stock <= 10);
-      case 'out':
-        return products.filter((p) => p.stock === 0);
-      case 'ok':
-        return products.filter((p) => p.stock > 10);
-      case 'all':
-      default:
-        return products;
-    }
+    const term = this.search().trim().toLowerCase();
+    const cat = this.categoryFilter();
+    const stock = this.filter();
+
+    return products.filter((p) => {
+      if (cat !== 'all' && p.categoryId !== cat) return false;
+      if (term) {
+        const hit =
+          p.name.toLowerCase().includes(term) ||
+          p.sku.toLowerCase().includes(term) ||
+          (p.barcode?.toLowerCase().includes(term) ?? false);
+        if (!hit) return false;
+      }
+      switch (stock) {
+        case 'low': return p.stock > 0 && p.stock <= 10;
+        case 'out': return p.stock === 0;
+        case 'ok':  return p.stock > 10;
+        case 'all':
+        default:    return true;
+      }
+    });
   });
+
+  protected readonly hasActiveFilters = computed(
+    () =>
+      this.search() !== '' ||
+      this.categoryFilter() !== 'all' ||
+      this.filter() !== 'all',
+  );
 
   protected readonly columns = ['image', 'name', 'category', 'stock', 'cost', 'value', 'actions'] as const;
 
@@ -127,5 +159,11 @@ export class InventoryPage {
       autoFocus: false,
       data: { product },
     });
+  }
+
+  protected clearFilters(): void {
+    this.search.set('');
+    this.categoryFilter.set('all');
+    this.filter.set('all');
   }
 }

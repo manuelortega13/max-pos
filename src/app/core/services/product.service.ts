@@ -1,7 +1,8 @@
 import { HttpClient, HttpErrorResponse, HttpParams } from '@angular/common/http';
-import { Injectable, computed, inject, signal } from '@angular/core';
+import { Injectable, computed, effect, inject, signal } from '@angular/core';
 import { Observable, tap } from 'rxjs';
 import { ExpiringBatch, Product, ProductBatch, ProductUpsertRequest } from '../models';
+import { RealtimeService } from './realtime.service';
 
 export interface RestockPayload {
   readonly quantity: number;
@@ -13,6 +14,7 @@ export interface RestockPayload {
 @Injectable({ providedIn: 'root' })
 export class ProductService {
   private readonly http = inject(HttpClient);
+  private readonly realtime = inject(RealtimeService);
 
   private readonly _products = signal<Product[]>([]);
   private readonly _loading = signal<boolean>(false);
@@ -31,6 +33,17 @@ export class ProductService {
 
   constructor() {
     this.load();
+
+    // Refresh product list when the backend signals inventory changed (new
+    // sale, refund, restock, write-off, etc.). The realtime stream is admin-
+    // only; for cashiers the effect simply never fires because `latestEvent`
+    // stays null, which is the intended behavior.
+    effect(() => {
+      const event = this.realtime.latestEvent();
+      if (event && event.type === 'inventory.changed') {
+        this.load();
+      }
+    });
   }
 
   load(): void {

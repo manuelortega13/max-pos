@@ -6,8 +6,10 @@
           <mat-label>Scan or search</mat-label>
           <input
             matInput
+            #searchInput
             [ngModel]="search()"
             (ngModelChange)="search.set($event)"
+            (keydown)="onSearchKeydown($event)"
             placeholder="Scan barcode, name or SKU"
             autofocus
           />
@@ -46,6 +48,7 @@
       }
 
       <mat-button-toggle-group
+        #catGroup
         [value]="activeCategory()"
         (change)="activeCategory.set($event.value)"
         class="pos__categories"
@@ -60,13 +63,14 @@
       </mat-button-toggle-group>
     </header>
 
-    <div class="pos__grid">
-      @for (product of filteredProducts(); track product.id) {
+    <div class="pos__grid" #productGrid>
+      @for (product of filteredProducts(); track product.id; let i = $index) {
         <button
           type="button"
           class="product-tile"
           [class.product-tile--low]="product.stock > 0 && product.stock <= 10"
           [class.product-tile--out]="product.stock === 0"
+          [class.product-tile--active]="i === activeIndex()"
           (click)="addToCart(product)"
           [disabled]="product.stock === 0"
         >
@@ -131,7 +135,13 @@
                   <mat-icon>remove</mat-icon>
                 </button>
                 <span>{{ line.quantity }}</span>
-                <button mat-icon-button (click)="increment(line.product.id)" aria-label="Increase">
+                <button
+                  mat-icon-button
+                  (click)="increment(line.product.id)"
+                  [disabled]="isAtMaxStock(line.product.id, line.quantity)"
+                  [matTooltip]="isAtMaxStock(line.product.id, line.quantity) ? 'At stock limit' : ''"
+                  aria-label="Increase"
+                >
                   <mat-icon>add</mat-icon>
                 </button>
               </div>
