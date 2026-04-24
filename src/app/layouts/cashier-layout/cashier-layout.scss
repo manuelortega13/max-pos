@@ -79,6 +79,10 @@
     // own wrapper with overflow-x: auto and still work.
     overflow-x: clip;
     background: var(--mat-sys-surface-container-lowest);
+    // Breathing room below the toolbar, matching the admin shell's
+    // treatment. Kept to top-only so the sticky cart on desktop still
+    // runs flush to the right edge instead of getting inset.
+    padding-top: 0.75rem;
   }
 
   &__sync {
