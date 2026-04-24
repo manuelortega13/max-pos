@@ -42,6 +42,18 @@
             (ngModelChange)="search.set($event)"
           />
           <mat-icon matPrefix>search</mat-icon>
+          @if (cameraSupported) {
+            <button
+              matSuffix
+              mat-icon-button
+              type="button"
+              aria-label="Scan barcode with camera"
+              matTooltip="Scan with camera"
+              (click)="scanBarcodeIntoSearch()"
+            >
+              <mat-icon>photo_camera</mat-icon>
+            </button>
+          }
         </mat-form-field>
 
         <mat-form-field appearance="outline" class="filters__category">

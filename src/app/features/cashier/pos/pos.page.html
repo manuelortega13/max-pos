@@ -14,6 +14,18 @@
             autofocus
           />
           <mat-icon matPrefix>qr_code_scanner</mat-icon>
+          @if (cameraSupported) {
+            <button
+              matSuffix
+              mat-icon-button
+              type="button"
+              aria-label="Scan with camera"
+              matTooltip="Scan with camera"
+              (click)="openCameraScanner()"
+            >
+              <mat-icon>photo_camera</mat-icon>
+            </button>
+          }
         </mat-form-field>
 
         <button

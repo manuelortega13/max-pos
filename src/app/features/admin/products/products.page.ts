@@ -15,6 +15,7 @@ import { MatChipsModule } from '@angular/material/chips';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { Product } from '../../../core/models';
+import { BarcodeScannerService } from '../../../core/services/barcode-scanner.service';
 import { CategoryService } from '../../../core/services/category.service';
 import { ProductService } from '../../../core/services/product.service';
 import { ConfirmDialog } from '../../../shared/dialogs/confirm-dialog';
@@ -47,6 +48,9 @@ export class ProductsPage {
   private readonly categoryService = inject(CategoryService);
   private readonly dialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
+  private readonly scanner = inject(BarcodeScannerService);
+
+  protected readonly cameraSupported = this.scanner.isSupported;
 
   protected readonly categories = this.categoryService.categories;
   protected readonly loading = this.productService.loading;
@@ -92,6 +96,13 @@ export class ProductsPage {
     if (stock === 0) return 'status-chip--refunded';
     if (stock <= 10) return 'status-chip--warn';
     return 'status-chip--completed';
+  }
+
+  /** Dump the scanned barcode into the list's search so the admin can
+   *  locate the existing product matching a physical barcode. */
+  protected async scanBarcodeIntoSearch(): Promise<void> {
+    const code = await this.scanner.scan();
+    if (code) this.search.set(code);
   }
 
   protected openCreate(): void {

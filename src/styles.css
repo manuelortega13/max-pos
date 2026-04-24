@@ -44,6 +44,15 @@ mat-icon {
    this class — they stay compact so the user can still see the context
    behind the modal.
    ────────────────────────────────────────────────────────────────── */
+/* Camera scanner is a full-bleed dialog at every viewport size — kill
+   Material's default padding and white background so the video fills
+   the surface with no gutters. */
+.barcode-scanner-panel .mat-mdc-dialog-surface,
+.barcode-scanner-panel .mat-mdc-dialog-container {
+  padding: 0 !important;
+  background: #000 !important;
+}
+
 @media (max-width: 640px) {
   .cdk-overlay-pane.dialog-fullscreen-mobile {
     width: 100vw !important;
@@ -53,6 +62,7 @@ mat-icon {
     max-height: 100vh !important;
     max-height: 100dvh !important;
   }
+
 
   .dialog-fullscreen-mobile .mat-mdc-dialog-surface,
   .dialog-fullscreen-mobile .mat-mdc-dialog-container {

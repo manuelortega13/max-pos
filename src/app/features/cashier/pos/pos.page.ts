@@ -22,6 +22,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { BarcodeScannerService } from '../../../core/services/barcode-scanner.service';
 import { CartService } from '../../../core/services/cart.service';
 import { CategoryService } from '../../../core/services/category.service';
 import { ProductService } from '../../../core/services/product.service';
@@ -59,6 +60,10 @@ export class PosPage implements AfterViewInit {
   private readonly settingsService = inject(SettingsService);
   private readonly dialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
+  private readonly scanner = inject(BarcodeScannerService);
+
+  /** Hide the in-input camera button when the browser can't stream video. */
+  protected readonly cameraSupported = this.scanner.isSupported;
 
   /** Store-level override: lets the cashier oversell past zero stock. */
   protected readonly allowNegativeStock = computed(
@@ -220,6 +225,27 @@ export class PosPage implements AfterViewInit {
       const input = this.searchInputRef()?.nativeElement;
       input?.focus({ preventScroll: true });
     });
+  }
+
+  /**
+   * Open the camera barcode scanner. On a successful read, treat the
+   * result exactly like an Enter-pressed scan — exact-barcode lookup
+   * against active products, add to cart if found, snackbar otherwise.
+   */
+  protected async openCameraScanner(): Promise<void> {
+    const code = await this.scanner.scan();
+    if (!code) return;
+    const product = this.findByExactBarcode(code);
+    if (product) {
+      this.addToCart(product);
+    } else {
+      this.snackBar.open(
+        `No product with barcode ${code}`,
+        'Dismiss',
+        { duration: 2500 },
+      );
+    }
+    queueMicrotask(() => this.searchInputRef()?.nativeElement.focus());
   }
 
   /** Exact (case-sensitive) barcode match across active products. */

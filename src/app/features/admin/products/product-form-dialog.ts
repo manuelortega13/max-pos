@@ -17,7 +17,9 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { Product, ProductUpsertRequest } from '../../../core/models';
+import { BarcodeScannerService } from '../../../core/services/barcode-scanner.service';
 import { CategoryService } from '../../../core/services/category.service';
 import { ProductService } from '../../../core/services/product.service';
 import { SettingsService } from '../../../core/services/settings.service';
@@ -43,6 +45,7 @@ const SKU_PATTERN = /^([A-Z]+)-?(\d+)$/;
     MatInputModule,
     MatSelectModule,
     MatSlideToggleModule,
+    MatTooltipModule,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './product-form-dialog.html',
@@ -56,7 +59,10 @@ export class ProductFormDialog {
   private readonly dialogRef = inject(MatDialogRef<ProductFormDialog>);
   private readonly snackBar = inject(MatSnackBar);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly scanner = inject(BarcodeScannerService);
   protected readonly data = inject<ProductFormData>(MAT_DIALOG_DATA);
+
+  protected readonly cameraSupported = this.scanner.isSupported;
 
   protected readonly categories = this.categoryService.categories;
   protected readonly currencySymbol = computed(
@@ -132,6 +138,19 @@ export class ProductFormDialog {
 
   protected clearImage(): void {
     this.imageUrl.set(null);
+  }
+
+  /**
+   * Open the camera scanner and, on a successful read, write the decoded
+   * string into the Barcode form control. No product lookup here — the
+   * admin is defining what this product's barcode is.
+   */
+  protected async scanBarcode(): Promise<void> {
+    const code = await this.scanner.scan();
+    if (!code) return;
+    this.form.controls.barcode.setValue(code);
+    this.form.controls.barcode.markAsDirty();
+    this.snackBar.open(`Scanned ${code}`, 'Dismiss', { duration: 1500 });
   }
 
   protected submit(): void {

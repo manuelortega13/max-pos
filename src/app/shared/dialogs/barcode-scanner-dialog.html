@@ -1,0 +1,84 @@
+<div class="scanner">
+  <video #video playsinline muted autoplay class="scanner__video"></video>
+
+  <div class="scanner__overlay" aria-hidden="true">
+    <div class="scanner__scrim"></div>
+    <div class="scanner__frame">
+      <span class="scanner__corner scanner__corner--tl"></span>
+      <span class="scanner__corner scanner__corner--tr"></span>
+      <span class="scanner__corner scanner__corner--bl"></span>
+      <span class="scanner__corner scanner__corner--br"></span>
+      <span
+        class="scanner__line"
+        [class.scanner__line--detected]="state() === 'detected'"
+      ></span>
+    </div>
+  </div>
+
+  <header class="scanner__header">
+    <button
+      mat-icon-button
+      class="scanner__close"
+      aria-label="Close scanner"
+      (click)="close()"
+    >
+      <mat-icon>close</mat-icon>
+    </button>
+    <span class="scanner__title">Scan barcode</span>
+    <span class="scanner__spacer"></span>
+  </header>
+
+  <footer class="scanner__footer">
+    @switch (state()) {
+      @case ('initializing') {
+        <p class="scanner__status">Starting camera…</p>
+      }
+      @case ('scanning') {
+        <p class="scanner__status">Point the camera at the barcode</p>
+      }
+      @case ('detected') {
+        <p class="scanner__status scanner__status--ok">
+          <mat-icon>check_circle</mat-icon> Detected
+        </p>
+      }
+      @case ('error') {
+        <p class="scanner__status scanner__status--error">
+          <mat-icon>error_outline</mat-icon> {{ errorMessage() }}
+        </p>
+      }
+    }
+
+    <div class="scanner__actions">
+      @if (torchSupported() && state() === 'scanning') {
+        <button
+          mat-icon-button
+          class="scanner__icon-btn"
+          [attr.aria-label]="torchOn() ? 'Turn off flashlight' : 'Turn on flashlight'"
+          (click)="toggleTorch()"
+        >
+          <mat-icon>{{ torchOn() ? 'flashlight_on' : 'flashlight_off' }}</mat-icon>
+        </button>
+      }
+      @if (canSwitchCamera() && state() === 'scanning') {
+        <button
+          mat-icon-button
+          class="scanner__icon-btn"
+          aria-label="Switch camera"
+          (click)="switchCamera()"
+        >
+          <mat-icon>cameraswitch</mat-icon>
+        </button>
+      }
+      @if (state() === 'error') {
+        <button
+          mat-flat-button
+          color="primary"
+          class="scanner__manual"
+          (click)="close()"
+        >
+          Enter barcode manually
+        </button>
+      }
+    </div>
+  </footer>
+</div>

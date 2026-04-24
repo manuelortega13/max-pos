@@ -14,6 +14,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { Product } from '../../../core/models';
+import { BarcodeScannerService } from '../../../core/services/barcode-scanner.service';
 import { CategoryService } from '../../../core/services/category.service';
 import { ProductService } from '../../../core/services/product.service';
 import { MoneyPipe } from '../../../shared/pipes/currency-symbol.pipe';
@@ -48,6 +49,9 @@ export class InventoryPage {
   private readonly categoryService = inject(CategoryService);
   private readonly dialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
+  private readonly scanner = inject(BarcodeScannerService);
+
+  protected readonly cameraSupported = this.scanner.isSupported;
 
   protected readonly filter = signal<StockFilter>('all');
   protected readonly search = signal<string>('');
@@ -165,6 +169,12 @@ export class InventoryPage {
       panelClass: 'dialog-fullscreen-mobile',
       data: { product },
     });
+  }
+
+  /** Push the scanned barcode straight into the filter search. */
+  protected async scanBarcodeIntoSearch(): Promise<void> {
+    const code = await this.scanner.scan();
+    if (code) this.search.set(code);
   }
 
   protected clearFilters(): void {

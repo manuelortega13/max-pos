@@ -1,0 +1,179 @@
+:host {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.scanner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 60vh;
+  background: #000;
+  color: #fff;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+
+  &__video {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    background: #000;
+  }
+
+  /* Dim the outside of the scan rectangle and draw the corner markers +
+     moving detection line. Inspired by every iOS / Android scanner UI. */
+  &__overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  &__scrim {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(
+      ellipse at center,
+      transparent 30%,
+      rgba(0, 0, 0, 0.55) 70%
+    );
+  }
+
+  &__frame {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: min(78vw, 420px);
+    height: min(42vw, 220px);
+    border-radius: 1rem;
+    overflow: hidden;
+  }
+
+  &__corner {
+    position: absolute;
+    width: 28px;
+    height: 28px;
+    border: 3px solid rgba(255, 255, 255, 0.95);
+
+    &--tl {
+      top: 0; left: 0;
+      border-right: none; border-bottom: none;
+      border-top-left-radius: 1rem;
+    }
+    &--tr {
+      top: 0; right: 0;
+      border-left: none; border-bottom: none;
+      border-top-right-radius: 1rem;
+    }
+    &--bl {
+      bottom: 0; left: 0;
+      border-right: none; border-top: none;
+      border-bottom-left-radius: 1rem;
+    }
+    &--br {
+      bottom: 0; right: 0;
+      border-left: none; border-top: none;
+      border-bottom-right-radius: 1rem;
+    }
+  }
+
+  &__line {
+    position: absolute;
+    top: 0;
+    left: 8%;
+    right: 8%;
+    height: 2px;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      #22c55e 50%,
+      transparent 100%
+    );
+    box-shadow: 0 0 12px rgba(34, 197, 94, 0.7);
+    animation: scanner-line 1.8s ease-in-out infinite alternate;
+
+    &--detected {
+      animation: none;
+      top: 50%;
+      background: #22c55e;
+      height: 3px;
+    }
+  }
+
+  &__header {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: calc(0.5rem + env(safe-area-inset-top, 0px)) 0.75rem 0.5rem;
+    background: linear-gradient(180deg, rgba(0, 0, 0, 0.55) 0%, transparent 100%);
+  }
+
+  &__close {
+    color: #fff !important;
+  }
+
+  &__title {
+    font-size: 1rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+
+  &__spacer { flex: 1 1 auto; }
+
+  &__footer {
+    position: relative;
+    z-index: 2;
+    margin-top: auto;
+    padding: 1rem 1rem calc(1rem + env(safe-area-inset-bottom, 0px));
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    background: linear-gradient(0deg, rgba(0, 0, 0, 0.6) 0%, transparent 100%);
+  }
+
+  &__status {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.95rem;
+    text-align: center;
+    color: #fff;
+
+    &--ok {
+      color: #22c55e;
+      font-weight: 600;
+    }
+
+    &--error {
+      color: #fca5a5;
+    }
+  }
+
+  &__actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  &__icon-btn {
+    color: #fff !important;
+    background: rgba(255, 255, 255, 0.12) !important;
+  }
+
+  &__manual {
+    margin-top: 0.25rem;
+  }
+}
+
+@keyframes scanner-line {
+  0%   { top: 12%; }
+  100% { top: 88%; }
+}

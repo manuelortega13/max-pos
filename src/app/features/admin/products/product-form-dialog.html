@@ -114,6 +114,18 @@
       <mat-form-field appearance="outline" class="form-dialog__grow">
         <mat-label>Barcode</mat-label>
         <input matInput formControlName="barcode" autocomplete="off" />
+        @if (cameraSupported) {
+          <button
+            matSuffix
+            mat-icon-button
+            type="button"
+            aria-label="Scan barcode with camera"
+            matTooltip="Scan with camera"
+            (click)="scanBarcode()"
+          >
+            <mat-icon>photo_camera</mat-icon>
+          </button>
+        }
         <mat-hint>Optional</mat-hint>
       </mat-form-field>
     </div>
