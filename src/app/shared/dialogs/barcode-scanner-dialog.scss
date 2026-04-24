@@ -47,8 +47,11 @@
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    width: min(78vw, 420px);
-    height: min(42vw, 220px);
+    // Square-ish aim box signals "any orientation works", unlike the
+    // landscape rectangle traditionally drawn by 1D-only scanners. Caps
+    // at 320px so it doesn't dominate tablet / desktop views.
+    width: min(72vw, 320px);
+    height: min(72vw, 320px);
     border-radius: 1rem;
     overflow: hidden;
   }

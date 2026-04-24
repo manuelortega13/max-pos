@@ -12,6 +12,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { BrowserMultiFormatReader, IScannerControls } from '@zxing/browser';
+import { DecodeHintType } from '@zxing/library';
 
 type ScannerState = 'initializing' | 'scanning' | 'detected' | 'error';
 
@@ -87,7 +88,17 @@ export class BarcodeScannerDialog implements AfterViewInit, OnDestroy {
         deviceId = devices[this.deviceIdx].deviceId;
       }
 
-      this.reader = new BrowserMultiFormatReader();
+      // TRY_HARDER makes zxing attempt orthogonal rotations on 1D barcodes
+      // — critical for a cashier scanning a barcode that's vertical on the
+      // package, or when the phone is held sideways. Without it, only the
+      // original left→right row scanline is tried and vertical codes never
+      // resolve. `delayBetweenScanAttempts` at 120ms gives a snappy live
+      // preview without pegging CPU on older phones.
+      const hints = new Map<DecodeHintType, unknown>();
+      hints.set(DecodeHintType.TRY_HARDER, true);
+      this.reader = new BrowserMultiFormatReader(hints, {
+        delayBetweenScanAttempts: 120,
+      });
       this.controls = await this.reader.decodeFromVideoDevice(
         deviceId,
         video,
