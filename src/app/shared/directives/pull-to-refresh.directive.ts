@@ -108,6 +108,16 @@ export class PullToRefreshDirective implements OnInit {
       this.pulling = false;
       return;
     }
+    // If the touch starts inside an inner scrollable element (e.g. the
+    // POS page's product grid or cart panel, which own their own
+    // overflow-y:auto), those events belong to that element — engaging
+    // the pull gesture would preventDefault on its touchmove and make
+    // the inner scroll unusable. Only engage when the touch is on the
+    // outer shell itself.
+    if (this.isInsideInnerScroll(e.target as HTMLElement | null)) {
+      this.pulling = false;
+      return;
+    }
     const top = this.scrollEl?.scrollTop ?? 0;
     if (top > 0) {
       this.pulling = false;
@@ -117,6 +127,27 @@ export class PullToRefreshDirective implements OnInit {
     this.lastY = this.startY;
     this.pulling = true;
   };
+
+  /**
+   * Walk up from the touch target looking for a scrollable ancestor
+   * that's strictly *inside* our chosen scrollEl. If we hit one before
+   * reaching scrollEl, the touch is inside a nested scroller and we
+   * should stay out of its way.
+   */
+  private isInsideInnerScroll(target: HTMLElement | null): boolean {
+    let el: HTMLElement | null = target;
+    while (el && el !== this.scrollEl && el !== document.body) {
+      const s = getComputedStyle(el);
+      if (
+        (s.overflowY === 'auto' || s.overflowY === 'scroll') &&
+        el.scrollHeight > el.clientHeight
+      ) {
+        return true;
+      }
+      el = el.parentElement;
+    }
+    return false;
+  }
 
   private onMove = (e: TouchEvent): void => {
     if (!this.pulling) return;
