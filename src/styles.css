@@ -11,6 +11,11 @@ body {
   background: var(--mat-sys-surface, #f8fafc);
   color: var(--mat-sys-on-surface, #0f172a);
   font-family: 'Roboto', system-ui, sans-serif;
+  /* Kills the iOS double-tap-to-zoom gesture (which viewport
+     user-scalable=no doesn't block on its own) and removes the
+     300ms tap delay as a side benefit. Pinch-zoom is disabled via
+     the viewport meta in index.html. */
+  touch-action: manipulation;
 }
 
 mat-icon {
@@ -19,6 +24,46 @@ mat-icon {
 
 .w-full {
   width: 100%;
+}
+
+/* ──────────────────────────────────────────────────────────────────
+   Pull-to-refresh floating indicator (see PullToRefreshDirective).
+   Lives on body so it can sit above sticky toolbars without being
+   clipped by overflow containers. Kept off-screen by default; the
+   directive translates it into view as the user pulls.
+   ────────────────────────────────────────────────────────────────── */
+.app-ptr {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px));
+  left: 50%;
+  z-index: 9000;
+  pointer-events: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--mat-sys-surface, #fff);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transform: translate(-50%, -64px);
+}
+
+.app-ptr__spinner {
+  width: 22px;
+  height: 22px;
+  border: 2.5px solid color-mix(in srgb, var(--mat-sys-primary) 25%, transparent);
+  border-top-color: var(--mat-sys-primary);
+  border-radius: 50%;
+}
+
+.app-ptr--loading .app-ptr__spinner {
+  animation: app-ptr-spin 0.75s linear infinite;
+}
+
+@keyframes app-ptr-spin {
+  to { transform: rotate(360deg); }
 }
 
 .checkout-dialog-panel .mat-mdc-dialog-title {

@@ -1,5 +1,5 @@
 import { TitleCasePipe } from '@angular/common';
-import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatButtonModule } from '@angular/material/button';
@@ -11,7 +11,9 @@ import { AuthService } from '../../core/services/auth.service';
 import { CartService } from '../../core/services/cart.service';
 import { OfflineSyncService } from '../../core/services/offline-sync.service';
 import { RealtimeService } from '../../core/services/realtime.service';
+import { RefreshService } from '../../core/services/refresh.service';
 import { SettingsService } from '../../core/services/settings.service';
+import { PullToRefreshDirective } from '../../shared/directives/pull-to-refresh.directive';
 
 @Component({
   selector: 'app-cashier-layout',
@@ -26,6 +28,7 @@ import { SettingsService } from '../../core/services/settings.service';
     MatMenuModule,
     MatBadgeModule,
     MatTooltipModule,
+    PullToRefreshDirective,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './cashier-layout.html',
@@ -38,6 +41,8 @@ export class CashierLayout implements OnInit, OnDestroy {
   private readonly realtime = inject(RealtimeService);
   private readonly sync = inject(OfflineSyncService);
   private readonly settingsService = inject(SettingsService);
+  private readonly refreshService = inject(RefreshService);
+  protected readonly refreshing = signal(false);
 
   protected readonly currentUser = this.authService.user;
   protected readonly cartItemCount = this.cartService.itemCount;
@@ -76,6 +81,16 @@ export class CashierLayout implements OnInit, OnDestroy {
 
   protected retrySync(): void {
     void this.sync.retryNow();
+  }
+
+  protected async onPullRefresh(): Promise<void> {
+    if (this.refreshing()) return;
+    this.refreshing.set(true);
+    try {
+      await this.refreshService.refreshAll();
+    } finally {
+      this.refreshing.set(false);
+    }
   }
 
   protected goHome(): void {

@@ -18,6 +18,8 @@ import { AuthService } from '../../core/services/auth.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { PushService } from '../../core/services/push.service';
 import { RealtimeService } from '../../core/services/realtime.service';
+import { RefreshService } from '../../core/services/refresh.service';
+import { PullToRefreshDirective } from '../../shared/directives/pull-to-refresh.directive';
 
 interface NavItem {
   readonly path: string;
@@ -51,6 +53,7 @@ const NAV_ITEMS: readonly NavItem[] = [
     MatDividerModule,
     MatMenuModule,
     MatTooltipModule,
+    PullToRefreshDirective,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './admin-layout.html',
@@ -64,6 +67,8 @@ export class AdminLayout implements OnInit, OnDestroy {
   private readonly realtime = inject(RealtimeService);
   private readonly pushService = inject(PushService);
   private readonly snackBar = inject(MatSnackBar);
+  private readonly refreshService = inject(RefreshService);
+  protected readonly refreshing = signal(false);
 
   protected readonly navItems = NAV_ITEMS;
   protected readonly sidenavOpen = signal(true);
@@ -144,5 +149,15 @@ export class AdminLayout implements OnInit, OnDestroy {
     if (d === 0) return 'Expires today';
     if (d === 1) return 'Expires tomorrow';
     return `${d}d left`;
+  }
+
+  protected async onPullRefresh(): Promise<void> {
+    if (this.refreshing()) return;
+    this.refreshing.set(true);
+    try {
+      await this.refreshService.refreshAll();
+    } finally {
+      this.refreshing.set(false);
+    }
   }
 }

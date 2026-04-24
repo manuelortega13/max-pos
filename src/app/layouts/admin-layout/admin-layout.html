@@ -115,7 +115,12 @@
       </mat-menu>
     </mat-toolbar>
 
-    <main class="admin-shell__main">
+    <main
+      class="admin-shell__main"
+      appPullToRefresh
+      [refreshing]="refreshing()"
+      (refresh)="onPullRefresh()"
+    >
       <router-outlet></router-outlet>
     </main>
 

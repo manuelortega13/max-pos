@@ -84,7 +84,12 @@
     </div>
   </mat-toolbar>
 
-  <main class="cashier-shell__main">
+  <main
+    class="cashier-shell__main"
+    appPullToRefresh
+    [refreshing]="refreshing()"
+    (refresh)="onPullRefresh()"
+  >
     <router-outlet></router-outlet>
   </main>
 </div>
