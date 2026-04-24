@@ -1,4 +1,5 @@
 import {
+  AfterViewInit,
   ChangeDetectionStrategy,
   Component,
   ElementRef,
@@ -51,7 +52,7 @@ import { StockLimitDialog, StockLimitDialogData } from './stock-limit-dialog';
   templateUrl: './pos.page.html',
   styleUrl: './pos.page.scss',
 })
-export class PosPage {
+export class PosPage implements AfterViewInit {
   private readonly productService = inject(ProductService);
   private readonly categoryService = inject(CategoryService);
   private readonly cartService = inject(CartService);
@@ -135,26 +136,56 @@ export class PosPage {
    * Keyboard navigation from the search input:
    *   ←/→     — previous / next tile
    *   ↑/↓     — move one grid row up/down (column count detected from DOM)
-   *   Enter   — add the highlighted product (fallback: first visible)
+   *   Enter   — add the product whose barcode exactly matches the term
+   *             (scanner path), else the highlighted tile, else the first
+   *             visible. Clears the search after a successful add so the
+   *             next scan lands in a clean input.
    * Other keys (typing, shortcuts) pass through unchanged.
    */
   protected onSearchKeydown(event: KeyboardEvent): void {
-    const products = this.filteredProducts();
-    if (products.length === 0) return;
-
     const key = event.key;
     if (key === 'Enter') {
       // Ctrl/Cmd+Enter is the Complete Sale shortcut — let it bubble to the
       // document-level handler without adding the highlighted product first.
       if (event.ctrlKey || event.metaKey) return;
+      event.preventDefault();
+
+      const term = this.search().trim();
+      if (!term) return;
+
+      // Scanner-friendly path: when the term matches a product's barcode
+      // exactly, add that product regardless of what's highlighted. This
+      // handles the case where a human was navigating the grid with arrow
+      // keys and then scans something — the scan always wins.
+      const scanned = this.findByExactBarcode(term);
+      if (scanned) {
+        this.addToCart(scanned);
+        this.clearSearchAndRefocus();
+        return;
+      }
+
+      const products = this.filteredProducts();
+      if (products.length === 0) {
+        this.snackBar.open(
+          `No product matches "${term}"`,
+          'Dismiss',
+          { duration: 2000 },
+        );
+        this.clearSearchAndRefocus();
+        return;
+      }
+
       const idx = this.activeIndex();
       const target = products[idx >= 0 ? idx : 0];
       if (target) {
-        event.preventDefault();
         this.addToCart(target);
+        this.clearSearchAndRefocus();
       }
       return;
     }
+
+    // Arrow-key navigation only matters when there's something to navigate.
+    if (this.filteredProducts().length === 0) return;
 
     if (key !== 'ArrowLeft' && key !== 'ArrowRight'
         && key !== 'ArrowUp' && key !== 'ArrowDown') return;
@@ -169,11 +200,45 @@ export class PosPage {
       case 'ArrowDown':  next = current + cols + 1; break;
       case 'ArrowUp':    next = current - cols - 1; break;
     }
-    next = Math.max(0, Math.min(products.length - 1, next));
+    next = Math.max(0, Math.min(this.filteredProducts().length - 1, next));
     if (next !== current || this.activeIndex() < 0) {
       this.activeIndex.set(next);
       this.scrollActiveIntoView(next);
     }
+  }
+
+  /**
+   * Explicitly focus the search input on first render. The HTML `autofocus`
+   * attribute is racey with Angular's view mount — on slow devices or when
+   * a dialog opened during navigation the browser often doesn't apply it —
+   * so we force it here once the viewChild ref is actually resolved.
+   * preventScroll keeps the page from jumping on iOS when the soft keyboard
+   * doesn't need to appear (external scanner / physical keyboard).
+   */
+  ngAfterViewInit(): void {
+    queueMicrotask(() => {
+      const input = this.searchInputRef()?.nativeElement;
+      input?.focus({ preventScroll: true });
+    });
+  }
+
+  /** Exact (case-sensitive) barcode match across active products. */
+  private findByExactBarcode(term: string): Product | undefined {
+    return this.productService
+      .activeProducts()
+      .find((p) => p.barcode === term);
+  }
+
+  /**
+   * Reset the search input and hand focus back to it. Called after every
+   * keyboard-triggered add so a keyboard-wedge scanner can fire the next
+   * barcode without concatenating it onto the previous one.
+   */
+  private clearSearchAndRefocus(): void {
+    this.search.set('');
+    this.activeIndex.set(-1);
+    // Defer so Angular's ngModel write-back settles before we focus.
+    queueMicrotask(() => this.searchInputRef()?.nativeElement.focus());
   }
 
   /**
@@ -388,6 +453,9 @@ export class PosPage {
         this.snackBar.open('Sale completed', 'Dismiss', { duration: 2500 });
         this.cartExpanded.set(false);
       }
+      // Return focus to the search input in every close path (confirm or
+      // cancel) so a keyboard-wedge scanner's next shot lands in the input.
+      queueMicrotask(() => this.searchInputRef()?.nativeElement.focus());
     });
   }
 }
