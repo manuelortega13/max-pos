@@ -16,6 +16,10 @@ body {
      300ms tap delay as a side benefit. Pinch-zoom is disabled via
      the viewport meta in index.html. */
   touch-action: manipulation;
+  /* Block the iOS PWA rubber-band bounce at the document level too —
+     otherwise a pull from the very top in standalone mode hijacks the
+     touch stream before our pull-to-refresh directive can react. */
+  overscroll-behavior: none;
 }
 
 mat-icon {
