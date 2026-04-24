@@ -17,7 +17,7 @@ public class Sale {
     @GeneratedValue
     private UUID id;
 
-    @Column(name = "reference", nullable = false, unique = true, length = 32)
+    @Column(name = "reference", nullable = false, unique = true, length = 64)
     private String reference;
 
     @Column(nullable = false)
