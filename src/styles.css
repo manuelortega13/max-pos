@@ -31,6 +31,27 @@ mat-icon {
 }
 
 /* ──────────────────────────────────────────────────────────────────
+   Block the iOS Safari focus-zoom. Any input with a computed font-size
+   below 16px triggers Apple's "readability" auto-zoom when tapped —
+   which yanks the viewport in and leaves the user having to pinch out.
+   Forcing 16px on all form controls kills it at the source and is the
+   single most effective "disable zoom" fix on iOS (user-scalable=no in
+   the viewport meta is ignored there since iOS 10).
+   Scoped to mobile so Material's denser desktop form controls aren't
+   affected. `!important` because mat-form-field sets its own size via
+   density tokens that would otherwise win the cascade.
+   ────────────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  input,
+  textarea,
+  select,
+  .mat-mdc-input-element,
+  .mat-mdc-select-value-text {
+    font-size: 16px !important;
+  }
+}
+
+/* ──────────────────────────────────────────────────────────────────
    Pull-to-refresh floating indicator (see PullToRefreshDirective).
    Lives on body so it can sit above sticky toolbars without being
    clipped by overflow containers. Kept off-screen by default; the
