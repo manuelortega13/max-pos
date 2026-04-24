@@ -46,7 +46,7 @@
         <mat-card-title>Recent sales</mat-card-title>
         <mat-card-subtitle>Last 5 transactions</mat-card-subtitle>
       </mat-card-header>
-      <mat-card-content>
+      <mat-card-content class="table-wrap">
         <table mat-table [dataSource]="recentSales()" class="w-full">
           <ng-container matColumnDef="id">
             <th mat-header-cell *matHeaderCellDef>Sale #</th>

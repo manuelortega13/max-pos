@@ -177,12 +177,28 @@
                   <small>{{ line.product.price | money }} each</small>
                 </div>
                 <div class="cart-line__qty">
-                  <button mat-icon-button (click)="decrement(line.product.id)" aria-label="Decrease">
-                    <mat-icon>remove</mat-icon>
-                  </button>
-                  <span>{{ line.quantity }}</span>
                   <button
                     mat-icon-button
+                    class="cart-line__qty-btn"
+                    (click)="decrement(line.product.id)"
+                    aria-label="Decrease"
+                  >
+                    <mat-icon>remove</mat-icon>
+                  </button>
+                  <input
+                    type="number"
+                    class="cart-line__qty-input"
+                    min="1"
+                    inputmode="numeric"
+                    [value]="line.quantity"
+                    (focus)="onQtyInputFocus($event)"
+                    (change)="onQtyInputChange(line.product.id, $event)"
+                    (keydown.enter)="commitQty($event)"
+                    [attr.aria-label]="'Quantity of ' + line.product.name"
+                  />
+                  <button
+                    mat-icon-button
+                    class="cart-line__qty-btn"
                     (click)="increment(line.product.id)"
                     [disabled]="isAtMaxStock(line.product.id, line.quantity)"
                     [matTooltip]="isAtMaxStock(line.product.id, line.quantity) ? 'At stock limit' : ''"

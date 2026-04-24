@@ -73,7 +73,11 @@
 
   &__main {
     flex: 1;
-    overflow: auto;
+    overflow-y: auto;
+    // Clip horizontal overflow so a rogue wide child can't push the page
+    // sideways. Children that explicitly want sideways scroll use their
+    // own wrapper with overflow-x: auto and still work.
+    overflow-x: clip;
     background: var(--mat-sys-surface-container-lowest);
   }
 

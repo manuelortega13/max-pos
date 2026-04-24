@@ -81,6 +81,10 @@ table.mat-mdc-table {
   background: transparent;
 }
 
+.table-wrap {
+  overflow-x: auto;
+}
+
 .status-chip {
   font-size: 0.75rem;
   font-weight: 500;

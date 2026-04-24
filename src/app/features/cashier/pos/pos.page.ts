@@ -417,6 +417,50 @@ export class PosPage implements AfterViewInit {
     return fresh ? currentQty >= fresh.stock : false;
   }
 
+  /** Select-all on focus so a cashier can type the replacement in one tap. */
+  protected onQtyInputFocus(event: FocusEvent): void {
+    const input = event.target as HTMLInputElement;
+    // queueMicrotask because iOS Safari ignores .select() called
+    // synchronously from the focus event in some PWA contexts.
+    queueMicrotask(() => input.select());
+  }
+
+  /** Commit the typed quantity on change (fires on blur / Enter). */
+  protected onQtyInputChange(productId: string, event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const line = this.cart().find((l) => l.product.id === productId);
+    const currentQty = line?.quantity ?? 1;
+    const parsed = parseInt(input.value, 10);
+
+    if (!Number.isFinite(parsed) || parsed < 1) {
+      // Garbage / empty / 0 — revert to what's actually in the cart.
+      input.value = String(currentQty);
+      return;
+    }
+
+    const fresh = this.productService.getById(productId);
+    if (fresh && !this.allowNegativeStock() && parsed > fresh.stock) {
+      // Clamp to stock ceiling and surface the limit modal so the cashier
+      // knows why their typed value didn't fully stick.
+      this.cartService.setQuantity(productId, fresh.stock);
+      input.value = String(fresh.stock);
+      this.showStockLimit({
+        reason: 'at-limit',
+        productName: fresh.name,
+        stock: fresh.stock,
+      });
+      return;
+    }
+
+    this.cartService.setQuantity(productId, parsed);
+    input.value = String(parsed);
+  }
+
+  /** Enter should blur the input so (change) fires and the value commits. */
+  protected commitQty(event: Event): void {
+    (event.target as HTMLInputElement | null)?.blur();
+  }
+
   protected decrement(productId: string): void {
     this.cartService.decrement(productId);
   }

@@ -210,6 +210,11 @@
     &__main {
       padding: 0.85rem;
       padding-bottom: calc(64px + env(safe-area-inset-bottom, 0) + 0.5rem);
+      // Clip horizontal overflow so a future wide element (a mat-table
+      // column, a fixed-width chip, etc.) can't push the page sideways.
+      // Child containers that *want* horizontal scroll (e.g. `.table-wrap`
+      // with overflow-x: auto) still scroll internally.
+      overflow-x: clip;
     }
   }
 }
