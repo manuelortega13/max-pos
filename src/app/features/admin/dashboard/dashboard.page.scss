@@ -75,6 +75,13 @@
   @media (max-width: 1024px) {
     grid-template-columns: 1fr;
   }
+
+  // Grid children default to min-width: auto (content-sized), which means
+  // a wide table or a long product name inside a card pushes the card
+  // past its allotted track. Override so they shrink to fit their column.
+  > * {
+    min-width: 0;
+  }
 }
 
 table.mat-mdc-table {
@@ -83,6 +90,11 @@ table.mat-mdc-table {
 
 .table-wrap {
   overflow-x: auto;
+  // Stop the wrap itself from expanding past its parent. Without this a
+  // mat-table with wide columns makes mat-card-content grow to content
+  // width, which blows the card out to the right.
+  max-width: 100%;
+  min-width: 0;
 }
 
 .status-chip {
@@ -116,13 +128,24 @@ table.mat-mdc-table {
 
   &__emoji {
     font-size: 1.5rem;
+    flex-shrink: 0;
   }
 
   &__info {
     flex: 1;
+    // min-width: 0 lets the flex item shrink below its content-based
+    // intrinsic min, which is what enables text-overflow on long names.
+    min-width: 0;
     display: flex;
     flex-direction: column;
     line-height: 1.1;
+
+    strong,
+    small {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
 
     small {
       color: var(--mat-sys-on-surface-variant);
@@ -194,6 +217,7 @@ table.mat-mdc-table {
     font-size: 1.5rem;
     width: 2.25rem;
     text-align: center;
+    flex-shrink: 0;
   }
 
   &__photo {
@@ -201,13 +225,22 @@ table.mat-mdc-table {
     height: 2.25rem;
     border-radius: 0.4rem;
     object-fit: cover;
+    flex-shrink: 0;
   }
 
   &__info {
     flex: 1;
+    min-width: 0;
     display: flex;
     flex-direction: column;
     line-height: 1.1;
+
+    strong,
+    small {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
 
     small {
       color: var(--mat-sys-on-surface-variant);
@@ -241,6 +274,7 @@ table.mat-mdc-table {
     font-size: 1.6rem;
     width: 2.25rem;
     text-align: center;
+    flex-shrink: 0;
   }
 
   &__photo {
@@ -248,13 +282,22 @@ table.mat-mdc-table {
     height: 2.25rem;
     border-radius: 0.4rem;
     object-fit: cover;
+    flex-shrink: 0;
   }
 
   &__info {
     flex: 1;
+    min-width: 0;
     display: flex;
     flex-direction: column;
     line-height: 1.2;
+
+    strong,
+    small {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
 
     small {
       color: var(--mat-sys-on-surface-variant);
