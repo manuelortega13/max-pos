@@ -74,12 +74,8 @@ export class PullToRefreshDirective implements OnInit {
     // need to check scrollTop on.
     this.scrollEl = this.findScrollContainer(this.host.nativeElement);
     // Stop the browser's native overscroll bounce from eating the gesture.
-    // iOS PWA (standalone mode) in particular rubber-bands the scroll
-    // container on pull-at-top and steals the touchmove events before our
-    // handler sees them. `none` (not `contain`) is what actually kills the
-    // bounce — `contain` only stops scroll chaining.
     if (this.scrollEl && this.scrollEl !== document.documentElement) {
-      this.scrollEl.style.overscrollBehaviorY = 'none';
+      this.scrollEl.style.overscrollBehaviorY = 'contain';
     }
 
     // Touch handling runs outside Angular — we only re-enter the zone when
@@ -108,16 +104,6 @@ export class PullToRefreshDirective implements OnInit {
       this.pulling = false;
       return;
     }
-    // If the touch starts inside an inner scrollable element (e.g. the
-    // POS page's product grid or cart panel, which own their own
-    // overflow-y:auto), those events belong to that element — engaging
-    // the pull gesture would preventDefault on its touchmove and make
-    // the inner scroll unusable. Only engage when the touch is on the
-    // outer shell itself.
-    if (this.isInsideInnerScroll(e.target as HTMLElement | null)) {
-      this.pulling = false;
-      return;
-    }
     const top = this.scrollEl?.scrollTop ?? 0;
     if (top > 0) {
       this.pulling = false;
@@ -128,27 +114,6 @@ export class PullToRefreshDirective implements OnInit {
     this.pulling = true;
   };
 
-  /**
-   * Walk up from the touch target looking for a scrollable ancestor
-   * that's strictly *inside* our chosen scrollEl. If we hit one before
-   * reaching scrollEl, the touch is inside a nested scroller and we
-   * should stay out of its way.
-   */
-  private isInsideInnerScroll(target: HTMLElement | null): boolean {
-    let el: HTMLElement | null = target;
-    while (el && el !== this.scrollEl && el !== document.body) {
-      const s = getComputedStyle(el);
-      if (
-        (s.overflowY === 'auto' || s.overflowY === 'scroll') &&
-        el.scrollHeight > el.clientHeight
-      ) {
-        return true;
-      }
-      el = el.parentElement;
-    }
-    return false;
-  }
-
   private onMove = (e: TouchEvent): void => {
     if (!this.pulling) return;
     this.lastY = e.touches[0].clientY;
@@ -157,14 +122,10 @@ export class PullToRefreshDirective implements OnInit {
       this.hideIndicator();
       return;
     }
-    // Call preventDefault early on any positive delta — on iOS PWA the
-    // native rubber-band bounce starts after ~2-3px of movement and, once
-    // it kicks in, the rest of touchmove is consumed by the overscroll
-    // animation. Blocking it at delta=1 keeps the gesture under our
-    // control. (Desktop/Android tolerate this fine because they don't
-    // rubber-band when the gate passed scrollTop===0.)
-    if (e.cancelable) e.preventDefault();
     const damped = Math.min(MAX_PULL, delta * DAMPING);
+    // Only preventDefault once we're clearly pulling; lets the first few
+    // pixels still act as normal scroll if the user was really scrolling.
+    if (damped > 4 && e.cancelable) e.preventDefault();
     this.showIndicator(damped);
   };
 
