@@ -31,6 +31,15 @@ public class SaleItem {
     @Column(name = "unit_price", nullable = false, precision = 12, scale = 2)
     private BigDecimal unitPrice;
 
+    /**
+     * The product's {@code cost} at the moment this line was rung up.
+     * Stamped by {@link com.maxpos.sale.SaleService#create}. Nullable for
+     * pre-V14 rows; the reports page falls back to {@link com.maxpos.product.Product#getCost()}
+     * when computing historical COGS.
+     */
+    @Column(name = "unit_cost", precision = 12, scale = 2)
+    private BigDecimal unitCost;
+
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal subtotal;
 
@@ -55,6 +64,8 @@ public class SaleItem {
     public void setQuantity(int quantity) { this.quantity = quantity; }
     public BigDecimal getUnitPrice() { return unitPrice; }
     public void setUnitPrice(BigDecimal unitPrice) { this.unitPrice = unitPrice; }
+    public BigDecimal getUnitCost() { return unitCost; }
+    public void setUnitCost(BigDecimal unitCost) { this.unitCost = unitCost; }
     public BigDecimal getSubtotal() { return subtotal; }
     public void setSubtotal(BigDecimal subtotal) { this.subtotal = subtotal; }
     public DiscountType getDiscountType() { return discountType; }

@@ -17,11 +17,19 @@ const RECONNECT_DELAY_MS = 5_000;
 
 /**
  * Connects to the backend's SSE stream at /api/notifications/stream and
- * surfaces every received event as a MatSnackBar toast, plus keeps a rolling
- * log in a signal for anyone who wants to render the history.
+ * surfaces every received event as a MatSnackBar toast, plus keeps a
+ * rolling log in a signal for anyone who wants to render the history.
  *
- * Uses fetch() + ReadableStream instead of native EventSource because the
- * latter can't send the JWT Authorization header.
+ * Uses fetch() + ReadableStream instead of native EventSource because
+ * the latter can't send the JWT Authorization header.
+ *
+ * Mobile robustness note: iOS / Android aggressively suspend background
+ * fetch streams and throttle setTimeout for hidden tabs. The reconnect
+ * timer alone isn't enough because (1) the timer itself may be
+ * throttled, and (2) the stream can sit half-dead with no data flowing
+ * and no error fired. We listen to `visibilitychange` + `focus` and
+ * force a fresh reconnect whenever the app comes back to the
+ * foreground — that's the moment it actually matters.
  */
 @Injectable({ providedIn: 'root' })
 export class RealtimeService {
@@ -33,6 +41,7 @@ export class RealtimeService {
   private readonly _connected = signal<boolean>(false);
   private readonly _events = signal<RealtimeEvent[]>([]);
   private readonly _latestEvent = signal<RealtimeEvent | null>(null);
+  private visibilityBound = false;
 
   readonly connected = this._connected.asReadonly();
   /** Rolling log of received events (most recent first, capped at 50). */
@@ -46,6 +55,7 @@ export class RealtimeService {
 
   start(): void {
     if (!this.authService.isAuthenticated()) return;
+    this.bindVisibilityListeners();
     if (this.abortController) return;
     this.connect();
   }
@@ -58,6 +68,49 @@ export class RealtimeService {
     this.abortController?.abort();
     this.abortController = null;
     this._connected.set(false);
+    this.unbindVisibilityListeners();
+  }
+
+  /** Force a fresh reconnect — used when app returns from background. */
+  private wake(): void {
+    if (!this.authService.isAuthenticated()) return;
+    console.info('[realtime] wake → reconnecting SSE');
+    // Cancel any scheduled timer so we don't double-connect moments later.
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    // Abort the (potentially half-dead) current stream; the finally block
+    // from connect() kicks in, schedules a reconnect, but we also call
+    // connect() directly because on mobile the aborted-promise settlement
+    // can be delayed by the suspended engine.
+    this.abortController?.abort();
+    this.abortController = null;
+    this._connected.set(false);
+    this.connect();
+  }
+
+  private onVisible = () => {
+    if (document.visibilityState === 'visible' && !this._connected()) {
+      this.wake();
+    }
+  };
+  private onFocus = () => {
+    if (!this._connected()) this.wake();
+  };
+
+  private bindVisibilityListeners(): void {
+    if (this.visibilityBound || typeof window === 'undefined') return;
+    document.addEventListener('visibilitychange', this.onVisible);
+    window.addEventListener('focus', this.onFocus);
+    this.visibilityBound = true;
+  }
+
+  private unbindVisibilityListeners(): void {
+    if (!this.visibilityBound || typeof window === 'undefined') return;
+    document.removeEventListener('visibilitychange', this.onVisible);
+    window.removeEventListener('focus', this.onFocus);
+    this.visibilityBound = false;
   }
 
   private connect(): void {
@@ -67,6 +120,7 @@ export class RealtimeService {
     const controller = new AbortController();
     this.abortController = controller;
 
+    console.info('[realtime] connecting');
     // SSE uses raw fetch (EventSource can't send Authorization headers),
     // so the apiBaseUrl interceptor doesn't apply here — prepend manually.
     fetch(environment.apiBaseUrl + '/api/notifications/stream', {
@@ -81,15 +135,23 @@ export class RealtimeService {
         if (!response.ok || !response.body) {
           throw new Error(`SSE handshake failed (${response.status})`);
         }
+        console.info('[realtime] connected');
         this._connected.set(true);
         await this.readStream(response.body);
       })
-      .catch(() => {
-        /* network / aborted — handled by scheduleReconnect below */
+      .catch((err) => {
+        // Aborts show up here too — that's fine, the finally block
+        // schedules a reconnect. Don't log abort noise, but do log real
+        // network failures so they show up in phone DevTools.
+        if ((err as { name?: string })?.name !== 'AbortError') {
+          console.warn('[realtime] stream error', err);
+        }
       })
       .finally(() => {
         this._connected.set(false);
-        this.abortController = null;
+        if (this.abortController === controller) {
+          this.abortController = null;
+        }
         if (this.authService.isAuthenticated()) {
           this.scheduleReconnect();
         }

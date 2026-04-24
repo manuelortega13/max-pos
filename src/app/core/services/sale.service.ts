@@ -184,6 +184,7 @@ export class SaleService {
         productName: product?.name ?? '(offline)',
         quantity: line.quantity,
         unitPrice,
+        unitCost: product?.cost ?? null,
         subtotal,
         discountType: line.discount?.type ?? null,
         discountValue: line.discount?.value ?? null,

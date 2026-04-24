@@ -2,110 +2,183 @@
   <header class="page__header">
     <div>
       <h1 class="page__title">Reports</h1>
-      <p class="page__subtitle">Performance across the store</p>
+      <p class="page__subtitle">
+        Gross profit, expenses, and net profit for a selected date range
+      </p>
     </div>
-    <button mat-stroked-button>
-      <mat-icon>download</mat-icon>
-      Export report
+    <button
+      mat-stroked-button
+      [matMenuTriggerFor]="exportMenu"
+      [disabled]="exporting()"
+      class="page__export"
+    >
+      <mat-icon>{{ exporting() ? 'hourglass_empty' : 'download' }}</mat-icon>
+      {{ exporting() ? 'Exporting…' : 'Export' }}
+      <mat-icon iconPositionEnd>expand_more</mat-icon>
     </button>
+    <mat-menu #exportMenu="matMenu">
+      <button mat-menu-item (click)="exportCsv()">
+        <mat-icon>table_view</mat-icon>
+        <span>CSV</span>
+      </button>
+      <button mat-menu-item (click)="exportXlsx()">
+        <mat-icon>grid_on</mat-icon>
+        <span>Excel sheet (.xlsx)</span>
+      </button>
+      <button mat-menu-item (click)="exportPdf()">
+        <mat-icon>picture_as_pdf</mat-icon>
+        <span>PDF</span>
+      </button>
+    </mat-menu>
   </header>
 
-  <div class="kpi-grid">
-    <mat-card appearance="outlined" class="kpi">
-      <div class="kpi__icon kpi__icon--primary"><mat-icon>payments</mat-icon></div>
-      <div>
-        <span class="kpi__label">Total revenue</span>
-        <span class="kpi__value">{{ summary().revenue | money }}</span>
+  <!-- ── Date range controls ────────────────────────────────────────── -->
+  <mat-card appearance="outlined">
+    <mat-card-content class="range">
+      <mat-button-toggle-group
+        [value]="preset()"
+        (change)="applyPreset($event.value)"
+        class="range__presets"
+        hideSingleSelectionIndicator
+      >
+        <mat-button-toggle value="today">Today</mat-button-toggle>
+        <mat-button-toggle value="week">7 days</mat-button-toggle>
+        <mat-button-toggle value="month">This month</mat-button-toggle>
+        <mat-button-toggle value="year">This year</mat-button-toggle>
+        <mat-button-toggle value="custom">Custom</mat-button-toggle>
+      </mat-button-toggle-group>
+
+      <div class="range__dates">
+        <mat-form-field appearance="outline" class="range__field" subscriptSizing="dynamic">
+          <mat-label>From</mat-label>
+          <input
+            matInput
+            [matDatepicker]="fromPicker"
+            [ngModel]="fromDate()"
+            (ngModelChange)="onFromDateChange($event)"
+          />
+          <mat-datepicker-toggle matIconSuffix [for]="fromPicker"></mat-datepicker-toggle>
+          <mat-datepicker #fromPicker></mat-datepicker>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="range__field" subscriptSizing="dynamic">
+          <mat-label>To</mat-label>
+          <input
+            matInput
+            [matDatepicker]="toPicker"
+            [ngModel]="toDate()"
+            (ngModelChange)="onToDateChange($event)"
+          />
+          <mat-datepicker-toggle matIconSuffix [for]="toPicker"></mat-datepicker-toggle>
+          <mat-datepicker #toPicker></mat-datepicker>
+        </mat-form-field>
       </div>
+    </mat-card-content>
+  </mat-card>
+
+  <!-- ── Summary tiles ──────────────────────────────────────────────── -->
+  <div class="summary">
+    <mat-card appearance="outlined" class="summary__tile">
+      <span class="summary__label">Revenue</span>
+      <span class="summary__value">{{ revenue() | money }}</span>
+      <small class="summary__meta">{{ rangeSales().length }} completed sale(s)</small>
     </mat-card>
-    <mat-card appearance="outlined" class="kpi">
-      <div class="kpi__icon kpi__icon--tertiary"><mat-icon>shopping_bag</mat-icon></div>
-      <div>
-        <span class="kpi__label">Items sold</span>
-        <span class="kpi__value">{{ summary().itemsSold }}</span>
-      </div>
+    <mat-card appearance="outlined" class="summary__tile">
+      <span class="summary__label">COGS</span>
+      <span class="summary__value summary__value--muted">−{{ cogs() | money }}</span>
+      <small class="summary__meta">Cost of goods sold</small>
     </mat-card>
-    <mat-card appearance="outlined" class="kpi">
-      <div class="kpi__icon kpi__icon--secondary"><mat-icon>receipt_long</mat-icon></div>
-      <div>
-        <span class="kpi__label">Transactions</span>
-        <span class="kpi__value">{{ summary().transactions }}</span>
-      </div>
+    <mat-card appearance="outlined" class="summary__tile summary__tile--gp">
+      <span class="summary__label">Gross profit</span>
+      <span class="summary__value">{{ grossProfit() | money }}</span>
+      <small class="summary__meta">{{ grossMargin().toFixed(1) }}% margin</small>
     </mat-card>
-    <mat-card appearance="outlined" class="kpi">
-      <div class="kpi__icon kpi__icon--neutral"><mat-icon>local_atm</mat-icon></div>
-      <div>
-        <span class="kpi__label">Average ticket</span>
-        <span class="kpi__value">{{ summary().averageTicket | money }}</span>
-      </div>
+    <mat-card appearance="outlined" class="summary__tile">
+      <span class="summary__label">Expenses</span>
+      <span class="summary__value summary__value--muted">
+        −{{ totalExpenses() | money }}
+      </span>
+      <small class="summary__meta">{{ expenses().length }} entry(ies)</small>
+    </mat-card>
+    <mat-card
+      appearance="outlined"
+      class="summary__tile"
+      [class.summary__tile--np]="netProfit() >= 0"
+      [class.summary__tile--loss]="netProfit() < 0"
+    >
+      <span class="summary__label">Net profit</span>
+      <span class="summary__value">{{ netProfit() | money }}</span>
+      <small class="summary__meta">Gross − expenses</small>
     </mat-card>
   </div>
 
-  <div class="reports-grid">
-    <mat-card appearance="outlined">
-      <mat-card-header>
-        <mat-card-title>Top products</mat-card-title>
-        <mat-card-subtitle>By revenue</mat-card-subtitle>
-      </mat-card-header>
-      <mat-card-content>
-        <ul class="rank-list">
-          @for (row of topProducts(); track row.label) {
-            <li class="rank-list__item">
-              <div class="rank-list__row">
-                <span class="rank-list__label">{{ row.label }}</span>
-                <span class="rank-list__value">{{ row.value | money }}</span>
-              </div>
-              <mat-progress-bar mode="determinate" [value]="row.percentage"></mat-progress-bar>
-              <small class="rank-list__meta">{{ row.count }} units sold</small>
-            </li>
-          }
-        </ul>
-      </mat-card-content>
-    </mat-card>
+  <!-- ── Expenses list ──────────────────────────────────────────────── -->
+  <mat-card appearance="outlined">
+    <mat-card-header class="expenses__header">
+      <mat-card-title>Expenses</mat-card-title>
+      <mat-card-subtitle>
+        Counted against gross profit to compute net profit
+      </mat-card-subtitle>
+      <span class="expenses__spacer"></span>
+      <button mat-flat-button color="primary" (click)="openCreateExpense()">
+        <mat-icon>add</mat-icon>
+        Add expense
+      </button>
+    </mat-card-header>
 
-    <mat-card appearance="outlined">
-      <mat-card-header>
-        <mat-card-title>By cashier</mat-card-title>
-        <mat-card-subtitle>Revenue per employee</mat-card-subtitle>
-      </mat-card-header>
-      <mat-card-content>
-        <ul class="rank-list">
-          @for (row of byCashier(); track row.label) {
-            <li class="rank-list__item">
-              <div class="rank-list__row">
-                <span class="rank-list__label">{{ row.label }}</span>
-                <span class="rank-list__value">{{ row.value | money }}</span>
-              </div>
-              <mat-progress-bar mode="determinate" [value]="row.percentage"></mat-progress-bar>
-              <small class="rank-list__meta">{{ row.count }} transactions</small>
-            </li>
-          }
-        </ul>
-      </mat-card-content>
-    </mat-card>
+    @if (expensesLoading()) {
+      <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+    }
 
-    <mat-card appearance="outlined" class="span-full">
-      <mat-card-header>
-        <mat-card-title>By category</mat-card-title>
-        <mat-card-subtitle>Revenue distribution</mat-card-subtitle>
-      </mat-card-header>
-      <mat-card-content>
-        <ul class="rank-list">
-          @for (row of byCategory(); track row.label) {
-            <li class="rank-list__item">
-              <div class="rank-list__row">
-                <span class="rank-list__label">
-                  <span class="rank-list__dot" [style.background]="row.color"></span>
-                  {{ row.label }}
-                </span>
-                <span class="rank-list__value">{{ row.value | money }}</span>
-              </div>
-              <mat-progress-bar mode="determinate" [value]="row.percentage"></mat-progress-bar>
-              <small class="rank-list__meta">{{ row.count }} units sold</small>
-            </li>
-          }
-        </ul>
-      </mat-card-content>
-    </mat-card>
-  </div>
+    <mat-card-content class="table-wrap">
+      <table mat-table [dataSource]="expenses()" class="w-full">
+        <ng-container matColumnDef="date">
+          <th mat-header-cell *matHeaderCellDef>Date</th>
+          <td mat-cell *matCellDef="let e">{{ e.date | date: 'mediumDate' }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="category">
+          <th mat-header-cell *matHeaderCellDef>Category</th>
+          <td mat-cell *matCellDef="let e">{{ e.category ?? '—' }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="description">
+          <th mat-header-cell *matHeaderCellDef>Description</th>
+          <td mat-cell *matCellDef="let e" class="expenses__desc">{{ e.description }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="amount">
+          <th mat-header-cell *matHeaderCellDef class="expenses__num">Amount</th>
+          <td mat-cell *matCellDef="let e" class="expenses__num">
+            <strong>{{ e.amount | money }}</strong>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef></th>
+          <td mat-cell *matCellDef="let e" class="expenses__actions">
+            <button mat-icon-button (click)="openEditExpense(e)" matTooltip="Edit">
+              <mat-icon>edit</mat-icon>
+            </button>
+            <button
+              mat-icon-button
+              color="warn"
+              (click)="confirmDelete(e)"
+              matTooltip="Delete"
+            >
+              <mat-icon>delete</mat-icon>
+            </button>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="columns"></tr>
+        <tr mat-row *matRowDef="let row; columns: columns"></tr>
+        <tr *matNoDataRow>
+          <td [attr.colspan]="columns.length" class="no-data">
+            No expenses in this range. Tap <strong>Add expense</strong> to log one.
+          </td>
+        </tr>
+      </table>
+    </mat-card-content>
+  </mat-card>
 </section>

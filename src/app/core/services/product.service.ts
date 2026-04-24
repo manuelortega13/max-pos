@@ -37,12 +37,22 @@ export class ProductService {
     this.load();
 
     // Refresh product list when the backend signals inventory changed (new
-    // sale, refund, restock, write-off, etc.). The realtime stream is admin-
-    // only; for cashiers the effect simply never fires because `latestEvent`
-    // stays null, which is the intended behavior.
+    // sale, refund, restock, write-off, etc.). Every role can receive
+    // inventory.* via the publishToAll broadcast, so this effect works for
+    // both the admin and cashier shells.
     effect(() => {
       const event = this.realtime.latestEvent();
       if (event && event.type === 'inventory.changed') {
+        this.load();
+      }
+    });
+
+    // Reload whenever the SSE stream (re)connects. SSE doesn't replay
+    // history, so any inventory.changed events fired while the phone was
+    // backgrounded and the stream was suspended are lost to us — the
+    // safest recovery is a full reload the moment we're back online.
+    effect(() => {
+      if (this.realtime.connected()) {
         this.load();
       }
     });

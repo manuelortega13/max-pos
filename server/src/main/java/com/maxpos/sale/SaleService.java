@@ -136,6 +136,9 @@ public class SaleService {
             item.setProductName(product.getName());
             item.setQuantity(line.quantity());
             item.setUnitPrice(product.getPrice());
+            // Stamp the cost at sale time so future gross-profit reports
+            // stay accurate when product.cost drifts.
+            item.setUnitCost(product.getCost());
             BigDecimal lineGross = product.getPrice()
                     .multiply(BigDecimal.valueOf(line.quantity()))
                     .setScale(2, RoundingMode.HALF_UP);

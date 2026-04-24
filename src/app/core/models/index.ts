@@ -5,3 +5,4 @@ export * from './user.model';
 export * from './cart.model';
 export * from './settings.model';
 export * from './auth.model';
+export * from './expense.model';

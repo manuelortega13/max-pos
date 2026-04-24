@@ -11,6 +11,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { DiscountInput, DiscountType } from '../../core/models';
+import { SettingsService } from '../../core/services/settings.service';
 import { MoneyPipe } from '../pipes/currency-symbol.pipe';
 
 export interface DiscountDialogData {
@@ -70,7 +71,7 @@ export interface DiscountDialogResult {
           Percent
         </mat-button-toggle>
         <mat-button-toggle value="FIXED">
-          <mat-icon>attach_money</mat-icon>
+          <span class="discount__currency">{{ currencySymbol() }}</span>
           Fixed amount
         </mat-button-toggle>
       </mat-button-toggle-group>
@@ -79,6 +80,8 @@ export interface DiscountDialogResult {
         <mat-label>{{ type() === 'PERCENT' ? 'Percent off' : 'Amount off' }}</mat-label>
         @if (type() === 'PERCENT') {
           <span matTextSuffix>&nbsp;%</span>
+        } @else {
+          <span matTextPrefix>{{ currencySymbol() }}&nbsp;</span>
         }
         <input
           matInput
@@ -181,6 +184,17 @@ export interface DiscountDialogResult {
         gap: 0.35rem;
         justify-content: center;
       }
+      /* Mirrors a Material icon's 1.25rem optical weight so the currency
+         glyph lines up with the Percent toggle's mat-icon on the other. */
+      .discount__currency {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 1.25rem;
+        height: 1.25rem;
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+      }
       .discount__field { width: 100%; }
       .discount__hint-error { color: var(--mat-sys-error); }
       .discount__preview {
@@ -214,10 +228,17 @@ export class DiscountDialog {
   private readonly ref = inject(
     MatDialogRef<DiscountDialog, DiscountDialogResult>,
   );
+  private readonly settingsService = inject(SettingsService);
+  protected readonly currencySymbol = computed(
+    () => this.settingsService.settings().currencySymbol,
+  );
 
   // Keep the input as a string so we can tell "empty" apart from 0 and
   // avoid rounding artifacts during typing (parseFloat('.5') = 0.5 etc.).
-  protected readonly type = signal<DiscountType>(this.data.current?.type ?? 'PERCENT');
+  // Default to FIXED because cashiers most often take a round amount off
+  // (₱5, ₱10) rather than computing a percentage in their head; an
+  // existing discount on edit still wins.
+  protected readonly type = signal<DiscountType>(this.data.current?.type ?? 'FIXED');
   protected readonly valueText = signal<string>(
     this.data.current?.value != null ? String(this.data.current.value) : '',
   );

@@ -19,6 +19,8 @@ export interface SaleItem {
   readonly productName: string;
   readonly quantity: number;
   readonly unitPrice: number;
+  /** product.cost at sale time. Nullable for pre-V14 historical rows. */
+  readonly unitCost: number | null;
   /** Line subtotal, already NET of any line discount. */
   readonly subtotal: number;
   readonly discountType: DiscountType | null;
