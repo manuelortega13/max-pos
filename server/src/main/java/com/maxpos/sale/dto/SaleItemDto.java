@@ -1,5 +1,6 @@
 package com.maxpos.sale.dto;
 
+import com.maxpos.sale.DiscountType;
 import com.maxpos.sale.SaleItem;
 
 import java.math.BigDecimal;
@@ -10,7 +11,10 @@ public record SaleItemDto(
         String productName,
         int quantity,
         BigDecimal unitPrice,
-        BigDecimal subtotal
+        BigDecimal subtotal,
+        DiscountType discountType,
+        BigDecimal discountValue,
+        BigDecimal discountAmount
 ) {
     public static SaleItemDto from(SaleItem item) {
         return new SaleItemDto(
@@ -18,7 +22,10 @@ public record SaleItemDto(
                 item.getProductName(),
                 item.getQuantity(),
                 item.getUnitPrice(),
-                item.getSubtotal()
+                item.getSubtotal(),
+                item.getDiscountType(),
+                item.getDiscountValue(),
+                item.getDiscountAmount()
         );
     }
 }

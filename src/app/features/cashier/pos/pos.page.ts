@@ -27,8 +27,18 @@ import { CartService } from '../../../core/services/cart.service';
 import { CategoryService } from '../../../core/services/category.service';
 import { ProductService } from '../../../core/services/product.service';
 import { SettingsService } from '../../../core/services/settings.service';
-import { Product } from '../../../core/models';
+import { CartLine, Product } from '../../../core/models';
+import {
+  lineDiscountAmount,
+  lineGross,
+  lineNet,
+} from '../../../core/services/cart.service';
 import { MoneyPipe } from '../../../shared/pipes/currency-symbol.pipe';
+import {
+  DiscountDialog,
+  DiscountDialogData,
+  DiscountDialogResult,
+} from '../../../shared/dialogs/discount-dialog';
 import { CheckoutDialog } from './checkout-dialog';
 import { QuantityDialog } from './quantity-dialog';
 import { StockLimitDialog, StockLimitDialogData } from './stock-limit-dialog';
@@ -78,6 +88,12 @@ export class PosPage implements AfterViewInit {
   protected readonly activeIndex = signal<number>(-1);
   /** Mobile-only: whether the bottom-sheet cart is expanded to full-screen. */
   protected readonly cartExpanded = signal<boolean>(false);
+  /**
+   * Index of the cart line the cashier is navigating with keyboard focus
+   * (enter with F4). `null` means we're not in cart-navigation mode — the
+   * usual search-input focus applies.
+   */
+  protected readonly cartFocusIndex = signal<number | null>(null);
   private readonly gridRef = viewChild<ElementRef<HTMLElement>>('productGrid');
   private readonly searchInputRef = viewChild<ElementRef<HTMLInputElement>>('searchInput');
   private readonly catGroupRef = viewChild('catGroup', { read: ElementRef });
@@ -103,6 +119,14 @@ export class PosPage implements AfterViewInit {
   protected readonly total = this.cartService.total;
   protected readonly itemCount = this.cartService.itemCount;
   protected readonly isEmpty = this.cartService.isEmpty;
+  protected readonly orderDiscount = this.cartService.orderDiscount;
+  protected readonly orderDiscountAmount = this.cartService.orderDiscountAmount;
+  protected readonly lineDiscountTotal = this.cartService.lineDiscountTotal;
+
+  // Template helpers — keep math in one place (cart.service.ts).
+  protected lineGross = lineGross;
+  protected lineNet = lineNet;
+  protected lineDiscountAmount = lineDiscountAmount;
 
   constructor() {
     // Whenever the filtered list changes (cashier types a new search term,
@@ -474,6 +498,50 @@ export class PosPage implements AfterViewInit {
     this.cartExpanded.set(false);
   }
 
+  /** Open the discount dialog scoped to a single cart line. */
+  protected openLineDiscount(line: CartLine): void {
+    const base = this.lineGross(line);
+    if (base <= 0) return;
+    const ref = this.dialog.open<DiscountDialog, DiscountDialogData, DiscountDialogResult>(
+      DiscountDialog,
+      {
+        width: '480px',
+        panelClass: 'dialog-fullscreen-mobile',
+        data: {
+          target: line.product.name,
+          baseAmount: base,
+          current: line.discount ?? null,
+        },
+      },
+    );
+    ref.afterClosed().subscribe((result) => {
+      if (!result) return;
+      this.cartService.setLineDiscount(line.product.id, result.discount);
+    });
+  }
+
+  /** Open the discount dialog scoped to the whole sale. */
+  protected openOrderDiscount(): void {
+    const base = this.subtotal();
+    if (base <= 0) return;
+    const ref = this.dialog.open<DiscountDialog, DiscountDialogData, DiscountDialogResult>(
+      DiscountDialog,
+      {
+        width: '480px',
+        panelClass: 'dialog-fullscreen-mobile',
+        data: {
+          target: 'sale total',
+          baseAmount: base,
+          current: this.orderDiscount(),
+        },
+      },
+    );
+    ref.afterClosed().subscribe((result) => {
+      if (!result) return;
+      this.cartService.setOrderDiscount(result.discount);
+    });
+  }
+
   protected toggleCart(): void {
     if (this.isEmpty()) return;
     this.cartExpanded.update((v) => !v);
@@ -485,20 +553,92 @@ export class PosPage implements AfterViewInit {
 
   @HostListener('document:keydown', ['$event'])
   protected onKeydown(event: KeyboardEvent): void {
+    const evt = event;
     if (this.dialog.openDialogs.length > 0) return;
 
-    const isChargeShortcut = (event.ctrlKey || event.metaKey) && event.key === 'Enter';
+    // Shift+F4 — jump straight to the order-level discount dialog.
+    if (evt.key === 'F4' && evt.shiftKey) {
+      evt.preventDefault();
+      this.cartFocusIndex.set(null);
+      if (!this.isEmpty()) this.openOrderDiscount();
+      return;
+    }
+
+    // Cart-navigation mode — only active once F4 has been pressed once.
+    if (this.cartFocusIndex() !== null) {
+      if (evt.key === 'ArrowUp') {
+        evt.preventDefault();
+        this.moveCartFocus(-1);
+        return;
+      }
+      if (evt.key === 'ArrowDown' || evt.key === 'F4') {
+        evt.preventDefault();
+        this.moveCartFocus(+1);
+        return;
+      }
+      if (evt.key === 'Enter') {
+        evt.preventDefault();
+        this.openLineDiscountAtFocus();
+        return;
+      }
+      if (evt.key === 'Escape') {
+        evt.preventDefault();
+        this.exitCartFocus();
+        return;
+      }
+      // Any other key quietly exits the mode so normal typing resumes.
+      this.exitCartFocus();
+    }
+
+    const isChargeShortcut = (evt.ctrlKey || evt.metaKey) && evt.key === 'Enter';
     if (isChargeShortcut) {
       if (this.isEmpty()) return;
-      event.preventDefault();
+      evt.preventDefault();
       this.checkout();
       return;
     }
 
-    if (event.key === 'F3') {
-      event.preventDefault();
+    // F4 (no modifier) — enter cart-navigation mode if the cart has items.
+    if (evt.key === 'F4' && !evt.shiftKey && this.cartFocusIndex() === null) {
+      evt.preventDefault();
+      if (!this.isEmpty()) this.enterCartFocus();
+      return;
+    }
+
+    if (evt.key === 'F3') {
+      evt.preventDefault();
       this.openQuantityDialog();
     }
+  }
+
+  private enterCartFocus(): void {
+    this.cartFocusIndex.set(0);
+    // Release the search input so arrow keys reach the document-level
+    // handler instead of moving the caret.
+    (document.activeElement as HTMLElement | null)?.blur();
+  }
+
+  private exitCartFocus(): void {
+    this.cartFocusIndex.set(null);
+    queueMicrotask(() => this.searchInputRef()?.nativeElement.focus());
+  }
+
+  private moveCartFocus(delta: number): void {
+    const count = this.cart().length;
+    if (count === 0) {
+      this.cartFocusIndex.set(null);
+      return;
+    }
+    const current = this.cartFocusIndex() ?? 0;
+    this.cartFocusIndex.set((current + delta + count) % count);
+  }
+
+  private openLineDiscountAtFocus(): void {
+    const idx = this.cartFocusIndex();
+    if (idx === null) return;
+    const line = this.cart()[idx];
+    this.cartFocusIndex.set(null);
+    if (line) this.openLineDiscount(line);
   }
 
   protected checkout(): void {
@@ -513,6 +653,9 @@ export class PosPage implements AfterViewInit {
         tax: this.tax(),
         total: this.total(),
         lines: this.cart(),
+        orderDiscount: this.orderDiscount(),
+        orderDiscountAmount: this.orderDiscountAmount(),
+        lineDiscountTotal: this.lineDiscountTotal(),
       },
     });
     ref.afterClosed().subscribe((confirmed) => {

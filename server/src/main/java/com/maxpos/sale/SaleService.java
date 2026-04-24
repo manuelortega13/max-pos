@@ -136,17 +136,34 @@ public class SaleService {
             item.setProductName(product.getName());
             item.setQuantity(line.quantity());
             item.setUnitPrice(product.getPrice());
-            BigDecimal lineTotal = product.getPrice()
+            BigDecimal lineGross = product.getPrice()
                     .multiply(BigDecimal.valueOf(line.quantity()))
                     .setScale(2, RoundingMode.HALF_UP);
-            item.setSubtotal(lineTotal);
+
+            BigDecimal lineDiscountAmount = computeDiscount(lineGross, line.discount());
+            BigDecimal lineNet = lineGross.subtract(lineDiscountAmount);
+            item.setSubtotal(lineNet);
+            if (line.discount() != null) {
+                item.setDiscountType(line.discount().type());
+                item.setDiscountValue(line.discount().value());
+                item.setDiscountAmount(lineDiscountAmount);
+            }
             sale.addItem(item);
 
-            subtotal = subtotal.add(lineTotal);
+            subtotal = subtotal.add(lineNet);
         }
 
-        BigDecimal tax = subtotal.multiply(taxRate).setScale(2, RoundingMode.HALF_UP);
-        BigDecimal total = subtotal.add(tax);
+        // Order-level discount, applied against the line-net subtotal.
+        BigDecimal orderDiscountAmount = computeDiscount(subtotal, req.discount());
+        if (req.discount() != null) {
+            sale.setDiscountType(req.discount().type());
+            sale.setDiscountValue(req.discount().value());
+            sale.setDiscountAmount(orderDiscountAmount);
+        }
+
+        BigDecimal taxable = subtotal.subtract(orderDiscountAmount);
+        BigDecimal tax = taxable.multiply(taxRate).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal total = taxable.add(tax);
 
         sale.setSubtotal(subtotal);
         sale.setTax(tax);
@@ -154,7 +171,78 @@ public class SaleService {
 
         Sale saved = sales.save(sale);
         notifications.publishInventoryChanged();
+        publishDiscountNotificationIfAny(saved, cashier);
         return SaleDto.from(saved);
+    }
+
+    /**
+     * Given a base amount and a (possibly null) discount input, return the
+     * actual money off. Clamps to the base so a rogue FIXED value can't push
+     * a row below zero. Returns ZERO when the discount is missing / invalid.
+     */
+    private BigDecimal computeDiscount(BigDecimal base, CreateSaleRequest.Discount d) {
+        if (d == null || d.value() == null || d.value().signum() <= 0) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal amount = switch (d.type()) {
+            case PERCENT -> base.multiply(d.value())
+                    .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+            case FIXED -> d.value();
+        };
+        if (amount.compareTo(base) > 0) amount = base;
+        return amount.setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private void publishDiscountNotificationIfAny(Sale sale, User cashier) {
+        BigDecimal orderOff = sale.getDiscountAmount() == null ? BigDecimal.ZERO : sale.getDiscountAmount();
+        BigDecimal lineOff = sale.getItems().stream()
+                .map(SaleItem::getDiscountAmount)
+                .filter(java.util.Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal totalOff = orderOff.add(lineOff);
+        if (totalOff.signum() <= 0) return;
+
+        // Build a short, factual body. We list up to the first two item names
+        // that got a line discount so the admin can see what was marked down
+        // at a glance without rendering the entire basket.
+        java.util.List<String> discountedItemNames = sale.getItems().stream()
+                .filter(i -> i.getDiscountAmount() != null && i.getDiscountAmount().signum() > 0)
+                .map(SaleItem::getProductName)
+                .limit(2)
+                .toList();
+        StringBuilder body = new StringBuilder()
+                .append(cashier.getName())
+                .append(" discounted ")
+                .append(sale.getReference())
+                .append(" by ")
+                .append(totalOff.toPlainString());
+        if (orderOff.signum() > 0) {
+            body.append(" (order ").append(orderOff.toPlainString()).append(")");
+        }
+        if (!discountedItemNames.isEmpty()) {
+            body.append(" on ").append(String.join(", ", discountedItemNames));
+            long remaining = sale.getItems().stream()
+                    .filter(i -> i.getDiscountAmount() != null && i.getDiscountAmount().signum() > 0)
+                    .count() - discountedItemNames.size();
+            if (remaining > 0) body.append(" and ").append(remaining).append(" more");
+        }
+
+        java.util.Map<String, Object> data = new java.util.HashMap<>();
+        data.put("saleId", sale.getId());
+        data.put("reference", sale.getReference());
+        data.put("cashierId", cashier.getId());
+        data.put("cashierName", cashier.getName());
+        data.put("totalOff", totalOff);
+        data.put("orderOff", orderOff);
+        data.put("lineOff", lineOff);
+
+        notifications.publishToAdmins(NotificationEvent.of(
+                "sale.discounted",
+                "Discount applied",
+                body.toString(),
+                data,
+                "/admin/sales"
+        ));
     }
 
     /**

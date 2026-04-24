@@ -156,6 +156,24 @@
 
       <mat-divider></mat-divider>
 
+      @if (cartFocusIndex() !== null) {
+        <div class="pos__cart-hint" role="status" aria-live="polite">
+          <mat-icon>keyboard</mat-icon>
+          <span>
+            <strong>↑↓</strong> to pick · <strong>Enter</strong> to discount ·
+            <strong>Esc</strong> to cancel
+          </span>
+        </div>
+      } @else if (!isEmpty()) {
+        <div class="pos__cart-tip" aria-hidden="true">
+          <mat-icon>lightbulb_outline</mat-icon>
+          <span>
+            Press <kbd class="pos__shortcut pos__shortcut--inline">F4</kbd>
+            to discount a line item
+          </span>
+        </div>
+      }
+
       <div class="pos__cart-body">
         @if (isEmpty()) {
           <div class="pos__cart-empty">
@@ -165,8 +183,11 @@
           </div>
         } @else {
           <ul class="cart-list">
-            @for (line of cart(); track line.product.id) {
-              <li class="cart-line">
+            @for (line of cart(); track line.product.id; let i = $index) {
+              <li
+                class="cart-line"
+                [class.cart-line--focused]="cartFocusIndex() === i"
+              >
                 @if (line.product.imageUrl) {
                   <img [src]="line.product.imageUrl" [alt]="line.product.name" class="cart-line__photo" />
                 } @else {
@@ -207,9 +228,27 @@
                     <mat-icon>add</mat-icon>
                   </button>
                 </div>
-                <strong class="cart-line__total">
-                  {{ line.product.price * line.quantity | money }}
-                </strong>
+                <div class="cart-line__totals">
+                  @if (line.discount) {
+                    <span class="cart-line__total-gross">{{ lineGross(line) | money }}</span>
+                  }
+                  <strong
+                    class="cart-line__total"
+                    [class.cart-line__total--discounted]="!!line.discount"
+                  >
+                    {{ lineNet(line) | money }}
+                  </strong>
+                </div>
+                <button
+                  mat-icon-button
+                  class="cart-line__discount"
+                  [class.cart-line__discount--active]="!!line.discount"
+                  (click)="openLineDiscount(line)"
+                  [matTooltip]="line.discount ? 'Edit discount' : 'Add discount'"
+                  aria-label="Line discount"
+                >
+                  <mat-icon>local_offer</mat-icon>
+                </button>
                 <button
                   mat-icon-button
                   class="cart-line__remove"
@@ -232,6 +271,24 @@
             <span>Subtotal</span>
             <span>{{ subtotal() | money }}</span>
           </div>
+          @if (lineDiscountTotal() > 0) {
+            <div class="totals__row totals__row--discount">
+              <span>Line discounts</span>
+              <span>−{{ lineDiscountTotal() | money }}</span>
+            </div>
+          }
+          @if (orderDiscount(); as disc) {
+            <div class="totals__row totals__row--discount">
+              <span class="totals__order-discount">
+                <mat-icon>local_offer</mat-icon>
+                Order discount
+                <small>
+                  ({{ disc.type === 'PERCENT' ? disc.value + '%' : (disc.value | money) }})
+                </small>
+              </span>
+              <span>−{{ orderDiscountAmount() | money }}</span>
+            </div>
+          }
           <div class="totals__row">
             <span>Tax</span>
             <span>{{ tax() | money }}</span>
@@ -241,6 +298,24 @@
             <span>{{ total() | money }}</span>
           </div>
         </div>
+
+        <button
+          type="button"
+          mat-stroked-button
+          class="pos__discount-btn"
+          [class.pos__discount-btn--active]="!!orderDiscount()"
+          [disabled]="isEmpty()"
+          matTooltip="Shift + F4"
+          (click)="openOrderDiscount()"
+        >
+          <mat-icon>local_offer</mat-icon>
+          @if (orderDiscount()) {
+            Edit order discount
+          } @else {
+            Add order discount
+          }
+          <kbd class="pos__shortcut">Shift&nbsp;+&nbsp;F4</kbd>
+        </button>
 
         <button
           mat-flat-button

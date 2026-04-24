@@ -18,17 +18,24 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { HttpErrorResponse } from '@angular/common/http';
-import { CartLine, PaymentMethod, Sale } from '../../../core/models';
+import { CartLine, DiscountInput, PaymentMethod, Sale } from '../../../core/models';
 import { SettingsService } from '../../../core/services/settings.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { SaleService } from '../../../core/services/sale.service';
 import { MoneyPipe } from '../../../shared/pipes/currency-symbol.pipe';
 
 export interface CheckoutData {
+  /** Sum of line.net — i.e. already net of per-line discounts. */
   readonly subtotal: number;
   readonly tax: number;
   readonly total: number;
   readonly lines: readonly CartLine[];
+  /** Order-level discount input, if any. Forwarded to the create request. */
+  readonly orderDiscount: DiscountInput | null;
+  /** Money off from the order-level discount, for receipt display. */
+  readonly orderDiscountAmount: number;
+  /** Combined money off from every per-line discount (receipt summary). */
+  readonly lineDiscountTotal: number;
 }
 
 type Step = 'payment' | 'receipt';
@@ -137,8 +144,10 @@ export class CheckoutDialog {
         items: this.data.lines.map((l) => ({
           productId: l.product.id,
           quantity: l.quantity,
+          discount: l.discount,
         })),
         paymentMethod: this.paymentMethod(),
+        discount: this.data.orderDiscount ?? undefined,
       })
       .subscribe({
         next: (sale) => {

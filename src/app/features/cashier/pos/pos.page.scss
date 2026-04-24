@@ -162,6 +162,58 @@
     padding: 0.5rem 0;
   }
 
+  // Thin banner that only appears while the cashier is in F4 cart-focus
+  // mode. Explains the two key bindings needed to finish the discount or
+  // bail out so the UI is self-documenting the first time it's used.
+  &__cart-hint {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0.45rem 1rem 0;
+    padding: 0.45rem 0.75rem;
+    border-radius: 0.5rem;
+    background: var(--mat-sys-primary-container);
+    color: var(--mat-sys-on-primary-container);
+    font-size: 0.8rem;
+
+    mat-icon {
+      font-size: 1.1rem;
+      width: 1.1rem;
+      height: 1.1rem;
+    }
+
+    strong {
+      font-variant-numeric: tabular-nums;
+    }
+  }
+
+  // Persistent "Press F4 to discount" tip shown above the cart list when
+  // the cashier has items but isn't in F4 mode. Softer tone than the
+  // active hint so it doesn't shout — it's a nudge, not an instruction.
+  // Hidden on phones where a physical keyboard is the exception.
+  &__cart-tip {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0.45rem 1rem 0;
+    padding: 0.4rem 0.75rem;
+    border-radius: 0.5rem;
+    background: var(--mat-sys-surface-container);
+    color: var(--mat-sys-on-surface-variant);
+    font-size: 0.78rem;
+
+    mat-icon {
+      font-size: 1.05rem;
+      width: 1.05rem;
+      height: 1.05rem;
+      color: var(--mat-sys-primary);
+    }
+
+    @media (max-width: 640px) {
+      display: none;
+    }
+  }
+
   &__cart-empty {
     display: flex;
     flex-direction: column;
@@ -211,6 +263,16 @@
     font-size: 0.7rem;
     font-weight: 500;
     letter-spacing: 0.02em;
+
+    // Inline variant — used inside the F4 cart tip where the background
+    // is surface-container, so the translucent-white chip from the Charge
+    // button is unreadable. This is a bordered neutral chip instead.
+    &--inline {
+      margin: 0 0.1rem;
+      background: var(--mat-sys-surface);
+      color: var(--mat-sys-on-surface);
+      border: 1px solid var(--mat-sys-outline-variant);
+    }
   }
 
   /* Backdrop is desktop-invisible; activated only on mobile via media query. */
@@ -294,16 +356,26 @@
 
 .cart-line {
   display: grid;
-  // image | product info (flex) | qty controls | money | remove
-  // Auto-size the trailing columns so each one takes exactly what it
-  // needs; the info column absorbs the rest and truncates if too long.
-  // Tabular nums + min-width on .cart-line__total stops the grid from
-  // jittering as prices change length.
-  grid-template-columns: 2rem minmax(0, 1fr) auto auto 2rem;
+  // image | product info (flex) | qty controls | money | discount | remove
+  // Auto-size the trailing columns so each takes exactly what it needs;
+  // the info column absorbs the rest and truncates if too long. Tabular
+  // nums + min-width on .cart-line__total stop the grid from jittering
+  // as prices change length.
+  grid-template-columns: 2rem minmax(0, 1fr) auto auto 2rem 2rem;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.35rem;
   padding: 0.6rem 1.25rem;
   border-bottom: 1px solid var(--mat-sys-outline-variant);
+  transition: background 0.1s ease;
+
+  // Keyboard-nav highlight — set by cartFocusIndex when the cashier has
+  // entered F4 cart-navigation mode. Primary-container tint + inset ring
+  // so the row reads as "the currently selected one" without shifting
+  // layout.
+  &--focused {
+    background: var(--mat-sys-secondary-container);
+    box-shadow: inset 0 0 0 2px var(--mat-sys-primary);
+  }
 
   &__image {
     font-size: 1.4rem;
@@ -390,17 +462,37 @@
     }
   }
 
-  &__total {
+  &__totals {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
     min-width: 4.5rem;
+    line-height: 1.15;
+  }
+
+  &__total {
     text-align: right;
     font-weight: 600;
     font-variant-numeric: tabular-nums;
     font-size: 0.95rem;
     white-space: nowrap;
+
+    // When a line has a discount, the net price is shown in primary
+    // color so it reads as the "you pay" amount.
+    &--discounted {
+      color: var(--mat-sys-primary);
+    }
   }
 
+  &__total-gross {
+    font-size: 0.7rem;
+    text-decoration: line-through;
+    color: var(--mat-sys-on-surface-variant);
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__discount,
   &__remove {
-    color: var(--mat-sys-error);
     width: 2rem !important;
     height: 2rem !important;
     padding: 0 !important;
@@ -416,6 +508,18 @@
       height: 1.1rem;
     }
   }
+
+  &__discount {
+    color: var(--mat-sys-on-surface-variant);
+
+    &--active {
+      color: var(--mat-sys-primary);
+    }
+  }
+
+  &__remove {
+    color: var(--mat-sys-error);
+  }
 }
 
 .totals {
@@ -426,8 +530,11 @@
   &__row {
     display: flex;
     justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
     font-size: 0.9rem;
     color: var(--mat-sys-on-surface-variant);
+    font-variant-numeric: tabular-nums;
 
     &--grand {
       font-size: 1.15rem;
@@ -436,6 +543,38 @@
       padding-top: 0.5rem;
       border-top: 1px solid var(--mat-sys-outline-variant);
     }
+
+    &--discount {
+      color: var(--mat-sys-primary);
+    }
+  }
+
+  &__order-discount {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+
+    mat-icon {
+      font-size: 1rem;
+      width: 1rem;
+      height: 1rem;
+    }
+
+    small {
+      color: var(--mat-sys-on-surface-variant);
+      font-weight: 400;
+    }
+  }
+}
+
+.pos__discount-btn {
+  width: 100%;
+  justify-content: center;
+  color: var(--mat-sys-on-surface-variant);
+
+  &--active {
+    color: var(--mat-sys-primary);
+    border-color: var(--mat-sys-primary);
   }
 }
 
@@ -611,20 +750,21 @@
   }
 
   .cart-line {
-    grid-template-columns: 2rem minmax(0, 1fr) auto;
+    grid-template-columns: 2rem minmax(0, 1fr) auto auto;
     grid-template-areas:
-      "img info    qty"
-      "img total   remove";
-    gap: 0.35rem 0.5rem;
+      "img  info  info  qty"
+      "img  total disc  remove";
+    gap: 0.3rem 0.4rem;
     padding: 0.6rem 1rem;
 
     &__photo,
     &__image { grid-area: img; grid-row: 1 / span 2; align-self: center; }
     &__info { grid-area: info; }
     &__qty { grid-area: qty; justify-self: end; }
-    // Price hangs off the bottom-right of the info row so it lines up
-    // under the quantity cluster above — feels like a receipt.
-    &__total { grid-area: total; text-align: right; min-width: 0; }
+    // Totals column sits under info on row 2 — reads like a receipt.
+    &__totals { grid-area: total; align-items: flex-start; min-width: 0; }
+    &__total { text-align: left; }
+    &__discount { grid-area: disc; justify-self: end; }
     &__remove { grid-area: remove; justify-self: end; }
   }
 }

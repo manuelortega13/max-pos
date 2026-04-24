@@ -3,6 +3,7 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { Observable, of, tap, throwError } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 import { CreateSaleRequest, Sale, SaleItem } from '../models';
+import { computeDiscount } from './cart.service';
 import { AuthService } from './auth.service';
 import { OfflineQueueService } from './offline-queue.service';
 import { ProductService } from './product.service';
@@ -175,19 +176,26 @@ export class SaleService {
     const items: SaleItem[] = payload.items.map((line) => {
       const product = this.productService.getById(line.productId);
       const unitPrice = product?.price ?? 0;
-      const subtotal = round2(unitPrice * line.quantity);
+      const gross = round2(unitPrice * line.quantity);
+      const lineDiscountAmount = computeDiscount(gross, line.discount ?? null);
+      const subtotal = round2(gross - lineDiscountAmount);
       return {
         productId: line.productId,
         productName: product?.name ?? '(offline)',
         quantity: line.quantity,
         unitPrice,
         subtotal,
+        discountType: line.discount?.type ?? null,
+        discountValue: line.discount?.value ?? null,
+        discountAmount: line.discount ? lineDiscountAmount : null,
       };
     });
 
     const subtotal = round2(items.reduce((sum, i) => sum + i.subtotal, 0));
-    const tax = round2(subtotal * taxRate);
-    const total = round2(subtotal + tax);
+    const orderDiscountAmount = computeDiscount(subtotal, payload.discount ?? null);
+    const taxable = round2(Math.max(0, subtotal - orderDiscountAmount));
+    const tax = round2(taxable * taxRate);
+    const total = round2(taxable + tax);
 
     return {
       id: clientRef,
@@ -201,6 +209,9 @@ export class SaleService {
       paymentMethod: payload.paymentMethod,
       status: 'COMPLETED',
       refundReason: null,
+      discountType: payload.discount?.type ?? null,
+      discountValue: payload.discount?.value ?? null,
+      discountAmount: payload.discount ? orderDiscountAmount : null,
       items,
     };
   }

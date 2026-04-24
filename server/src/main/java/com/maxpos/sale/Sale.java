@@ -47,6 +47,16 @@ public class Sale {
     @Column(nullable = false, length = 16)
     private SaleStatus status;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "discount_type", length = 16)
+    private DiscountType discountType;
+
+    @Column(name = "discount_value", precision = 12, scale = 4)
+    private BigDecimal discountValue;
+
+    @Column(name = "discount_amount", precision = 12, scale = 2)
+    private BigDecimal discountAmount;
+
     @Column(name = "refund_reason", columnDefinition = "TEXT")
     private String refundReason;
 
@@ -79,5 +89,11 @@ public class Sale {
     public void setStatus(SaleStatus status) { this.status = status; }
     public String getRefundReason() { return refundReason; }
     public void setRefundReason(String refundReason) { this.refundReason = refundReason; }
+    public DiscountType getDiscountType() { return discountType; }
+    public void setDiscountType(DiscountType discountType) { this.discountType = discountType; }
+    public BigDecimal getDiscountValue() { return discountValue; }
+    public void setDiscountValue(BigDecimal discountValue) { this.discountValue = discountValue; }
+    public BigDecimal getDiscountAmount() { return discountAmount; }
+    public void setDiscountAmount(BigDecimal discountAmount) { this.discountAmount = discountAmount; }
     public List<SaleItem> getItems() { return items; }
 }

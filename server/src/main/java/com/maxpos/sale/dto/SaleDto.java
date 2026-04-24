@@ -1,5 +1,6 @@
 package com.maxpos.sale.dto;
 
+import com.maxpos.sale.DiscountType;
 import com.maxpos.sale.PaymentMethod;
 import com.maxpos.sale.Sale;
 import com.maxpos.sale.SaleStatus;
@@ -21,6 +22,9 @@ public record SaleDto(
         PaymentMethod paymentMethod,
         SaleStatus status,
         String refundReason,
+        DiscountType discountType,
+        BigDecimal discountValue,
+        BigDecimal discountAmount,
         List<SaleItemDto> items
 ) {
     public static SaleDto from(Sale s) {
@@ -36,6 +40,9 @@ public record SaleDto(
                 s.getPaymentMethod(),
                 s.getStatus(),
                 s.getRefundReason(),
+                s.getDiscountType(),
+                s.getDiscountValue(),
+                s.getDiscountAmount(),
                 s.getItems().stream().map(SaleItemDto::from).toList()
         );
     }

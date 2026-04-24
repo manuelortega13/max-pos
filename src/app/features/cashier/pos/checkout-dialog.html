@@ -11,6 +11,18 @@
           <span>Subtotal</span>
           <span>{{ data.subtotal | money }}</span>
         </div>
+        @if (data.lineDiscountTotal > 0) {
+          <div class="totals__row totals__row--discount">
+            <span>Line discounts</span>
+            <span>−{{ data.lineDiscountTotal | money }}</span>
+          </div>
+        }
+        @if (data.orderDiscount) {
+          <div class="totals__row totals__row--discount">
+            <span>Order discount</span>
+            <span>−{{ data.orderDiscountAmount | money }}</span>
+          </div>
+        }
         <div class="totals__row">
           <span>Tax</span>
           <span>{{ data.tax | money }}</span>
@@ -155,6 +167,18 @@
             <span>Subtotal</span>
             <span>{{ data.subtotal | money }}</span>
           </div>
+          @if (data.lineDiscountTotal > 0) {
+            <div class="receipt__row receipt__row--discount">
+              <span>Line discounts</span>
+              <span>−{{ data.lineDiscountTotal | money }}</span>
+            </div>
+          }
+          @if (data.orderDiscount) {
+            <div class="receipt__row receipt__row--discount">
+              <span>Order discount</span>
+              <span>−{{ data.orderDiscountAmount | money }}</span>
+            </div>
+          }
           <div class="receipt__row">
             <span>Tax</span>
             <span>{{ data.tax | money }}</span>
