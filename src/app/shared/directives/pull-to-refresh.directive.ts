@@ -39,9 +39,18 @@ const DAMPING = 0.55;
   standalone: true,
 })
 export class PullToRefreshDirective implements OnInit {
-  /** Parent sets this to true while a refresh is in flight; false when done. */
+  /**
+   * Parent sets this to true while a refresh is in flight; false when done.
+   *
+   * Angular applies @Input bindings before ngOnInit, so this setter can
+   * fire *before* `this.indicator` is created. Touching `indicator.style`
+   * in that window throws and kills the entire host's template render —
+   * e.g. on the cashier layout it blanks the POS on first load. Store
+   * the latest value and let ngOnInit apply it once the indicator exists.
+   */
   @Input() set refreshing(value: boolean) {
     this._refreshing = value;
+    if (!this.indicator) return;
     if (value) {
       this.setIndicatorLoading();
     } else {
@@ -67,6 +76,9 @@ export class PullToRefreshDirective implements OnInit {
   ngOnInit(): void {
     this.indicator = this.makeIndicator();
     document.body.appendChild(this.indicator);
+    // If the parent set `refreshing=true` before ngOnInit ran, the setter
+    // bailed out early — apply that state now.
+    if (this._refreshing) this.setIndicatorLoading();
 
     // The host isn't necessarily the real scroll container (e.g. admin
     // layout uses <mat-sidenav-content> as the scroller and <main> is
