@@ -116,6 +116,15 @@ export class PullToRefreshDirective implements OnInit {
       this.pulling = false;
       return;
     }
+    // If the touch starts inside a nested scroll container (e.g. the
+    // POS page's product grid or cart panel, which own their own
+    // overflow-y:auto), those events belong to that container —
+    // engaging the pull would preventDefault its touchmove and make
+    // the inner scroll unusable.
+    if (this.isInsideInnerScroll(e.target as HTMLElement | null)) {
+      this.pulling = false;
+      return;
+    }
     const top = this.scrollEl?.scrollTop ?? 0;
     if (top > 0) {
       this.pulling = false;
@@ -125,6 +134,26 @@ export class PullToRefreshDirective implements OnInit {
     this.lastY = this.startY;
     this.pulling = true;
   };
+
+  /**
+   * Walk up from the touch target. If we hit a scrollable ancestor
+   * before reaching scrollEl, the touch is inside a nested scroller
+   * and we should stay out of its way.
+   */
+  private isInsideInnerScroll(target: HTMLElement | null): boolean {
+    let el: HTMLElement | null = target;
+    while (el && el !== this.scrollEl && el !== document.body) {
+      const s = getComputedStyle(el);
+      if (
+        (s.overflowY === 'auto' || s.overflowY === 'scroll') &&
+        el.scrollHeight > el.clientHeight
+      ) {
+        return true;
+      }
+      el = el.parentElement;
+    }
+    return false;
+  }
 
   private onMove = (e: TouchEvent): void => {
     if (!this.pulling) return;
@@ -157,18 +186,22 @@ export class PullToRefreshDirective implements OnInit {
   };
 
   /**
-   * Walk up from the host looking for an ancestor that actually scrolls.
-   * Falls back to documentElement so PTR still works on pages that rely on
-   * full-page scroll.
+   * Walk up from the host looking for an ancestor that's *declared* to
+   * scroll vertically. Crucially, we do NOT also require
+   * `scrollHeight > clientHeight` here — at ngOnInit the route's content
+   * hasn't rendered yet so the host appears non-overflowing, and the
+   * old check made us walk past <main> all the way up to documentElement.
+   * That was the actual bug: documentElement.scrollTop is permanently 0
+   * because body/html don't scroll in this layout, so the "are we at
+   * top?" gate evaluated true forever and PTR blocked every scroll-up
+   * gesture once you'd scrolled down.
+   * Falls back to documentElement only if no overflow ancestor exists.
    */
   private findScrollContainer(start: HTMLElement): HTMLElement {
     let el: HTMLElement | null = start;
     while (el && el !== document.body) {
       const s = getComputedStyle(el);
-      if (
-        (s.overflowY === 'auto' || s.overflowY === 'scroll') &&
-        el.scrollHeight > el.clientHeight
-      ) {
+      if (s.overflowY === 'auto' || s.overflowY === 'scroll') {
         return el;
       }
       el = el.parentElement;
