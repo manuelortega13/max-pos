@@ -209,13 +209,30 @@
   .admin-shell {
     &__main {
       padding: 0.85rem;
-      padding-bottom: calc(64px + env(safe-area-inset-bottom, 0) + 0.5rem);
       // Clip horizontal overflow so a future wide element (a mat-table
       // column, a fixed-width chip, etc.) can't push the page sideways.
       // Child containers that *want* horizontal scroll (e.g. `.table-wrap`
       // with overflow-x: auto) still scroll internally.
       overflow-x: clip;
     }
+  }
+}
+
+/* ─── Bottom-nav clearance ─────────────────────────────────────────
+   The fixed bottom nav is rendered whenever isHandset() is true in
+   admin-layout.ts, which observes BOTH CDK's Handset and Tablet
+   breakpoints. So the nav appears for:
+     - phones in any orientation (≤599.98px portrait, ≤959.98 landscape)
+     - tablets portrait 600–839.98px
+     - tablets landscape 960–1279.98px
+   The previous `max-width: 768px` clearance missed everything past
+   that — a landscape phone at 844px or an iPad landscape at 1180px
+   still showed the nav, but with no padding-bottom the last scroll
+   line sat behind it. This media query precisely mirrors isHandset(). */
+@media (max-width: 839.98px) and (orientation: portrait),
+       (max-width: 1279.98px) and (orientation: landscape) {
+  .admin-shell__main {
+    padding-bottom: calc(64px + env(safe-area-inset-bottom, 0) + 0.5rem);
   }
 }
 
