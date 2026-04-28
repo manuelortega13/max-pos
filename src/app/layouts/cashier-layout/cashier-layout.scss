@@ -83,6 +83,12 @@
     // treatment. Kept to top-only so the sticky cart on desktop still
     // runs flush to the right edge instead of getting inset.
     padding-top: 0.75rem;
+    // Reserve room for the iOS home indicator. With viewport-fit=cover
+    // the 100vh shell extends behind it on iPad PWA in landscape, which
+    // hides the last ~20px of any scroll. Padding-bottom inside the
+    // overflow:auto container keeps the last content line above the
+    // indicator without cutting off any actual viewport area.
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
   &__sync {
