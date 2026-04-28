@@ -7,7 +7,12 @@
   // (Complete Sale button, total row) gets clipped.
   min-height: calc(100vh - 64px - env(safe-area-inset-bottom, 0px));
 
-  @media (max-width: 1024px) {
+  // Single-column layout: collapse only when there isn't horizontal room
+  // for catalog + 400px cart. In landscape (phones, iPad mini) we keep
+  // the two-column split down to 768px so the cart doesn't stack below
+  // the catalog and "take over" a short landscape viewport.
+  @media (max-width: 1024px) and (orientation: portrait),
+         (max-width: 768px) and (orientation: landscape) {
     grid-template-columns: 1fr;
   }
 
@@ -121,7 +126,12 @@
     // home indicator in landscape PWA.
     height: calc(100vh - 64px - env(safe-area-inset-bottom, 0px));
 
-    @media (max-width: 1024px) {
+    // Match the single-column breakpoint above. Without the orientation
+    // gate, a landscape phone or iPad mini landscape would unstick the
+    // cart and stack it below the catalog with auto height — quickly
+    // consuming most of a short landscape viewport.
+    @media (max-width: 1024px) and (orientation: portrait),
+           (max-width: 768px) and (orientation: landscape) {
       position: static;
       border-left: none;
       border-top: 1px solid var(--mat-sys-outline-variant);
