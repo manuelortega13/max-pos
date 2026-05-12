@@ -9,7 +9,7 @@
     content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
   >
   <meta name="description" content="MaxPOS — Point of Sale">
-  <meta name="theme-color" content="#2563eb">
+  <meta name="theme-color" content="#101414">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -22,6 +22,16 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons|Material+Icons+Outlined|Material+Icons+Round|Material+Icons+Sharp|Material+Icons+Two+Tone" rel="stylesheet">
+  <script>
+    // Pre-bootstrap theme application — avoids the dark-then-light flash
+    // on reload when the user's saved preference is "light". ThemeService
+    // takes over for runtime toggles.
+    try {
+      if (localStorage.getItem('maxpos.theme') === 'light') {
+        document.documentElement.classList.add('theme-light');
+      }
+    } catch (e) { /* localStorage unavailable — fall back to default dark */ }
+  </script>
 </head>
 <body class="mat-typography">
   <app-root></app-root>

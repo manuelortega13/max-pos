@@ -1,7 +1,110 @@
 @import 'tailwindcss';
 
 html {
+  /* Match the M3 cyan-orange prebuilt theme, which ships as dark.
+     This makes system-rendered UI (scrollbars, form controls, the
+     date-picker, autofill bg) follow suit instead of staying light. */
+  color-scheme: dark;
+
+  /* Semantic colors for the dark theme. M3 ships --mat-sys-error* but
+     no success/warning equivalents, so we define them once here and
+     reference them everywhere instead of repeating hex codes per file.
+     Values are tuned for contrast on the cyan-orange dark surfaces. */
+  --color-success: #34d399;
+  --color-success-container: rgba(52, 211, 153, 0.18);
+  --color-warning: #fbbf24;
+  --color-warning-container: rgba(251, 191, 36, 0.18);
+}
+
+/* ──────────────────────────────────────────────────────────────────
+   Light-mode override. ThemeService toggles `theme-light` on <html>
+   when the user picks "Light" in Settings; the prebuilt cyan-orange
+   dark values from node_modules stay as the default.
+
+   Values below are a cohesive M3 cyan-orange *light* scheme derived
+   from the same source colors as the dark prebuilt (cyan primary +
+   orange tertiary) — just tuned for white surfaces. Switching themes
+   now feels like brightness changing, not like swapping apps.
+   Only color tokens are listed; typography / corner / elevation
+   tokens are identical between schemes and stay inherited.
+   ────────────────────────────────────────────────────────────────── */
+html.theme-light {
   color-scheme: light;
+
+  /* Cyan primary — deep teal for contrast on white. */
+  --mat-sys-primary: #006a6a;
+  --mat-sys-on-primary: #ffffff;
+  --mat-sys-primary-container: #9cf1f0;
+  --mat-sys-on-primary-container: #002020;
+  --mat-sys-primary-fixed: #9cf1f0;
+  --mat-sys-primary-fixed-dim: #80d4d4;
+  --mat-sys-on-primary-fixed: #002020;
+  --mat-sys-on-primary-fixed-variant: #004f4f;
+  --mat-sys-inverse-primary: #80d4d4;
+  --mat-sys-surface-tint: #006a6a;
+
+  /* Secondary — desaturated teal partner. */
+  --mat-sys-secondary: #4a6363;
+  --mat-sys-on-secondary: #ffffff;
+  --mat-sys-secondary-container: #cce8e7;
+  --mat-sys-on-secondary-container: #051f1f;
+  --mat-sys-secondary-fixed: #cce8e7;
+  --mat-sys-secondary-fixed-dim: #b0cccb;
+  --mat-sys-on-secondary-fixed: #051f1f;
+  --mat-sys-on-secondary-fixed-variant: #324b4b;
+
+  /* Tertiary — burnt-orange accent (light counterpart of the dark
+     theme's #ffb787 warm orange). */
+  --mat-sys-tertiary: #8b5000;
+  --mat-sys-on-tertiary: #ffffff;
+  --mat-sys-tertiary-container: #ffdcc7;
+  --mat-sys-on-tertiary-container: #311300;
+  --mat-sys-tertiary-fixed: #ffdcc7;
+  --mat-sys-tertiary-fixed-dim: #ffb787;
+  --mat-sys-on-tertiary-fixed: #311300;
+  --mat-sys-on-tertiary-fixed-variant: #6a3c00;
+
+  /* Neutral surfaces — slight cyan tint so light mode reads as the
+     same product family as the dark theme. */
+  --mat-sys-background: #fafdfc;
+  --mat-sys-on-background: #191c1c;
+  --mat-sys-surface: #fafdfc;
+  --mat-sys-on-surface: #191c1c;
+  --mat-sys-surface-variant: #dae5e4;
+  --mat-sys-on-surface-variant: #3f4948;
+  --mat-sys-surface-dim: #d8dcdc;
+  --mat-sys-surface-bright: #fafdfc;
+  --mat-sys-surface-container-lowest: #ffffff;
+  --mat-sys-surface-container-low: #f4f7f6;
+  --mat-sys-surface-container: #eef1f1;
+  --mat-sys-surface-container-high: #e8ecec;
+  --mat-sys-surface-container-highest: #e3e7e6;
+  --mat-sys-inverse-on-surface: #eff1f1;
+  --mat-sys-inverse-surface: #2d3131;
+
+  /* Outlines */
+  --mat-sys-outline: #6f7979;
+  --mat-sys-outline-variant: #bec9c8;
+
+  /* Error (Material 3 default — neutral red works in both schemes) */
+  --mat-sys-error: #ba1a1a;
+  --mat-sys-on-error: #ffffff;
+  --mat-sys-error-container: #ffdad6;
+  --mat-sys-on-error-container: #410002;
+
+  /* Scrim / shadow stay black */
+  --mat-sys-scrim: #000000;
+  --mat-sys-shadow: #000000;
+
+  /* Neutrals that some Material components key into directly */
+  --mat-sys-neutral10: #191c1c;
+  --mat-sys-neutral-variant20: #293232;
+
+  /* Semantic colors — denser tones for contrast on white surfaces. */
+  --color-success: #047857;
+  --color-success-container: rgba(4, 120, 87, 0.1);
+  --color-warning: #b45309;
+  --color-warning-container: rgba(180, 83, 9, 0.1);
 }
 
 html,

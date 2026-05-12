@@ -26,6 +26,25 @@
     </mat-card>
   }
 
+  <mat-card appearance="outlined">
+    <mat-card-header>
+      <mat-card-title>Appearance</mat-card-title>
+      <mat-card-subtitle>Per-device preference — saved on this browser, not the store</mat-card-subtitle>
+    </mat-card-header>
+    <mat-card-content class="settings-form__inventory">
+      <mat-slide-toggle
+        [checked]="darkTheme() === 'dark'"
+        (change)="toggleTheme($event.checked)"
+      >
+        Dark theme
+      </mat-slide-toggle>
+      <small class="settings-form__hint">
+        Switch to a light theme if the dark one feels too dim under
+        bright store lighting. Applies immediately; no Save needed.
+      </small>
+    </mat-card-content>
+  </mat-card>
+
   <form [formGroup]="form" (ngSubmit)="save()" class="settings-form">
     <mat-card appearance="outlined">
       <mat-card-header>

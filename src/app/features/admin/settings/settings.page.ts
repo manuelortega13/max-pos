@@ -12,6 +12,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { SettingsService } from '../../../core/services/settings.service';
+import { ThemeService } from '../../../core/services/theme.service';
 
 @Component({
   selector: 'app-settings-page',
@@ -34,7 +35,15 @@ import { SettingsService } from '../../../core/services/settings.service';
 export class SettingsPage {
   private readonly fb = inject(FormBuilder);
   private readonly settingsService = inject(SettingsService);
+  private readonly themeService = inject(ThemeService);
   private readonly snackBar = inject(MatSnackBar);
+
+  /** Bound to the slide toggle. True = dark mode (toggle "on" = on-brand dark). */
+  protected readonly darkTheme = this.themeService.mode;
+
+  protected toggleTheme(dark: boolean): void {
+    this.themeService.set(dark ? 'dark' : 'light');
+  }
 
   protected readonly currencies = [
     { code: 'USD', symbol: '$', label: 'US Dollar' },

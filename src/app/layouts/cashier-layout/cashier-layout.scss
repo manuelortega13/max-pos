@@ -123,12 +123,15 @@
     }
 
     &--offline {
-      background: rgba(239, 68, 68, 0.15);
-      color: #b91c1c;
-      border-color: rgba(239, 68, 68, 0.4);
+      // Theme-aware error tint so the offline pill stays readable on
+      // both the cyan-orange dark and azure-blue light surfaces. The
+      // literal rgba(239,68,68) + #b91c1c text was unreadable on dark.
+      background: var(--mat-sys-error-container);
+      color: var(--mat-sys-on-error-container);
+      border-color: color-mix(in srgb, var(--mat-sys-error) 50%, transparent);
 
       &:hover:not([disabled]) {
-        background: rgba(239, 68, 68, 0.22);
+        background: color-mix(in srgb, var(--mat-sys-error) 22%, transparent);
       }
     }
 

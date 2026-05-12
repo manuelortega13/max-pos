@@ -60,17 +60,14 @@
       }
 
       <mat-button-toggle-group
-        #catGroup
-        [value]="activeCategory()"
-        (change)="activeCategory.set($event.value)"
+        #letterGroup
+        [value]="activeLetter()"
+        (change)="activeLetter.set($event.value)"
         class="pos__categories"
       >
         <mat-button-toggle value="all">All</mat-button-toggle>
-        @for (category of categories(); track category.id) {
-          <mat-button-toggle [value]="category.id">
-            <mat-icon>{{ category.icon }}</mat-icon>
-            {{ category.name }}
-          </mat-button-toggle>
+        @for (letter of availableLetters(); track letter) {
+          <mat-button-toggle [value]="letter">{{ letter }}</mat-button-toggle>
         }
       </mat-button-toggle-group>
     </header>
@@ -131,7 +128,7 @@
     <div class="pos__cart-inner">
       <header class="pos__cart-header">
         <div>
-          <strong>Current sale</strong>
+          <strong>Cart</strong>
           <small>{{ itemCount() }} item(s)</small>
         </div>
         <div class="pos__cart-header-actions">

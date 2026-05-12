@@ -24,7 +24,6 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { BarcodeScannerService } from '../../../core/services/barcode-scanner.service';
 import { CartService } from '../../../core/services/cart.service';
-import { CategoryService } from '../../../core/services/category.service';
 import { ProductService } from '../../../core/services/product.service';
 import { SettingsService } from '../../../core/services/settings.service';
 import { CartLine, Product } from '../../../core/models';
@@ -65,7 +64,6 @@ import { StockLimitDialog, StockLimitDialogData } from './stock-limit-dialog';
 })
 export class PosPage implements AfterViewInit {
   private readonly productService = inject(ProductService);
-  private readonly categoryService = inject(CategoryService);
   private readonly cartService = inject(CartService);
   private readonly settingsService = inject(SettingsService);
   private readonly dialog = inject(MatDialog);
@@ -80,9 +78,23 @@ export class PosPage implements AfterViewInit {
     () => this.settingsService.settings().allowNegativeStock,
   );
 
-  protected readonly categories = this.categoryService.categories;
-  protected readonly activeCategory = signal<string>('all');
+  /** Active A-Z filter — 'all' means no letter restriction. */
+  protected readonly activeLetter = signal<string>('all');
   protected readonly search = signal('');
+
+  /**
+   * Letters that actually appear as the first character of at least one
+   * active product, sorted A-Z. Used to render the filter strip so the
+   * cashier never sees a dead letter with no matches behind it.
+   */
+  protected readonly availableLetters = computed(() => {
+    const seen = new Set<string>();
+    for (const p of this.productService.activeProducts()) {
+      const c = p.name.charAt(0).toUpperCase();
+      if (c >= 'A' && c <= 'Z') seen.add(c);
+    }
+    return Array.from(seen).sort();
+  });
   protected readonly pendingQuantity = signal<number | null>(null);
   /** Index into filteredProducts() of the tile currently highlighted via keyboard. */
   protected readonly activeIndex = signal<number>(-1);
@@ -96,14 +108,15 @@ export class PosPage implements AfterViewInit {
   protected readonly cartFocusIndex = signal<number | null>(null);
   private readonly gridRef = viewChild<ElementRef<HTMLElement>>('productGrid');
   private readonly searchInputRef = viewChild<ElementRef<HTMLInputElement>>('searchInput');
-  private readonly catGroupRef = viewChild('catGroup', { read: ElementRef });
+  private readonly letterGroupRef = viewChild('letterGroup', { read: ElementRef });
 
   protected readonly filteredProducts = computed(() => {
     const term = this.search().trim().toLowerCase();
-    const category = this.activeCategory();
-    return this.productService.activeProducts().filter((product) => {
-      const matchesCategory = category === 'all' || product.categoryId === category;
-      if (!matchesCategory) return false;
+    const letter = this.activeLetter();
+    const matches = this.productService.activeProducts().filter((product) => {
+      const matchesLetter =
+        letter === 'all' || product.name.charAt(0).toUpperCase() === letter;
+      if (!matchesLetter) return false;
       if (!term) return true;
       return (
         product.name.toLowerCase().includes(term) ||
@@ -111,6 +124,10 @@ export class PosPage implements AfterViewInit {
         product.sku.toLowerCase().includes(term)
       );
     });
+    // Sort A→Z by name so letter buckets read naturally and the grid
+    // doesn't reshuffle by insertion order. localeCompare keeps accented
+    // names ordered correctly for non-ASCII locales.
+    return matches.sort((a, b) => a.name.localeCompare(b.name));
   });
 
   protected readonly cart = this.cartService.lines;
@@ -130,7 +147,7 @@ export class PosPage implements AfterViewInit {
 
   constructor() {
     // Whenever the filtered list changes (cashier types a new search term,
-    // clicks a different category, or the product list reloads from the
+    // picks a different A-Z letter, or the product list reloads from the
     // backend), snap the highlighted tile back to index 0 so the next Enter
     // always lands on the first match. -1 when there are no results.
     effect(() => {
@@ -138,12 +155,12 @@ export class PosPage implements AfterViewInit {
       this.activeIndex.set(count > 0 ? 0 : -1);
     });
 
-    // Capture-phase keydown on the category toggle group so we run *before*
+    // Capture-phase keydown on the A-Z toggle group so we run *before*
     // Material's own host listener advances the toggle on ArrowDown/ArrowUp.
     // stopImmediatePropagation prevents the key from reaching the Material
-    // FocusKeyManager at all — only Left/Right remain as category-switchers.
+    // FocusKeyManager at all — only Left/Right remain as letter-switchers.
     effect((onCleanup) => {
-      const group = this.catGroupRef()?.nativeElement as HTMLElement | undefined;
+      const group = this.letterGroupRef()?.nativeElement as HTMLElement | undefined;
       if (!group) return;
       const handler = (event: KeyboardEvent) => {
         if (event.key === 'ArrowDown') {
@@ -226,8 +243,8 @@ export class PosPage implements AfterViewInit {
     switch (key) {
       case 'ArrowRight': next = current + 1; break;
       case 'ArrowLeft':  next = current - 1; break;
-      case 'ArrowDown':  next = current + cols + 1; break;
-      case 'ArrowUp':    next = current - cols - 1; break;
+      case 'ArrowDown':  next = current + cols; break;
+      case 'ArrowUp':    next = current - cols; break;
     }
     next = Math.max(0, Math.min(this.filteredProducts().length - 1, next));
     if (next !== current || this.activeIndex() < 0) {
@@ -292,7 +309,7 @@ export class PosPage implements AfterViewInit {
   }
 
   /**
-   * ArrowDown from a focused category toggle: highlight the first visible
+   * ArrowDown from a focused A-Z toggle: highlight the first visible
    * product tile and return keyboard focus to the search input so that
    * subsequent arrow keys / Enter use the same nav model the cashier is
    * already familiar with.
@@ -305,8 +322,8 @@ export class PosPage implements AfterViewInit {
     this.searchInputRef()?.nativeElement.focus();
   }
 
-  /** ArrowUp from a focused category toggle: return focus to the search input
-   *  (without selecting a product tile). Left/Right keep switching categories
+  /** ArrowUp from a focused A-Z toggle: return focus to the search input
+   *  (without selecting a product tile). Left/Right keep switching letters
    *  via Material's built-in toggle-group key manager. */
   protected jumpToSearch(event: Event): void {
     event.preventDefault();

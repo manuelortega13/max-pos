@@ -117,7 +117,11 @@
   &__cart {
     display: flex;
     flex-direction: column;
-    background: var(--mat-sys-surface);
+    // Sit two M3 elevation steps above the catalog (surface-container-
+    // lowest) and one step above the product tiles (surface-container)
+    // so the cart visibly reads as the elevated "active workflow" pane
+    // — otherwise the panel and the tiles share a background and merge.
+    background: var(--mat-sys-surface-container-high);
     border-left: 1px solid var(--mat-sys-outline-variant);
     position: sticky;
     top: 0;
@@ -352,8 +356,8 @@
     color: var(--mat-sys-on-surface-variant);
   }
 
-  &--low { border-color: #f59e0b; }
-  &--out { border-color: #ef4444; }
+  &--low { border-color: var(--color-warning); }
+  &--out { border-color: var(--mat-sys-error); }
 
   &--active {
     border-color: var(--mat-sys-primary);

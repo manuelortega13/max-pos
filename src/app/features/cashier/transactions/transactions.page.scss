@@ -117,7 +117,9 @@
 
       &:hover {
         opacity: 1;
-        background: rgba(0, 0, 0, 0.08);
+        // State-layer hover that works on both light AND dark surfaces.
+        // The literal rgba(0,0,0,0.08) was invisible on the dark theme.
+        background: color-mix(in srgb, var(--mat-sys-on-surface) 12%, transparent);
       }
     }
   }
@@ -132,7 +134,7 @@
     }
 
     .pill__trailing--remove:hover {
-      background: rgba(0, 0, 0, 0.12);
+      background: color-mix(in srgb, var(--mat-sys-on-secondary-container) 16%, transparent);
     }
   }
 }
@@ -145,9 +147,9 @@
   margin-right: 0.6rem;
   flex-shrink: 0;
 
-  &--completed { background: #10b981; }
-  &--pending { background: #f59e0b; }
-  &--refunded { background: #ef4444; }
+  &--completed { background: var(--color-success); }
+  &--pending { background: var(--color-warning); }
+  &--refunded { background: var(--mat-sys-error); }
 }
 
 .range-panel {
@@ -201,7 +203,10 @@
     &:focus {
       outline: none;
       border-color: var(--mat-sys-primary);
-      box-shadow: 0 0 0 2px rgba(var(--mat-sys-primary-rgb, 6, 90, 216), 0.15);
+      // color-mix derives the focus ring from the theme primary, so it
+      // tracks light/dark themes instead of using a stale rgb fallback
+      // that pointed at the old azure-blue palette.
+      box-shadow: 0 0 0 2px color-mix(in srgb, var(--mat-sys-primary) 28%, transparent);
     }
 
     &::-webkit-outer-spin-button,
@@ -231,7 +236,7 @@
   font-size: 0.75rem;
   font-weight: 500;
 
-  &--completed { background: rgba(16, 185, 129, 0.15) !important; color: #047857 !important; }
-  &--refunded { background: rgba(239, 68, 68, 0.15) !important; color: #b91c1c !important; }
-  &--pending { background: rgba(245, 158, 11, 0.15) !important; color: #b45309 !important; }
+  &--completed { background: var(--color-success-container) !important; color: var(--color-success) !important; }
+  &--refunded { background: var(--mat-sys-error-container) !important; color: var(--mat-sys-error) !important; }
+  &--pending { background: var(--color-warning-container) !important; color: var(--color-warning) !important; }
 }

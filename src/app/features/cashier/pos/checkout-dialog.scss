@@ -90,8 +90,8 @@ h2[mat-dialog-title] {
   gap: 1.5rem;
   padding: 2rem 2.25rem;
   margin: 0.5rem 0;
-  background: rgba(16, 185, 129, 0.08);
-  border: 1px solid rgba(16, 185, 129, 0.25);
+  background: var(--color-success-container);
+  border: 1px solid color-mix(in srgb, var(--color-success) 35%, transparent);
   border-radius: 0.75rem;
 
   @media (max-width: 640px) {
@@ -104,13 +104,13 @@ h2[mat-dialog-title] {
     width: 3.5rem;
     height: 3.5rem;
     border-radius: 50%;
-    background: rgba(16, 185, 129, 0.2);
+    background: color-mix(in srgb, var(--color-success) 28%, transparent);
     display: flex;
     align-items: center;
     justify-content: center;
 
     mat-icon {
-      color: #059669;
+      color: var(--color-success);
       font-size: 2.25rem;
       width: 2.25rem;
       height: 2.25rem;
@@ -257,8 +257,8 @@ h2[mat-dialog-title] {
   margin: 0 2rem 0.5rem;
   padding: 0.75rem 1rem;
   border-radius: 0.5rem;
-  background: rgba(239, 68, 68, 0.1);
-  color: var(--mat-sys-error);
+  background: var(--mat-sys-error-container);
+  color: var(--mat-sys-on-error-container);
   font-size: 0.9rem;
 
   @media (max-width: 640px) {
