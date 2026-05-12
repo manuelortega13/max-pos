@@ -1,34 +1,44 @@
-<div class="cashier-shell">
+<div class="cashier-shell" [class.cashier-shell--handset]="isHandset()">
   <mat-toolbar class="cashier-shell__toolbar">
-    <img src="/icons/icon-192.png" alt="" class="cashier-shell__brand-logo" aria-hidden="true" />
-    <span class="cashier-shell__title">MaxPOS Register</span>
+    <a
+      class="cashier-shell__brand"
+      routerLink="pos"
+      aria-label="Go to register"
+    >
+      <img src="/icons/icon-192.png" alt="" class="cashier-shell__brand-logo" aria-hidden="true" />
+      <span class="cashier-shell__title">MaxPOS</span>
+    </a>
 
-    <nav class="cashier-shell__nav">
-      <a
-        mat-button
-        routerLink="pos"
-        routerLinkActive="cashier-shell__nav-link--active"
-      >
-        <mat-icon>shopping_cart</mat-icon>
-        Sell
-        @if (cartItemCount() > 0) {
-          <span
-            class="cashier-shell__badge"
-            [matBadge]="cartItemCount()"
-            matBadgeOverlap="false"
-            matBadgeColor="accent"
-          ></span>
-        }
-      </a>
-      <a
-        mat-button
-        routerLink="transactions"
-        routerLinkActive="cashier-shell__nav-link--active"
-      >
-        <mat-icon>history</mat-icon>
-        My Transactions
-      </a>
-    </nav>
+    @if (!isHandset()) {
+      <nav class="cashier-shell__nav">
+        <a
+          mat-button
+          class="cashier-shell__nav-link"
+          routerLink="pos"
+          routerLinkActive="cashier-shell__nav-link--active"
+        >
+          <mat-icon>shopping_cart</mat-icon>
+          Sell
+          @if (cartItemCount() > 0) {
+            <span
+              class="cashier-shell__badge"
+              [matBadge]="cartItemCount()"
+              matBadgeOverlap="false"
+              matBadgeColor="accent"
+            ></span>
+          }
+        </a>
+        <a
+          mat-button
+          class="cashier-shell__nav-link"
+          routerLink="transactions"
+          routerLinkActive="cashier-shell__nav-link--active"
+        >
+          <mat-icon>history</mat-icon>
+          My Transactions
+        </a>
+      </nav>
+    }
 
     <span class="cashier-shell__spacer"></span>
 
@@ -36,23 +46,16 @@
       <button
         type="button"
         class="cashier-shell__sync"
-        [class.cashier-shell__sync--offline]="!online()"
         [class.cashier-shell__sync--syncing]="syncing()"
-        [matTooltip]="
-          !online()
-            ? 'Offline — sales are queued locally and will sync when you reconnect'
-            : pendingSync() + ' pending sale(s). Tap to retry now.'
-        "
+        [matTooltip]="pendingSync() + ' pending sale(s). Tap to retry now.'"
         (click)="retrySync()"
         [disabled]="syncing()"
       >
         <mat-icon>
-          {{ !online() ? 'cloud_off' : syncing() ? 'sync' : 'sync_problem' }}
+          {{ syncing() ? 'sync' : 'sync_problem' }}
         </mat-icon>
         <span class="cashier-shell__sync-label">
-          @if (!online()) {
-            Offline
-          } @else if (syncing()) {
+          @if (syncing()) {
             Syncing…
           } @else {
             {{ pendingSync() }} pending
@@ -61,28 +64,34 @@
       </button>
     }
 
-    <div class="cashier-shell__user">
+    <button mat-icon-button [matMenuTriggerFor]="userMenu" aria-label="Account menu">
+      <mat-icon>account_circle</mat-icon>
+    </button>
+    <mat-menu #userMenu="matMenu">
       @if (currentUser(); as user) {
-        <div class="cashier-shell__user-text">
+        <div class="cashier-shell__user-info" disabled>
           <strong>{{ user.name }}</strong>
           <small>{{ user.role | titlecase }}</small>
         </div>
+        <mat-divider></mat-divider>
       }
-      <button mat-icon-button [matMenuTriggerFor]="userMenu" aria-label="Account menu">
-        <mat-icon>account_circle</mat-icon>
+      <button mat-menu-item (click)="goHome()">
+        <mat-icon>home</mat-icon>
+        <span>Home</span>
       </button>
-      <mat-menu #userMenu="matMenu">
-        <button mat-menu-item (click)="goHome()">
-          <mat-icon>home</mat-icon>
-          <span>Home</span>
-        </button>
-        <button mat-menu-item (click)="logout()">
-          <mat-icon>logout</mat-icon>
-          <span>Sign out</span>
-        </button>
-      </mat-menu>
-    </div>
+      <button mat-menu-item (click)="logout()">
+        <mat-icon>logout</mat-icon>
+        <span>Sign out</span>
+      </button>
+    </mat-menu>
   </mat-toolbar>
+
+  @if (showOfflineBanner()) {
+    <div class="cashier-shell__offline-banner" role="status" aria-live="polite">
+      <mat-icon>cloud_off</mat-icon>
+      <span>Offline — sales are queued locally and will sync when you reconnect.</span>
+    </div>
+  }
 
   <main
     class="cashier-shell__main"
@@ -92,4 +101,25 @@
   >
     <router-outlet></router-outlet>
   </main>
+
+  @if (showBottomNav()) {
+    <nav class="cashier-shell__bottom-nav" aria-label="Primary">
+      <a
+        class="cashier-shell__bottom-link"
+        routerLink="pos"
+        routerLinkActive="cashier-shell__bottom-link--active"
+      >
+        <mat-icon>shopping_cart</mat-icon>
+        <span>Sell</span>
+      </a>
+      <a
+        class="cashier-shell__bottom-link"
+        routerLink="transactions"
+        routerLinkActive="cashier-shell__bottom-link--active"
+      >
+        <mat-icon>history</mat-icon>
+        <span>Transactions</span>
+      </a>
+    </nav>
+  }
 </div>

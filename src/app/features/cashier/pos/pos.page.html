@@ -83,14 +83,23 @@
           (click)="addToCart(product)"
           [disabled]="product.stock === 0 && !allowNegativeStock()"
         >
-          @if (product.imageUrl) {
-            <img [src]="product.imageUrl" [alt]="product.name" class="product-tile__photo" />
-          } @else {
-            <span class="product-tile__image">{{ product.image }}</span>
-          }
+          <div class="product-tile__media">
+            @if (product.imageUrl) {
+              <img [src]="product.imageUrl" [alt]="product.name" class="product-tile__photo" />
+            } @else {
+              <span class="product-tile__image">{{ product.image }}</span>
+            }
+            @if (product.stock <= 0) {
+              <span class="product-tile__badge product-tile__badge--out">Out</span>
+            } @else if (product.stock <= 10) {
+              <span class="product-tile__badge product-tile__badge--low">Low</span>
+            }
+          </div>
           <span class="product-tile__name">{{ product.name }}</span>
-          <span class="product-tile__price">{{ product.price | money }}</span>
-          <span class="product-tile__stock">{{ product.stock }} in stock</span>
+          <div class="product-tile__footer">
+            <span class="product-tile__price">{{ product.price | money }}</span>
+            <span class="product-tile__stock">{{ product.stock }} left</span>
+          </div>
         </button>
       } @empty {
         <div class="pos__empty">

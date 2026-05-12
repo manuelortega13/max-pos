@@ -197,30 +197,39 @@ export class PosPage implements AfterViewInit {
       event.preventDefault();
 
       const term = this.search().trim();
-      if (!term) return;
 
-      // Scanner-friendly path: when the term matches a product's barcode
-      // exactly, add that product regardless of what's highlighted. This
-      // handles the case where a human was navigating the grid with arrow
-      // keys and then scans something — the scan always wins.
-      const scanned = this.findByExactBarcode(term);
-      if (scanned) {
-        this.addToCart(scanned);
-        this.clearSearchAndRefocus();
-        return;
+      // Scanner-friendly path: when there's a term AND it exactly matches
+      // a product's barcode, add that product regardless of what's
+      // highlighted. The scan always wins over arrow-key navigation.
+      if (term) {
+        const scanned = this.findByExactBarcode(term);
+        if (scanned) {
+          this.addToCart(scanned);
+          this.clearSearchAndRefocus();
+          return;
+        }
       }
 
       const products = this.filteredProducts();
       if (products.length === 0) {
-        this.snackBar.open(
-          `No product matches "${term}"`,
-          'Dismiss',
-          { duration: 2000 },
-        );
-        this.clearSearchAndRefocus();
+        // Only show "no matches" when the cashier actually typed
+        // something. An empty search + empty grid is just an empty
+        // store — silently no-op.
+        if (term) {
+          this.snackBar.open(
+            `No product matches "${term}"`,
+            'Dismiss',
+            { duration: 2000 },
+          );
+          this.clearSearchAndRefocus();
+        }
         return;
       }
 
+      // Empty search + visible products: Enter still adds the
+      // currently highlighted tile (activeIndex stays at 0 by default
+      // via the filteredProducts effect), so the cashier doesn't have
+      // to type something just to confirm an arrow-key selection.
       const idx = this.activeIndex();
       const target = products[idx >= 0 ? idx : 0];
       if (target) {
