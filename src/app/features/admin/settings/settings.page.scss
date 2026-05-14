@@ -69,6 +69,39 @@
   align-items: center;
   gap: 0.75rem;
   margin: 0.25rem 0 0.5rem;
+  flex-wrap: wrap;
+}
+
+.settings-form__divider {
+  margin: 0.5rem 0 0.25rem;
+}
+
+.settings-form__hint {
+  &--ok {
+    color: var(--color-success);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+
+    mat-icon {
+      font-size: 1.05rem;
+      width: 1.05rem;
+      height: 1.05rem;
+    }
+  }
+
+  &--err {
+    color: var(--mat-sys-error);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+
+    mat-icon {
+      font-size: 1.05rem;
+      width: 1.05rem;
+      height: 1.05rem;
+    }
+  }
 }
 
 .settings-form__error {

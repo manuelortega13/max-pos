@@ -1,5 +1,5 @@
 import { TitleCasePipe } from '@angular/common';
-import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, HostListener, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatButtonModule } from '@angular/material/button';
@@ -15,6 +15,7 @@ import { AuthService } from '../../core/services/auth.service';
 import { CartService } from '../../core/services/cart.service';
 import { OfflineSyncService } from '../../core/services/offline-sync.service';
 import { RealtimeService } from '../../core/services/realtime.service';
+import { PrinterService } from '../../core/services/printer.service';
 import { RefreshService } from '../../core/services/refresh.service';
 import { SettingsService } from '../../core/services/settings.service';
 import { PullToRefreshDirective } from '../../shared/directives/pull-to-refresh.directive';
@@ -48,6 +49,7 @@ export class CashierLayout implements OnInit, OnDestroy {
   private readonly sync = inject(OfflineSyncService);
   private readonly settingsService = inject(SettingsService);
   private readonly refreshService = inject(RefreshService);
+  private readonly printerService = inject(PrinterService);
   protected readonly refreshing = signal(false);
 
   protected readonly currentUser = this.authService.user;
@@ -132,6 +134,21 @@ export class CashierLayout implements OnInit, OnDestroy {
       await this.refreshService.refreshAll();
     } finally {
       this.refreshing.set(false);
+    }
+  }
+
+  /**
+   * Ctrl/Cmd+D — pop the cash drawer manually. Lives at the shell
+   * level so it works from POS, Transactions, anywhere in the cashier
+   * section. preventDefault stops the browser's "Bookmark this page"
+   * gesture. Silently no-ops when the helper isn't configured (the
+   * browser path can't kick the drawer anyway).
+   */
+  @HostListener('document:keydown', ['$event'])
+  protected onCashierKeydown(event: KeyboardEvent): void {
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'd') {
+      event.preventDefault();
+      void this.printerService.kickDrawer();
     }
   }
 

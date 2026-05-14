@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   ElementRef,
+  HostListener,
   computed,
   effect,
   inject,
@@ -22,7 +23,7 @@ import { CartLine, DiscountInput, PaymentMethod, Sale } from '../../../core/mode
 import { SettingsService } from '../../../core/services/settings.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { SaleService } from '../../../core/services/sale.service';
-import { PrinterService } from '../../../core/services/printer.service';
+import { PrinterService, ReceiptPayload } from '../../../core/services/printer.service';
 import { MoneyPipe } from '../../../shared/pipes/currency-symbol.pipe';
 
 export interface CheckoutData {
@@ -101,7 +102,19 @@ export class CheckoutDialog {
 
   /** Receipt details — prefer the backend's canonical values, fall back to
    *  local approximations if the dialog is shown pre-persist (shouldn't happen). */
-  protected readonly saleId = computed(() => this.persistedSale()?.reference ?? '—');
+  /**
+   * Short, human-readable sale number for the receipt. Prefers the
+   * backend's sequential `id` over the long `reference` (the latter is
+   * the `S-<uuid>` idempotency token, 38 chars — fine for the queue,
+   * useless on a 58mm receipt). Falls back to the last 8 chars of the
+   * id if it's a UUID-style identifier.
+   */
+  protected readonly saleId = computed(() => {
+    const sale = this.persistedSale();
+    if (!sale) return '—';
+    const idStr = String(sale.id);
+    return idStr.length <= 12 ? `#${idStr}` : `#${idStr.slice(-8).toUpperCase()}`;
+  });
   protected readonly completedAt = computed(
     () => (this.persistedSale()?.date ? new Date(this.persistedSale()!.date) : new Date()),
   );
@@ -133,16 +146,78 @@ export class CheckoutDialog {
         // Auto-print is per-device — if this register has it on, fire
         // the print right after the receipt template has rendered.
         // The small delay lets Material finish its animation so the
-        // dialog content is fully laid out before we snapshot.
+        // dialog content is fully laid out before we snapshot (only
+        // matters for the browser-print fallback; the helper service
+        // path doesn't need the DOM to be painted).
         if (this.printerService.autoPrint()) {
-          setTimeout(() => this.printerService.print(), 200);
+          setTimeout(() => void this.printerService.printReceipt(this.buildPayload()), 200);
         }
       }
     });
   }
 
   protected print(): void {
-    this.printerService.print();
+    void this.printerService.printReceipt(this.buildPayload());
+  }
+
+  /**
+   * Ctrl/Cmd+P on the receipt step routes to our Print button instead
+   * of opening the browser's native print dialog. This keeps the
+   * helper-service path in play (window.print() would skip it) and
+   * mirrors the muscle memory cashiers have from other apps.
+   *
+   * Bound at document level so it fires whether focus is on the
+   * "New sale" button (the default after Confirm payment) or anywhere
+   * else inside the dialog.
+   */
+  @HostListener('document:keydown', ['$event'])
+  protected onKeydown(event: KeyboardEvent): void {
+    if (this.step() !== 'receipt') return;
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'p') {
+      event.preventDefault();
+      this.print();
+      return;
+    }
+    // Esc on the receipt step closes the dialog. Material's own
+    // Esc-to-close behaviour was disabled by dialogRef.disableClose
+    // (to block accidental backdrop clicks from losing the receipt);
+    // this restores the keyboard path without re-enabling backdrop
+    // dismissal.
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      this.done();
+    }
+  }
+
+  /** Snapshot the current sale into the helper-service payload shape.
+   *  Browser fallback path doesn't use it (it reads .print-receipt
+   *  from the DOM), but building it once here keeps both code paths
+   *  going through the same entry point. */
+  private buildPayload(): ReceiptPayload {
+    const s = this.settings();
+    return {
+      storeName: s.storeName,
+      address: s.address ?? '',
+      phone: s.phone ?? '',
+      saleId: this.saleId(),
+      date: this.completedAt().toISOString(),
+      cashierName: this.cashier()?.name,
+      paymentMethod: this.paymentMethod(),
+      lines: this.data.lines.map((l) => ({
+        name: l.product.name,
+        quantity: l.quantity,
+        lineTotal: l.product.price * l.quantity,
+      })),
+      subtotal: this.data.subtotal,
+      lineDiscountTotal: this.data.lineDiscountTotal,
+      orderDiscountAmount: this.data.orderDiscountAmount,
+      tax: this.data.tax,
+      total: this.data.total,
+      cashReceived: this.paymentMethod() === 'CASH' ? this.cashReceived() : undefined,
+      change: this.paymentMethod() === 'CASH' ? this.change() : undefined,
+      currencySymbol: s.currencySymbol,
+      footer: s.receiptFooter ?? '',
+    };
   }
 
   protected confirm(): void {
@@ -166,6 +241,14 @@ export class CheckoutDialog {
           this.submitting.set(false);
           this.persistedSale.set(sale);
           this.dialogRef.disableClose = true;
+          // Pop the cash drawer the instant the sale persists — the
+          // cashier reaches for change while the receipt template
+          // renders and the printer feeds. Independent of whether
+          // auto-print is on (some registers print, some don't, but
+          // the drawer always needs to open for cash flows).
+          if (this.printerService.openDrawer()) {
+            void this.printerService.kickDrawer();
+          }
           this.step.set('receipt');
         },
         error: (err: HttpErrorResponse) => {

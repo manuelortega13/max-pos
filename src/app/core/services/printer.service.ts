@@ -3,9 +3,37 @@ import { Injectable, effect, inject, signal } from '@angular/core';
 
 export type PaperSize = '58mm' | '80mm' | 'a4';
 
+/** Structured receipt sent to the local print helper. The helper turns
+ *  this into ESC/POS bytes; the browser fallback ignores it (uses the
+ *  rendered .print-receipt DOM instead). */
+export interface ReceiptPayload {
+  storeName: string;
+  address: string;
+  phone: string;
+  saleId: string;
+  date: string;
+  cashierName?: string;
+  paymentMethod: string;
+  lines: ReadonlyArray<{ name: string; quantity: number; lineTotal: number }>;
+  subtotal: number;
+  lineDiscountTotal: number;
+  orderDiscountAmount: number;
+  tax: number;
+  total: number;
+  cashReceived?: number;
+  change?: number;
+  currencySymbol: string;
+  footer: string;
+}
+
 const AUTO_PRINT_KEY = 'maxpos.printer.autoPrint';
 const PAPER_SIZE_KEY = 'maxpos.printer.paperSize';
+const HELPER_ENABLED_KEY = 'maxpos.printer.helperEnabled';
+const HELPER_URL_KEY = 'maxpos.printer.helperUrl';
+const OPEN_DRAWER_KEY = 'maxpos.printer.openDrawer';
 const PAGE_STYLE_ID = 'maxpos-printer-page-size';
+
+const DEFAULT_HELPER_URL = 'http://localhost:9100';
 
 /**
  * CSS @page rule per paper size — injected at runtime when the user
@@ -49,6 +77,9 @@ export class PrinterService {
   private readonly document = inject(DOCUMENT);
   private readonly _autoPrint = signal<boolean>(this.readAutoPrint());
   private readonly _paperSize = signal<PaperSize>(this.readPaperSize());
+  private readonly _helperEnabled = signal<boolean>(this.readHelperEnabled());
+  private readonly _helperUrl = signal<string>(this.readHelperUrl());
+  private readonly _openDrawer = signal<boolean>(this.readOpenDrawer());
 
   /** When true, the checkout dialog fires window.print() automatically
    *  the moment the receipt step renders. */
@@ -56,6 +87,19 @@ export class PrinterService {
 
   /** Paper size — drives the injected @page rule. */
   readonly paperSize = this._paperSize.asReadonly();
+
+  /** When true, printReceipt() POSTs structured JSON to the local
+   *  helper service instead of going through window.print(). The
+   *  browser path is still used as fallback if the helper is offline. */
+  readonly helperEnabled = this._helperEnabled.asReadonly();
+
+  /** Base URL of the local helper service (default http://localhost:9100). */
+  readonly helperUrl = this._helperUrl.asReadonly();
+
+  /** When true, every receipt prepends the ESC/POS drawer-kick command
+   *  so the cash drawer pops at the moment of sale. Helper-only —
+   *  browser print can't send raw bytes to the printer's DK port. */
+  readonly openDrawer = this._openDrawer.asReadonly();
 
   constructor() {
     effect(() => {
@@ -76,6 +120,29 @@ export class PrinterService {
       }
       this.applyPageRule(size);
     });
+
+    effect(() => {
+      try {
+        this.document.defaultView?.localStorage.setItem(
+          HELPER_ENABLED_KEY,
+          this._helperEnabled() ? '1' : '0',
+        );
+        this.document.defaultView?.localStorage.setItem(HELPER_URL_KEY, this._helperUrl());
+      } catch {
+        // ignore
+      }
+    });
+
+    effect(() => {
+      try {
+        this.document.defaultView?.localStorage.setItem(
+          OPEN_DRAWER_KEY,
+          this._openDrawer() ? '1' : '0',
+        );
+      } catch {
+        // ignore
+      }
+    });
   }
 
   setAutoPrint(on: boolean): void {
@@ -84,6 +151,28 @@ export class PrinterService {
 
   setPaperSize(size: PaperSize): void {
     this._paperSize.set(size);
+  }
+
+  setHelperEnabled(on: boolean): void {
+    this._helperEnabled.set(on);
+  }
+
+  setHelperUrl(url: string): void {
+    this._helperUrl.set(url.trim());
+  }
+
+  setOpenDrawer(on: boolean): void {
+    this._openDrawer.set(on);
+  }
+
+  /** Fire the cash drawer's kick pin via the helper. Returns true on
+   *  success, false if the helper is offline or disabled. Used by:
+   *   - The Ctrl+D shortcut in the cashier shell ("no-sale" drawer open).
+   *   - The "Open drawer" button in Settings (test wiring).
+   *  Not called from printReceipt — there we send `openDrawer` in the
+   *  same /print request so the kick rides along with the receipt. */
+  async kickDrawer(): Promise<boolean> {
+    return this.postToHelper('/kick', {});
   }
 
   /**
@@ -98,6 +187,66 @@ export class PrinterService {
    */
   print(): void {
     queueMicrotask(() => this.document.defaultView?.print());
+  }
+
+  /**
+   * Preferred print path. If the helper service is enabled and reachable,
+   * POSTs the structured payload (ESC/POS bytes generated server-side,
+   * no browser print dialog at all). Otherwise falls back to the
+   * @media-print browser flow via print() so receipts still come out —
+   * just with the brief Chrome preview flash.
+   */
+  async printReceipt(payload: ReceiptPayload): Promise<void> {
+    if (this._helperEnabled() && this._helperUrl()) {
+      // The drawer kick is NOT bundled here on purpose — CheckoutDialog
+      // calls kickDrawer() the moment "Confirm Payment" is clicked,
+      // well before the cashier hits Print. Pre-kicking lets the
+      // cashier reach for change while the sale is still finishing.
+      const ok = await this.postToHelper('/print', payload);
+      if (ok) return;
+      console.warn('[printer] helper unreachable — falling back to browser print');
+    }
+    this.print();
+  }
+
+  /** Ping /health to confirm the helper is up. Returned by the Settings
+   *  "Test connection" button so the cashier knows wiring is good
+   *  before they ring up a real sale. */
+  async pingHelper(): Promise<boolean> {
+    const url = this._helperUrl();
+    if (!url) return false;
+    try {
+      const res = await fetch(this.joinUrl(url, '/health'), { method: 'GET' });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  /** Send a sample receipt via the helper (independent of the
+   *  browser-side window.print() testPrint()). */
+  async testHelperPrint(): Promise<boolean> {
+    return this.postToHelper('/test', {});
+  }
+
+  private async postToHelper(path: string, body: unknown): Promise<boolean> {
+    const url = this._helperUrl();
+    if (!url) return false;
+    try {
+      const res = await fetch(this.joinUrl(url, path), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      return res.ok;
+    } catch (err) {
+      console.warn('[printer] helper request failed', err);
+      return false;
+    }
+  }
+
+  private joinUrl(base: string, path: string): string {
+    return base.replace(/\/$/, '') + path;
   }
 
   /**
@@ -157,6 +306,32 @@ export class PrinterService {
       // ignore
     }
     return '80mm';
+  }
+
+  private readHelperEnabled(): boolean {
+    try {
+      return this.document.defaultView?.localStorage.getItem(HELPER_ENABLED_KEY) === '1';
+    } catch {
+      return false;
+    }
+  }
+
+  private readHelperUrl(): string {
+    try {
+      return (
+        this.document.defaultView?.localStorage.getItem(HELPER_URL_KEY) ?? DEFAULT_HELPER_URL
+      );
+    } catch {
+      return DEFAULT_HELPER_URL;
+    }
+  }
+
+  private readOpenDrawer(): boolean {
+    try {
+      return this.document.defaultView?.localStorage.getItem(OPEN_DRAWER_KEY) === '1';
+    } catch {
+      return false;
+    }
   }
 
   /**

@@ -250,6 +250,22 @@ h2[mat-dialog-title] {
   text-transform: capitalize;
 }
 
+/* Keyboard-shortcut chip — mirrors the .pos__kbd pattern used on the
+   POS page so the muscle memory ("the shortcut lives in this little
+   pill at the end of the button") carries across screens. */
+.kbd {
+  margin-left: 0.5rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 0.35rem;
+  background: var(--mat-sys-surface-container);
+  border: 1px solid var(--mat-sys-outline-variant);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--mat-sys-on-surface-variant);
+}
+
 .checkout__error {
   display: flex;
   align-items: center;

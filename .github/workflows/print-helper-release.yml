@@ -1,0 +1,71 @@
+# Builds the print-helper as standalone binaries (Linux / Windows /
+# macOS) and attaches them to a GitHub Release. Cashier devices then
+# download the right binary directly from the release page — no
+# Node.js install, no source files, no commands to run.
+#
+# Trigger:
+#   - Push a tag of the form `print-helper-vX.Y.Z` (e.g. print-helper-v1.0.0):
+#       git tag print-helper-v1.0.0
+#       git push origin print-helper-v1.0.0
+#     The workflow builds the binaries, creates a Release named after
+#     the tag, and uploads the binaries as assets.
+#   - Or fire it manually from the GitHub Actions tab via the "Run
+#     workflow" button (workflow_dispatch).
+#
+# Why bun: it ships single-binary compilation built in, cross-compiles
+# to every target from one Linux runner, and the print-helper has no
+# Node-specific APIs we'd lose.
+
+name: print-helper release
+
+on:
+  push:
+    tags:
+      - 'print-helper-v*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      # Needed for softprops/action-gh-release to create the Release.
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Build binaries
+        working-directory: print-helper
+        run: |
+          mkdir -p dist
+          bun build --compile --target=bun-linux-x64    index.js --outfile=dist/maxpos-print-helper-linux-x64
+          bun build --compile --target=bun-windows-x64  index.js --outfile=dist/maxpos-print-helper-windows-x64.exe
+          bun build --compile --target=bun-darwin-x64   index.js --outfile=dist/maxpos-print-helper-mac-x64
+          bun build --compile --target=bun-darwin-arm64 index.js --outfile=dist/maxpos-print-helper-mac-arm64
+          ls -la dist/
+
+      - name: Create GitHub Release with binaries
+        # Only run on tag pushes — manual dispatches still build and
+        # leave the binaries available as run artifacts but don't try
+        # to make a Release without a tag.
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: print-helper/dist/*
+          generate_release_notes: true
+          name: ${{ github.ref_name }}
+
+      - name: Upload binaries as workflow artifacts
+        # Always upload — even on manual dispatch — so the binaries
+        # are downloadable from the Actions run page during testing.
+        uses: actions/upload-artifact@v4
+        with:
+          name: print-helper-binaries
+          path: print-helper/dist/*
+          retention-days: 30

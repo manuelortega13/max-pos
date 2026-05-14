@@ -1,0 +1,18 @@
+{
+  "name": "maxpos-print-helper",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Local HTTP -> ESC/POS bridge for MaxPOS receipt printing.",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "build:linux": "bun build --compile --target=bun-linux-x64 index.js --outfile=dist/maxpos-print-helper-linux-x64",
+    "build:windows": "bun build --compile --target=bun-windows-x64 index.js --outfile=dist/maxpos-print-helper-windows-x64.exe",
+    "build:mac": "bun build --compile --target=bun-darwin-x64 index.js --outfile=dist/maxpos-print-helper-mac-x64",
+    "build:mac-arm": "bun build --compile --target=bun-darwin-arm64 index.js --outfile=dist/maxpos-print-helper-mac-arm64",
+    "build:all": "npm run build:linux && npm run build:windows && npm run build:mac && npm run build:mac-arm"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

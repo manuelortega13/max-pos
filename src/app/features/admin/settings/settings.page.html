@@ -90,16 +90,95 @@
       </div>
 
       <small class="settings-form__hint">
-        <strong>Silent printing (no dialog):</strong> launch the app via
-        Chrome / Edge with the <code>--kiosk-printing</code> flag.
-        <br/>
-        Windows shortcut target:
-        <code>"chrome.exe" --kiosk-printing --app=https://your-pos-url</code><br/>
-        Linux: <code>google-chrome --kiosk-printing --app=https://your-pos-url</code><br/>
-        Without the flag, the OS print dialog appears for each receipt
-        (acceptable fallback). The receipt always goes to whichever
-        printer the OS has set as default.
+        <strong>Browser print (fallback):</strong> uses
+        <code>window.print()</code>. Set the Xprinter as the OS default
+        and launch via Chrome / Edge with the
+        <code>--kiosk-printing</code> flag to suppress the dialog. Brief
+        preview flash on each receipt is normal.
       </small>
+
+      <mat-divider class="settings-form__divider"></mat-divider>
+
+      <mat-slide-toggle
+        [checked]="helperEnabled()"
+        (change)="toggleHelper($event.checked)"
+      >
+        Use local print helper (zero-dialog)
+      </mat-slide-toggle>
+      <small class="settings-form__hint">
+        When enabled, receipts are sent as JSON to a small local service
+        that talks ESC/POS directly to the printer — no Chrome print
+        pipeline involved, no preview flash, no codepage drift. If the
+        helper is unreachable, the app silently falls back to browser
+        print. Start the helper with
+        <code>cd print-helper &amp;&amp; npm start</code> in the repo.
+      </small>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Helper URL</mat-label>
+        <input
+          matInput
+          [value]="helperUrl()"
+          (change)="onHelperUrlChange($any($event.target).value)"
+          placeholder="http://localhost:9100"
+        />
+      </mat-form-field>
+
+      <div class="settings-form__row">
+        <button type="button" mat-stroked-button (click)="testHelper()">
+          <mat-icon>cable</mat-icon>
+          Test connection
+        </button>
+        @switch (helperStatus()) {
+          @case ('checking') {
+            <span class="settings-form__hint">Checking…</span>
+          }
+          @case ('ok') {
+            <span class="settings-form__hint settings-form__hint--ok">
+              <mat-icon>check_circle</mat-icon>
+              Helper reachable — test receipt sent.
+            </span>
+          }
+          @case ('down') {
+            <span class="settings-form__hint settings-form__hint--err">
+              <mat-icon>error_outline</mat-icon>
+              Helper unreachable at this URL.
+            </span>
+          }
+        }
+      </div>
+
+      <mat-divider class="settings-form__divider"></mat-divider>
+
+      <mat-slide-toggle
+        [checked]="openDrawer()"
+        [disabled]="!helperEnabled()"
+        (change)="toggleOpenDrawer($event.checked)"
+      >
+        Open cash drawer on each sale
+      </mat-slide-toggle>
+      <small class="settings-form__hint">
+        Fires the printer's drawer-kick command
+        (<code>ESC p 0 25 250</code>) the moment Confirm Payment is
+        clicked — the drawer pops while the receipt is still rendering
+        so the cashier can reach for change immediately. The cashier
+        can also tap <code>Ctrl+D</code> anywhere in the cashier app
+        to open the drawer manually (no-sale access). Helper service
+        must be enabled for both — the browser can't reach the
+        printer's DK port.
+      </small>
+
+      <div class="settings-form__row">
+        <button
+          type="button"
+          mat-stroked-button
+          [disabled]="!helperEnabled()"
+          (click)="kickDrawer()"
+        >
+          <mat-icon>point_of_sale</mat-icon>
+          Open drawer
+        </button>
+      </div>
     </mat-card-content>
   </mat-card>
 

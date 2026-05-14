@@ -53,6 +53,10 @@ export class SettingsPage {
    *  signal — Settings page doesn't need to save these via API. */
   protected readonly autoPrint = this.printerService.autoPrint;
   protected readonly paperSize = this.printerService.paperSize;
+  protected readonly helperEnabled = this.printerService.helperEnabled;
+  protected readonly helperUrl = this.printerService.helperUrl;
+  protected readonly helperStatus = signal<'unknown' | 'ok' | 'down' | 'checking'>('unknown');
+  protected readonly openDrawer = this.printerService.openDrawer;
 
   protected toggleAutoPrint(on: boolean): void {
     this.printerService.setAutoPrint(on);
@@ -60,6 +64,39 @@ export class SettingsPage {
 
   protected setPaperSize(size: PaperSize): void {
     this.printerService.setPaperSize(size);
+  }
+
+  protected toggleHelper(on: boolean): void {
+    this.printerService.setHelperEnabled(on);
+  }
+
+  protected onHelperUrlChange(url: string): void {
+    this.printerService.setHelperUrl(url);
+    this.helperStatus.set('unknown');
+  }
+
+  protected async testHelper(): Promise<void> {
+    this.helperStatus.set('checking');
+    const ok = await this.printerService.pingHelper();
+    if (!ok) {
+      this.helperStatus.set('down');
+      return;
+    }
+    const printed = await this.printerService.testHelperPrint();
+    this.helperStatus.set(printed ? 'ok' : 'down');
+  }
+
+  protected toggleOpenDrawer(on: boolean): void {
+    this.printerService.setOpenDrawer(on);
+  }
+
+  protected async kickDrawer(): Promise<void> {
+    const ok = await this.printerService.kickDrawer();
+    this.snackBar.open(
+      ok ? 'Drawer kicked.' : 'Could not reach the print helper.',
+      'Dismiss',
+      { duration: 2500 },
+    );
   }
 
   protected testPrint(): void {

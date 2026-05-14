@@ -1,0 +1,49 @@
+# MaxPOS print helper — systemd user unit template.
+#
+# Install:
+#   1. Edit WorkingDirectory + Environment lines below to match this
+#      register's setup. (Common variants: PRINTER_DEVICE, PAPER_WIDTH,
+#      PORT — see print-helper/index.js for the full list.)
+#   2. Copy to the user's systemd directory:
+#        mkdir -p ~/.config/systemd/user
+#        cp print-helper/maxpos-print-helper.service \
+#           ~/.config/systemd/user/
+#   3. Enable + start:
+#        systemctl --user daemon-reload
+#        systemctl --user enable --now maxpos-print-helper
+#   4. Auto-start without a logged-in console session:
+#        sudo loginctl enable-linger $USER
+#
+# Inspect:
+#   systemctl --user status maxpos-print-helper
+#   journalctl --user -u maxpos-print-helper -f
+
+[Unit]
+Description=MaxPOS print helper (HTTP -> ESC/POS bridge)
+After=network.target
+
+[Service]
+Type=simple
+# Adjust to wherever the repo lives on this machine.
+WorkingDirectory=%h/Documents/personal-projects/max-pos/print-helper
+ExecStart=/usr/bin/node index.js
+
+# All optional — defaults in index.js are sane.
+Environment=PORT=9100
+Environment=PRINTER_DEVICE=/dev/usb/lp0
+Environment=PAPER_WIDTH=32
+
+Restart=always
+RestartSec=3
+
+# Hardening (cheap wins, no extra config needed).
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=yes
+# /dev/usb/* is the printer; ReadWritePaths needs to include it so the
+# service can write the receipt bytes even with ProtectSystem on.
+ReadWritePaths=/dev/usb
+
+[Install]
+WantedBy=default.target
