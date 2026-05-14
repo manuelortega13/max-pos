@@ -33,38 +33,6 @@ const PRINTER_DEVICE =
   (os.platform() === 'win32' ? '\\\\.\\XP58' : '/dev/usb/lp0');
 const PAPER_WIDTH = Number(process.env.PAPER_WIDTH ?? 32);
 
-// ─────────────────────── CLI flag dispatch ─────────────────────────
-// One-shot self-registration. The compiled binary's own path
-// (process.execPath) is what gets registered with the OS, so the
-// install survives moving / renaming as long as the binary itself
-// stays put. No root / admin / UAC needed on any platform — all
-// install paths target the *user* (not system) scope.
-const args = new Set(process.argv.slice(2));
-if (args.has('--install')) {
-  doInstall();
-  process.exit(0);
-}
-if (args.has('--uninstall')) {
-  doUninstall();
-  process.exit(0);
-}
-if (args.has('--help') || args.has('-h')) {
-  console.log(`MaxPOS print helper
-
-Usage:
-  maxpos-print-helper            Run the HTTP server (default).
-  maxpos-print-helper --install  Register to auto-start on boot/login.
-  maxpos-print-helper --uninstall  Remove the auto-start registration.
-  maxpos-print-helper --help     Show this message.
-
-Environment:
-  PORT            HTTP port to bind. Default 9100.
-  PRINTER_DEVICE  Device path / Windows queue. Default /dev/usb/lp0
-                  on Linux/macOS, \\\\.\\XP58 on Windows.
-  PAPER_WIDTH     Columns per line for thermal layout. Default 32 (58mm).`);
-  process.exit(0);
-}
-
 const SERVICE_NAME = 'maxpos-print-helper';
 
 function doInstall() {
@@ -204,6 +172,46 @@ function uninstallMac() {
     fsSync.unlinkSync(plistPath);
     console.log(`Removed LaunchAgent: ${plistPath}`);
   }
+}
+
+// ─────────────────────── CLI flag dispatch ─────────────────────────
+// One-shot self-registration. The compiled binary's own path
+// (process.execPath) is what gets registered with the OS, so the
+// install survives moving / renaming as long as the binary itself
+// stays put. No root / admin / UAC needed on any platform — all
+// install paths target the *user* (not system) scope.
+//
+// IMPORTANT: this block has to live BELOW the install functions and
+// the constants they reference (SERVICE_NAME, WIN_REG_KEY, …). In
+// regular Node, calling these functions before those `const`s are
+// evaluated would throw a TDZ ReferenceError; in Bun's compiled
+// standalone binary they silently evaluate to `undefined` and produce
+// `reg add "undefined" /v undefined …` — which is exactly what
+// bit me on the v1.0.0 binary.
+const args = new Set(process.argv.slice(2));
+if (args.has('--install')) {
+  doInstall();
+  process.exit(0);
+}
+if (args.has('--uninstall')) {
+  doUninstall();
+  process.exit(0);
+}
+if (args.has('--help') || args.has('-h')) {
+  console.log(`MaxPOS print helper
+
+Usage:
+  maxpos-print-helper            Run the HTTP server (default).
+  maxpos-print-helper --install  Register to auto-start on boot/login.
+  maxpos-print-helper --uninstall  Remove the auto-start registration.
+  maxpos-print-helper --help     Show this message.
+
+Environment:
+  PORT            HTTP port to bind. Default 9100.
+  PRINTER_DEVICE  Device path / Windows queue. Default /dev/usb/lp0
+                  on Linux/macOS, \\\\.\\XP58 on Windows.
+  PAPER_WIDTH     Columns per line for thermal layout. Default 32 (58mm).`);
+  process.exit(0);
 }
 
 // ───────────────────────────── ESC/POS ─────────────────────────────
