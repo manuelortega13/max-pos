@@ -18,9 +18,11 @@ set NODE=C:\Program Files\nodejs\node.exe
 set WORKDIR=%~dp0
 set SCRIPT=index.js
 
-REM Adjust to your queue. \\.\<queue-name> sends raw bytes to the
-REM Windows print spooler queue you added for the XP-58IIB.
-set PRINTER_DEVICE=\\.\XP58
+REM The exact name of the Windows printer queue (Settings -> Bluetooth
+REM & devices -> Printers & scanners -> click the printer -> Printer
+REM properties -> shows up at the top of the General tab). The helper
+REM routes raw ESC/POS bytes to it via the Print Spooler API.
+set PRINTER_DEVICE=XP58
 set PORT=9100
 set PAPER_WIDTH=32
 

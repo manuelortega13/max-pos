@@ -5,18 +5,23 @@
 // printer. Bypasses the browser print pipeline entirely so there's
 // no print dialog flash and no driver-mediated codepage drift.
 //
-// Cross-platform via direct file I/O:
-//   - Linux / macOS: writes to /dev/usb/lp0 (or whatever PRINTER_DEVICE points to).
-//   - Windows: writes to the UNC printer path "\\.\<queue-name>" which
-//     the print spooler accepts as a RAW byte stream when the queue is
-//     a raw queue.
+// Cross-platform transport:
+//   - Linux / macOS: writes ESC/POS bytes directly to /dev/usb/lp0
+//     (or whatever PRINTER_DEVICE points to) via fs.writeFile.
+//   - Windows: routes through the Print Spooler API via a small
+//     PowerShell+P/Invoke script. Direct file I/O to a printer
+//     namespace path (`\\.\<queue>`) doesn't work on Windows — that
+//     errors with EINVAL because printers aren't NT device objects.
 //
-// Zero npm deps on purpose — Node built-ins only. Run with `node index.js`.
+// Zero npm deps on purpose — Node/Bun built-ins only. Run with
+// `node index.js`, `bun index.js`, or as a compiled binary.
 //
 // Configuration via environment variables:
 //   PORT            HTTP port to listen on. Default 9100.
-//   PRINTER_DEVICE  Path the bytes get written to. Default /dev/usb/lp0
-//                   on Linux/macOS, \\.\XP58 on Windows.
+//   PRINTER_DEVICE  On Linux/macOS, the device path (default
+//                   /dev/usb/lp0). On Windows, the printer queue
+//                   name as shown in Settings -> Printers (default
+//                   "XP58"). A leading \\.\ is stripped if present.
 //   PAPER_WIDTH     Columns per line. Default 32 (matches 58mm thermal
 //                   at the printer's default Font A). Bump to 48 for 80mm.
 
@@ -30,7 +35,7 @@ import { execSync } from 'node:child_process';
 const PORT = Number(process.env.PORT ?? 9100);
 const PRINTER_DEVICE =
   process.env.PRINTER_DEVICE ??
-  (os.platform() === 'win32' ? '\\\\.\\XP58' : '/dev/usb/lp0');
+  (os.platform() === 'win32' ? 'XP58' : '/dev/usb/lp0');
 const PAPER_WIDTH = Number(process.env.PAPER_WIDTH ?? 32);
 
 const SERVICE_NAME = 'maxpos-print-helper';
@@ -209,7 +214,7 @@ Usage:
 Environment:
   PORT            HTTP port to bind. Default 9100.
   PRINTER_DEVICE  Device path / Windows queue. Default /dev/usb/lp0
-                  on Linux/macOS, \\\\.\\XP58 on Windows.
+                  on Linux/macOS, "XP58" (queue name) on Windows.
   PAPER_WIDTH     Columns per line for thermal layout. Default 32 (58mm).`);
   process.exit(0);
 }
@@ -368,8 +373,110 @@ function renderReceipt(d) {
 }
 
 // ─────────────────────────── transport ─────────────────────────────
+//
+// Linux / macOS: /dev/usb/lp0 is a real character device — fs.writeFile
+// pipes ESC/POS bytes straight to the printer hardware.
+//
+// Windows: there's no equivalent device path. The Win32 Print Spooler
+// is the only sanctioned route — fs.writeFile to `\\.\<printer>` (which
+// I had in here originally) errors with EINVAL, the actual call has to
+// go through winspool.drv's OpenPrinter / StartDocPrinter / WritePrinter
+// API. Easiest way to reach those from a Bun-compiled binary without
+// a native module is to invoke a small PowerShell P/Invoke script.
+// ~300ms extra latency per print, but it works on any modern Windows
+// without installing toolchains.
+
 async function writeToPrinter(bytes) {
+  if (os.platform() === 'win32') {
+    await writeToPrinterWindows(bytes);
+    return;
+  }
   await fs.writeFile(PRINTER_DEVICE, bytes);
+}
+
+const WIN_PRINT_SCRIPT = `param([string]$PrinterName, [string]$DataPath)
+$ErrorActionPreference = 'Stop'
+Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+public class RawPrinter {
+  [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+  public class DOCINFO {
+    [MarshalAs(UnmanagedType.LPWStr)] public string pDocName;
+    [MarshalAs(UnmanagedType.LPWStr)] public string pOutputFile;
+    [MarshalAs(UnmanagedType.LPWStr)] public string pDataType;
+  }
+  [DllImport("winspool.drv", CharSet = CharSet.Unicode, SetLastError = true)]
+  public static extern bool OpenPrinter(string n, out IntPtr h, IntPtr d);
+  [DllImport("winspool.drv", SetLastError = true)]
+  public static extern bool ClosePrinter(IntPtr h);
+  [DllImport("winspool.drv", CharSet = CharSet.Unicode, SetLastError = true)]
+  public static extern bool StartDocPrinter(IntPtr h, int l, [In] DOCINFO d);
+  [DllImport("winspool.drv", SetLastError = true)]
+  public static extern bool EndDocPrinter(IntPtr h);
+  [DllImport("winspool.drv", SetLastError = true)]
+  public static extern bool StartPagePrinter(IntPtr h);
+  [DllImport("winspool.drv", SetLastError = true)]
+  public static extern bool EndPagePrinter(IntPtr h);
+  [DllImport("winspool.drv", SetLastError = true)]
+  public static extern bool WritePrinter(IntPtr h, IntPtr b, int n, out int w);
+}
+'@
+$bytes = [System.IO.File]::ReadAllBytes($DataPath)
+$h = [IntPtr]::Zero
+if (-not [RawPrinter]::OpenPrinter($PrinterName, [ref]$h, [IntPtr]::Zero)) {
+  throw "OpenPrinter failed for '$PrinterName' (is the queue installed?)"
+}
+try {
+  $di = New-Object RawPrinter+DOCINFO
+  $di.pDocName  = "MaxPOS Receipt"
+  $di.pDataType = "RAW"
+  if (-not [RawPrinter]::StartDocPrinter($h, 1, $di)) { throw "StartDocPrinter failed" }
+  try {
+    if (-not [RawPrinter]::StartPagePrinter($h)) { throw "StartPagePrinter failed" }
+    $ptr = [System.Runtime.InteropServices.Marshal]::AllocHGlobal($bytes.Length)
+    try {
+      [System.Runtime.InteropServices.Marshal]::Copy($bytes, 0, $ptr, $bytes.Length)
+      $w = 0
+      if (-not [RawPrinter]::WritePrinter($h, $ptr, $bytes.Length, [ref]$w)) {
+        throw "WritePrinter failed"
+      }
+    } finally { [System.Runtime.InteropServices.Marshal]::FreeHGlobal($ptr) }
+    [RawPrinter]::EndPagePrinter($h) | Out-Null
+  } finally { [RawPrinter]::EndDocPrinter($h) | Out-Null }
+} finally { [RawPrinter]::ClosePrinter($h) | Out-Null }
+`;
+
+let cachedScriptPath = null;
+async function ensurePrintScript() {
+  if (cachedScriptPath) return cachedScriptPath;
+  const p = path.join(os.tmpdir(), `maxpos-print-${process.pid}.ps1`);
+  await fs.writeFile(p, WIN_PRINT_SCRIPT);
+  cachedScriptPath = p;
+  return p;
+}
+
+async function writeToPrinterWindows(bytes) {
+  // Be lenient about PRINTER_DEVICE — earlier versions of this helper
+  // (and an old comment of mine) suggested the bogus `\\.\queue` form.
+  // Strip the device-namespace prefix so legacy installs keep working.
+  const printerName = PRINTER_DEVICE
+    .replace(/^\\\\\.\\/, '')
+    .replace(/^\\\\\?\\/, '');
+  const scriptPath = await ensurePrintScript();
+  const dataPath = path.join(
+    os.tmpdir(),
+    `maxpos-receipt-${process.pid}-${Date.now()}.bin`,
+  );
+  await fs.writeFile(dataPath, bytes);
+  try {
+    execSync(
+      `powershell -ExecutionPolicy Bypass -NoProfile -File "${scriptPath}" -PrinterName "${printerName}" -DataPath "${dataPath}"`,
+      { stdio: ['ignore', 'inherit', 'inherit'] },
+    );
+  } finally {
+    await fs.unlink(dataPath).catch(() => {});
+  }
 }
 
 // ──────────────────────────── HTTP ─────────────────────────────────
