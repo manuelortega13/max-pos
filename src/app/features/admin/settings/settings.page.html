@@ -45,6 +45,64 @@
     </mat-card-content>
   </mat-card>
 
+  <mat-card appearance="outlined">
+    <mat-card-header>
+      <mat-card-title>Receipt printer</mat-card-title>
+      <mat-card-subtitle>Per-device — only this register prints. Install the printer driver and set it as the OS default first.</mat-card-subtitle>
+    </mat-card-header>
+    <mat-card-content class="settings-form__inventory">
+      <mat-slide-toggle
+        [checked]="autoPrint()"
+        (change)="toggleAutoPrint($event.checked)"
+      >
+        Auto-print after each sale
+      </mat-slide-toggle>
+      <small class="settings-form__hint">
+        Fires the browser print as soon as the receipt appears. Still
+        prints the same receipt when off — just have to click the
+        <strong>Print</strong> button manually.
+      </small>
+
+      <div class="settings-form__row">
+        <span class="settings-form__hint">Paper size</span>
+        <mat-button-toggle-group
+          [value]="paperSize()"
+          (change)="setPaperSize($event.value)"
+          name="paperSize"
+          aria-label="Receipt paper size"
+        >
+          <mat-button-toggle value="58mm">58mm</mat-button-toggle>
+          <mat-button-toggle value="80mm">80mm</mat-button-toggle>
+          <mat-button-toggle value="a4">A4</mat-button-toggle>
+        </mat-button-toggle-group>
+      </div>
+      <small class="settings-form__hint">
+        Matches the thermal-paper width your printer feeds. 58mm and
+        80mm are the common thermal sizes; A4 is for ordinary office
+        printers. Applies on the next print.
+      </small>
+
+      <div class="settings-form__row">
+        <button type="button" mat-stroked-button (click)="testPrint()">
+          <mat-icon>print</mat-icon>
+          Test print
+        </button>
+      </div>
+
+      <small class="settings-form__hint">
+        <strong>Silent printing (no dialog):</strong> launch the app via
+        Chrome / Edge with the <code>--kiosk-printing</code> flag.
+        <br/>
+        Windows shortcut target:
+        <code>"chrome.exe" --kiosk-printing --app=https://your-pos-url</code><br/>
+        Linux: <code>google-chrome --kiosk-printing --app=https://your-pos-url</code><br/>
+        Without the flag, the OS print dialog appears for each receipt
+        (acceptable fallback). The receipt always goes to whichever
+        printer the OS has set as default.
+      </small>
+    </mat-card-content>
+  </mat-card>
+
   <form [formGroup]="form" (ngSubmit)="save()" class="settings-form">
     <mat-card appearance="outlined">
       <mat-card-header>

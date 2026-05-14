@@ -2,6 +2,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, effect, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
+import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatCardModule } from '@angular/material/card';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -13,12 +14,14 @@ import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { SettingsService } from '../../../core/services/settings.service';
 import { ThemeService } from '../../../core/services/theme.service';
+import { PaperSize, PrinterService } from '../../../core/services/printer.service';
 
 @Component({
   selector: 'app-settings-page',
   imports: [
     ReactiveFormsModule,
     MatButtonModule,
+    MatButtonToggleModule,
     MatCardModule,
     MatDividerModule,
     MatFormFieldModule,
@@ -36,6 +39,7 @@ export class SettingsPage {
   private readonly fb = inject(FormBuilder);
   private readonly settingsService = inject(SettingsService);
   private readonly themeService = inject(ThemeService);
+  private readonly printerService = inject(PrinterService);
   private readonly snackBar = inject(MatSnackBar);
 
   /** Bound to the slide toggle. True = dark mode (toggle "on" = on-brand dark). */
@@ -43,6 +47,23 @@ export class SettingsPage {
 
   protected toggleTheme(dark: boolean): void {
     this.themeService.set(dark ? 'dark' : 'light');
+  }
+
+  /** Per-device receipt-printer toggles. Wired straight to the
+   *  signal — Settings page doesn't need to save these via API. */
+  protected readonly autoPrint = this.printerService.autoPrint;
+  protected readonly paperSize = this.printerService.paperSize;
+
+  protected toggleAutoPrint(on: boolean): void {
+    this.printerService.setAutoPrint(on);
+  }
+
+  protected setPaperSize(size: PaperSize): void {
+    this.printerService.setPaperSize(size);
+  }
+
+  protected testPrint(): void {
+    this.printerService.testPrint();
   }
 
   protected readonly currencies = [

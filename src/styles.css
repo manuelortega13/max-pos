@@ -1,5 +1,113 @@
 @import 'tailwindcss';
 
+/* ──────────────────────────────────────────────────────────────────
+   Receipt print rules. PrinterService.print() just calls
+   window.print(); the @media print block below decides what's on the
+   paper: nothing except the .print-receipt subtree currently in the
+   DOM (typically inside the checkout dialog after a sale, or the
+   temporary container that testPrint() injects on the body).
+
+   Page sized for an 80mm thermal printer by default — most ESC/POS
+   drivers honor the CSS @page size; the few that don't use the
+   printer's hardware width and ignore us, which is also fine.
+   ────────────────────────────────────────────────────────────────── */
+@media print {
+  /* Belt-and-braces: hide ALL screen chrome (toolbars, sidenav,
+     dialogs' backdrops, etc.). Use visibility so descendants of
+     .print-receipt can still re-show themselves via the next rule
+     (display:none would prevent that). */
+  body * {
+    visibility: hidden !important;
+  }
+  .print-receipt,
+  .print-receipt * {
+    visibility: visible !important;
+  }
+  /* Position the receipt at page origin so it isn't anchored inside
+     the dialog overlay it was rendered into. Also drop the screen-
+     time chrome: 1.75rem padding, dashed border, light bg — all of
+     which would print as wasted space + lines on a 58mm column.
+
+     The padding-left/right here is the REAL gutter that keeps the
+     first character off the thermal printer's hardware unprintable
+     zone (~3mm on each side for the XP-58IIB / ZJ-58 family). @page
+     margin alone wasn't doing it — most thermal drivers ignore
+     @page side margins and clip to the head's physical range. */
+  .print-receipt {
+    position: absolute !important;
+    inset: 0 auto auto 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    margin: 0 !important;
+    /* 4mm top breathing room since @page margin is 0 for thermal,
+       7mm sides as the real anti-clipping gutter. */
+    padding: 4mm 7mm !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    /* Monospace for tabular alignment of qty / amount columns. */
+    font-family: 'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    /* 11px is the sweet spot for 58mm thermal — fits ~25 chars per
+       line in monospace inside the padded column. 80mm/A4 still look
+       fine because the column just gets wider, not denser. */
+    font-size: 11px !important;
+    line-height: 1.28 !important;
+    font-weight: 400 !important;
+  }
+
+  /* Reset chunky screen sizes inside the receipt so nothing inherits
+     1rem+ from .receipt__row--grand etc. */
+  .print-receipt strong,
+  .print-receipt small,
+  .print-receipt span,
+  .print-receipt div,
+  .print-receipt li,
+  .print-receipt p {
+    font-size: 11px !important;
+    line-height: 1.28 !important;
+    color: #000000 !important;
+    background: transparent !important;
+  }
+  .print-receipt .receipt__header strong {
+    font-size: 13px !important;
+    font-weight: 700 !important;
+  }
+  .print-receipt .receipt__row--grand,
+  .print-receipt .receipt__row--grand span {
+    font-size: 12px !important;
+    font-weight: 700 !important;
+  }
+  .print-receipt .receipt__label {
+    font-size: 10px !important;
+  }
+  /* Material dividers render as <hr>s with extra inset margins —
+     flatten to a plain printer-friendly rule. */
+  .print-receipt mat-divider,
+  .print-receipt .mat-divider {
+    display: block !important;
+    border: 0 !important;
+    border-top: 1px dashed #000 !important;
+    margin: 3px 0 !important;
+    height: 0 !important;
+  }
+  /* The Material dialog surface and CDK overlay still exist in the
+     DOM during print; flatten them so they don't add visible chrome. */
+  .cdk-overlay-container,
+  .cdk-overlay-backdrop,
+  .cdk-overlay-pane,
+  .mat-mdc-dialog-surface,
+  .mat-mdc-dialog-container,
+  .mat-mdc-dialog-content {
+    background: transparent !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+  }
+}
+
+
 html {
   /* Match the M3 cyan-orange prebuilt theme, which ships as dark.
      This makes system-rendered UI (scrollbars, form controls, the

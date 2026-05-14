@@ -22,6 +22,7 @@ import { CartLine, DiscountInput, PaymentMethod, Sale } from '../../../core/mode
 import { SettingsService } from '../../../core/services/settings.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { SaleService } from '../../../core/services/sale.service';
+import { PrinterService } from '../../../core/services/printer.service';
 import { MoneyPipe } from '../../../shared/pipes/currency-symbol.pipe';
 
 export interface CheckoutData {
@@ -63,6 +64,7 @@ export class CheckoutDialog {
   private readonly settingsService = inject(SettingsService);
   private readonly authService = inject(AuthService);
   private readonly saleService = inject(SaleService);
+  private readonly printerService = inject(PrinterService);
   protected readonly data = inject<CheckoutData>(MAT_DIALOG_DATA);
 
   protected readonly settings = this.settingsService.settings;
@@ -127,10 +129,20 @@ export class CheckoutDialog {
       } else if (step === 'receipt') {
         setTimeout(() => {
           this.newSaleBtnRef()?.nativeElement.focus();
-          console.log('Focused new sale button', this.newSaleBtnRef()?.nativeElement);
         }, 100);
+        // Auto-print is per-device — if this register has it on, fire
+        // the print right after the receipt template has rendered.
+        // The small delay lets Material finish its animation so the
+        // dialog content is fully laid out before we snapshot.
+        if (this.printerService.autoPrint()) {
+          setTimeout(() => this.printerService.print(), 200);
+        }
       }
     });
+  }
+
+  protected print(): void {
+    this.printerService.print();
   }
 
   protected confirm(): void {

@@ -116,7 +116,7 @@
         </div>
       </div>
 
-      <section class="receipt">
+      <section class="receipt print-receipt">
         <header class="receipt__header">
           <strong>{{ settings().storeName }}</strong>
           <small>{{ settings().address }}</small>
@@ -207,7 +207,7 @@
       </section>
     </mat-dialog-content>
     <mat-dialog-actions align="end">
-      <button mat-stroked-button>
+      <button type="button" mat-stroked-button (click)="print()">
         <mat-icon>print</mat-icon>
         Print
       </button>
