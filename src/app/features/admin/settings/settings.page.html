@@ -187,6 +187,36 @@
     </mat-card-content>
   </mat-card>
 
+  <mat-card appearance="outlined">
+    <mat-card-header>
+      <mat-card-title>Fast checkout</mat-card-title>
+      <mat-card-subtitle>Per-device — for registers on slow or flaky internet</mat-card-subtitle>
+    </mat-card-header>
+    <mat-card-content class="settings-form__inventory">
+      <mat-slide-toggle
+        [checked]="fastCheckout()"
+        [disabled]="!offlineModeEnabled()"
+        (change)="toggleFastCheckout($event.checked)"
+      >
+        Don't wait for sync on each sale
+      </mat-slide-toggle>
+      <small class="settings-form__hint">
+        When on, the cashier never waits for the server during checkout
+        — the sale prints + the drawer pops the instant Confirm Payment
+        is clicked, and the actual POST to the backend rides the
+        background offline queue. Great for stores on slow / flaky
+        internet; the trade-off is that stock counts on screen lag the
+        real database by a few seconds.
+        <br/>
+        <strong>Requires Offline mode</strong> (above) — eventual
+        replays may land against zero stock, and offline mode forces
+        the "Allow negative stock" pairing on the backend so those
+        sales aren't rejected after the cashier has already handed the
+        customer their receipt.
+      </small>
+    </mat-card-content>
+  </mat-card>
+
   <form [formGroup]="form" (ngSubmit)="save()" class="settings-form">
     <mat-card appearance="outlined">
       <mat-card-header>

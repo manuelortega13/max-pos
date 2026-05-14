@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, effect, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
@@ -12,6 +12,7 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { SaleService } from '../../../core/services/sale.service';
 import { SettingsService } from '../../../core/services/settings.service';
 import { ThemeService } from '../../../core/services/theme.service';
 import { PaperSize, PrinterService } from '../../../core/services/printer.service';
@@ -40,6 +41,7 @@ export class SettingsPage {
   private readonly settingsService = inject(SettingsService);
   private readonly themeService = inject(ThemeService);
   private readonly printerService = inject(PrinterService);
+  private readonly saleService = inject(SaleService);
   private readonly snackBar = inject(MatSnackBar);
 
   /** Bound to the slide toggle. True = dark mode (toggle "on" = on-brand dark). */
@@ -101,6 +103,18 @@ export class SettingsPage {
 
   protected testPrint(): void {
     this.printerService.testPrint();
+  }
+
+  /** Per-device "ring up first, sync later" toggle. */
+  protected readonly fastCheckout = this.saleService.fastCheckout;
+  /** Exposed so the Fast-checkout toggle can disable itself when the
+   *  store-wide offline-mode prerequisite is off. */
+  protected readonly offlineModeEnabled = computed(
+    () => this.settingsService.settings().offlineModeEnabled,
+  );
+
+  protected toggleFastCheckout(on: boolean): void {
+    this.saleService.setFastCheckout(on);
   }
 
   protected readonly currencies = [

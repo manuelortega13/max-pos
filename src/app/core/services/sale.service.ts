@@ -20,10 +20,36 @@ export class SaleService {
   private readonly _sales = signal<Sale[]>([]);
   private readonly _loading = signal<boolean>(false);
   private readonly _error = signal<string | null>(null);
+  /**
+   * Per-device "ring up first, sync later" toggle. When on AND store
+   * offline mode is enabled, create() returns an optimistic Sale
+   * immediately and pushes the POST onto the offline queue for the
+   * background drainer to ship out. Cashier never waits on the network.
+   * Backed by localStorage so the choice survives reloads.
+   */
+  private readonly _fastCheckout = signal<boolean>(this.readFastCheckout());
 
   readonly sales = this._sales.asReadonly();
   readonly loading = this._loading.asReadonly();
   readonly error = this._error.asReadonly();
+  readonly fastCheckout = this._fastCheckout.asReadonly();
+
+  setFastCheckout(on: boolean): void {
+    this._fastCheckout.set(on);
+    try {
+      localStorage.setItem('maxpos.sale.fastCheckout', on ? '1' : '0');
+    } catch {
+      // localStorage unavailable — best effort.
+    }
+  }
+
+  private readFastCheckout(): boolean {
+    try {
+      return localStorage.getItem('maxpos.sale.fastCheckout') === '1';
+    } catch {
+      return false;
+    }
+  }
 
   readonly completedSales = computed(() =>
     this._sales().filter((s) => s.status === 'COMPLETED'),
@@ -88,6 +114,16 @@ export class SaleService {
     const clientRef = request.clientRef ?? this.generateClientRef();
     const payload: CreateSaleRequest = { ...request, clientRef };
     const offlineEnabled = this.settingsService.settings().offlineModeEnabled;
+
+    // Fast checkout: the cashier doesn't wait for the server at all,
+    // even on a healthy connection. Sale goes straight to the queue,
+    // OfflineSyncService ships it in the background. Requires offline
+    // mode to be enabled at the store level — eventual replays may
+    // land against zero stock, and offlineModeEnabled enforces
+    // allowNegativeStock so the backend accepts them.
+    if (this._fastCheckout() && offlineEnabled) {
+      return of(this.enqueueOffline(payload, clientRef, 'fast checkout (queued for background sync)'));
+    }
 
     // Only short-circuit to the offline queue when the admin has explicitly
     // enabled offline mode in Settings. Otherwise keep the legacy behavior
