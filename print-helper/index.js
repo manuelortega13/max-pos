@@ -32,11 +32,33 @@ import os from 'node:os';
 import path from 'node:path';
 import { execSync } from 'node:child_process';
 
-const PORT = Number(process.env.PORT ?? 9100);
+/**
+ * Read a `--name <value>` flag from argv. Returns null when missing,
+ * or when the following arg looks like another flag (`--foo --bar`).
+ * Kept dead-simple — we only need a handful of named flags and no
+ * one-character aliases or `=` syntax.
+ */
+function readFlag(name) {
+  const i = process.argv.indexOf(`--${name}`);
+  if (i === -1 || i + 1 >= process.argv.length) return null;
+  const next = process.argv[i + 1];
+  if (next.startsWith('--')) return null;
+  return next;
+}
+const cliPrinter = readFlag('printer');
+const cliPort = readFlag('port');
+const cliPaperWidth = readFlag('paper-width');
+
+// Precedence: CLI flag -> env var -> per-platform default. The CLI flag
+// wins so install-time choices baked into the Run-key / systemd unit /
+// LaunchAgent stay deterministic regardless of what env vars happen to
+// be set when the auto-start fires.
+const PORT = Number(cliPort ?? process.env.PORT ?? 9100);
 const PRINTER_DEVICE =
+  cliPrinter ??
   process.env.PRINTER_DEVICE ??
   (os.platform() === 'win32' ? 'XP58' : '/dev/usb/lp0');
-const PAPER_WIDTH = Number(process.env.PAPER_WIDTH ?? 32);
+const PAPER_WIDTH = Number(cliPaperWidth ?? process.env.PAPER_WIDTH ?? 32);
 
 const SERVICE_NAME = 'maxpos-print-helper';
 
@@ -129,11 +151,21 @@ function uninstallLinux() {
 const WIN_REG_KEY = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run';
 const WIN_REG_VALUE = 'MaxPOSPrintHelper';
 function installWindows(exePath) {
+  // Capture install-time CLI flags into the Run-key command line so
+  // they survive every login. Without this, the auto-launched helper
+  // would always run with default config — useless if the user's
+  // printer queue isn't literally named XP58.
+  const parts = [`\\"${exePath}\\"`];
+  if (cliPrinter) parts.push(`--printer \\"${cliPrinter}\\"`);
+  if (cliPort) parts.push(`--port ${cliPort}`);
+  if (cliPaperWidth) parts.push(`--paper-width ${cliPaperWidth}`);
+  const command = parts.join(' ');
   execSync(
-    `reg add "${WIN_REG_KEY}" /v ${WIN_REG_VALUE} /t REG_SZ /d "\\"${exePath}\\"" /f`,
+    `reg add "${WIN_REG_KEY}" /v ${WIN_REG_VALUE} /t REG_SZ /d "${command}" /f`,
     { stdio: 'inherit' },
   );
   console.log(`Wrote Run entry: ${WIN_REG_KEY}\\${WIN_REG_VALUE}`);
+  console.log(`Command: ${parts.join(' ').replace(/\\"/g, '"')}`);
 }
 function uninstallWindows() {
   execSync(`reg delete "${WIN_REG_KEY}" /v ${WIN_REG_VALUE} /f`, { stdio: 'inherit' });
@@ -206,16 +238,30 @@ if (args.has('--help') || args.has('-h')) {
   console.log(`MaxPOS print helper
 
 Usage:
-  maxpos-print-helper            Run the HTTP server (default).
-  maxpos-print-helper --install  Register to auto-start on boot/login.
-  maxpos-print-helper --uninstall  Remove the auto-start registration.
-  maxpos-print-helper --help     Show this message.
+  maxpos-print-helper                    Run the HTTP server (default).
+  maxpos-print-helper --install [flags]  Register to auto-start on
+                                         boot/login. Any --printer /
+                                         --port / --paper-width flags
+                                         passed at install time get
+                                         baked into the auto-start
+                                         entry, so they persist.
+  maxpos-print-helper --uninstall        Remove the auto-start entry.
+  maxpos-print-helper --help             Show this message.
 
-Environment:
-  PORT            HTTP port to bind. Default 9100.
-  PRINTER_DEVICE  Device path / Windows queue. Default /dev/usb/lp0
-                  on Linux/macOS, "XP58" (queue name) on Windows.
-  PAPER_WIDTH     Columns per line for thermal layout. Default 32 (58mm).`);
+Flags (override env vars; precedence: CLI > env > default):
+  --printer <name>    Printer queue name (Windows) / device path
+                      (Linux + macOS). Default /dev/usb/lp0 on
+                      Linux/macOS, "XP58" on Windows.
+  --port <n>          HTTP port to bind. Default 9100.
+  --paper-width <n>   Columns per line for thermal layout. Default 32
+                      (58mm). Use 48 for 80mm.
+
+Environment (also honored, same names as the CLI flags but ALL_CAPS):
+  PORT, PRINTER_DEVICE, PAPER_WIDTH.
+
+Examples:
+  maxpos-print-helper --install --printer "POS-58"
+  maxpos-print-helper --install --printer "Receipt 80mm" --paper-width 48`);
   process.exit(0);
 }
 
