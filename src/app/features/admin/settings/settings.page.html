@@ -110,8 +110,13 @@
         that talks ESC/POS directly to the printer — no Chrome print
         pipeline involved, no preview flash, no codepage drift. If the
         helper is unreachable, the app silently falls back to browser
-        print. Start the helper with
-        <code>cd print-helper &amp;&amp; npm start</code> in the repo.
+        print.
+        <br/>
+        <strong>Install:</strong> download the binary for your OS from
+        the GitHub Releases page and run it once with
+        <code>--install</code> — registers as auto-start on boot/login,
+        no admin needed. Without <code>--install</code>, the binary
+        still runs as long as you keep its window open.
       </small>
 
       <mat-form-field appearance="outline">

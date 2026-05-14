@@ -22,13 +22,189 @@
 
 import http from 'node:http';
 import fs from 'node:fs/promises';
+import fsSync from 'node:fs';
 import os from 'node:os';
+import path from 'node:path';
+import { execSync } from 'node:child_process';
 
 const PORT = Number(process.env.PORT ?? 9100);
 const PRINTER_DEVICE =
   process.env.PRINTER_DEVICE ??
   (os.platform() === 'win32' ? '\\\\.\\XP58' : '/dev/usb/lp0');
 const PAPER_WIDTH = Number(process.env.PAPER_WIDTH ?? 32);
+
+// ─────────────────────── CLI flag dispatch ─────────────────────────
+// One-shot self-registration. The compiled binary's own path
+// (process.execPath) is what gets registered with the OS, so the
+// install survives moving / renaming as long as the binary itself
+// stays put. No root / admin / UAC needed on any platform — all
+// install paths target the *user* (not system) scope.
+const args = new Set(process.argv.slice(2));
+if (args.has('--install')) {
+  doInstall();
+  process.exit(0);
+}
+if (args.has('--uninstall')) {
+  doUninstall();
+  process.exit(0);
+}
+if (args.has('--help') || args.has('-h')) {
+  console.log(`MaxPOS print helper
+
+Usage:
+  maxpos-print-helper            Run the HTTP server (default).
+  maxpos-print-helper --install  Register to auto-start on boot/login.
+  maxpos-print-helper --uninstall  Remove the auto-start registration.
+  maxpos-print-helper --help     Show this message.
+
+Environment:
+  PORT            HTTP port to bind. Default 9100.
+  PRINTER_DEVICE  Device path / Windows queue. Default /dev/usb/lp0
+                  on Linux/macOS, \\\\.\\XP58 on Windows.
+  PAPER_WIDTH     Columns per line for thermal layout. Default 32 (58mm).`);
+  process.exit(0);
+}
+
+const SERVICE_NAME = 'maxpos-print-helper';
+
+function doInstall() {
+  const platform = os.platform();
+  const exePath = process.execPath;
+  console.log(`Registering auto-start for: ${exePath}`);
+  try {
+    if (platform === 'linux') installLinux(exePath);
+    else if (platform === 'win32') installWindows(exePath);
+    else if (platform === 'darwin') installMac(exePath);
+    else {
+      console.error(`Auto-install not supported on platform: ${platform}`);
+      process.exit(1);
+    }
+    console.log(
+      `\nInstalled. The helper will start automatically on every ` +
+        `${platform === 'win32' ? 'login' : 'boot/login'}.`,
+    );
+  } catch (err) {
+    console.error('Install failed:', err?.message ?? err);
+    process.exit(1);
+  }
+}
+
+function doUninstall() {
+  const platform = os.platform();
+  try {
+    if (platform === 'linux') uninstallLinux();
+    else if (platform === 'win32') uninstallWindows();
+    else if (platform === 'darwin') uninstallMac();
+    else {
+      console.error(`Auto-uninstall not supported on platform: ${platform}`);
+      process.exit(1);
+    }
+    console.log('Uninstalled. Auto-start removed.');
+  } catch (err) {
+    console.error('Uninstall failed:', err?.message ?? err);
+    process.exit(1);
+  }
+}
+
+// ────── Linux: systemd user unit ──────
+function linuxUnitPath() {
+  return path.join(os.homedir(), '.config/systemd/user', `${SERVICE_NAME}.service`);
+}
+function installLinux(exePath) {
+  const unitPath = linuxUnitPath();
+  fsSync.mkdirSync(path.dirname(unitPath), { recursive: true });
+  const unit = `[Unit]
+Description=MaxPOS print helper (HTTP -> ESC/POS bridge)
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=${exePath}
+Environment=PORT=${PORT}
+Environment=PRINTER_DEVICE=${PRINTER_DEVICE}
+Environment=PAPER_WIDTH=${PAPER_WIDTH}
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=default.target
+`;
+  fsSync.writeFileSync(unitPath, unit);
+  execSync('systemctl --user daemon-reload', { stdio: 'inherit' });
+  execSync(`systemctl --user enable --now ${SERVICE_NAME}`, { stdio: 'inherit' });
+  console.log(`Wrote unit: ${unitPath}`);
+  console.log(
+    'Tip: run `loginctl enable-linger $USER` once to keep the helper ' +
+      'running when no user is logged into the console.',
+  );
+}
+function uninstallLinux() {
+  const unitPath = linuxUnitPath();
+  try {
+    execSync(`systemctl --user disable --now ${SERVICE_NAME}`, { stdio: 'inherit' });
+  } catch {
+    // service might already be stopped — ignore
+  }
+  if (fsSync.existsSync(unitPath)) {
+    fsSync.unlinkSync(unitPath);
+    console.log(`Removed unit: ${unitPath}`);
+  }
+  execSync('systemctl --user daemon-reload', { stdio: 'inherit' });
+}
+
+// ────── Windows: HKCU Run key ──────
+const WIN_REG_KEY = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run';
+const WIN_REG_VALUE = 'MaxPOSPrintHelper';
+function installWindows(exePath) {
+  execSync(
+    `reg add "${WIN_REG_KEY}" /v ${WIN_REG_VALUE} /t REG_SZ /d "\\"${exePath}\\"" /f`,
+    { stdio: 'inherit' },
+  );
+  console.log(`Wrote Run entry: ${WIN_REG_KEY}\\${WIN_REG_VALUE}`);
+}
+function uninstallWindows() {
+  execSync(`reg delete "${WIN_REG_KEY}" /v ${WIN_REG_VALUE} /f`, { stdio: 'inherit' });
+}
+
+// ────── macOS: LaunchAgent ──────
+function macPlistPath() {
+  return path.join(os.homedir(), 'Library/LaunchAgents', `com.maxpos.print-helper.plist`);
+}
+function installMac(exePath) {
+  const plistPath = macPlistPath();
+  fsSync.mkdirSync(path.dirname(plistPath), { recursive: true });
+  const plist = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.maxpos.print-helper</string>
+  <key>ProgramArguments</key>
+  <array><string>${exePath}</string></array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PORT</key><string>${PORT}</string>
+    <key>PRINTER_DEVICE</key><string>${PRINTER_DEVICE}</string>
+    <key>PAPER_WIDTH</key><string>${PAPER_WIDTH}</string>
+  </dict>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+</dict>
+</plist>
+`;
+  fsSync.writeFileSync(plistPath, plist);
+  // Unload first in case it was previously registered, then load.
+  try { execSync(`launchctl unload "${plistPath}"`, { stdio: 'ignore' }); } catch {}
+  execSync(`launchctl load "${plistPath}"`, { stdio: 'inherit' });
+  console.log(`Wrote LaunchAgent: ${plistPath}`);
+}
+function uninstallMac() {
+  const plistPath = macPlistPath();
+  try { execSync(`launchctl unload "${plistPath}"`, { stdio: 'ignore' }); } catch {}
+  if (fsSync.existsSync(plistPath)) {
+    fsSync.unlinkSync(plistPath);
+    console.log(`Removed LaunchAgent: ${plistPath}`);
+  }
+}
 
 // ───────────────────────────── ESC/POS ─────────────────────────────
 const ESC = '\x1b';
