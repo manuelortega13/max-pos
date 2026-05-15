@@ -145,12 +145,16 @@ export class CheckoutDialog {
         }, 100);
         // Auto-print is per-device — if this register has it on, fire
         // the print right after the receipt template has rendered.
-        // The small delay lets Material finish its animation so the
-        // dialog content is fully laid out before we snapshot (only
-        // matters for the browser-print fallback; the helper service
-        // path doesn't need the DOM to be painted).
+        //
+        // The 200ms delay is only useful for the browser-print fallback
+        // (gives Material's dialog content swap time to settle before
+        // window.print() snapshots the DOM). When the helper service is
+        // the active path, we POST JSON straight to it — no DOM read,
+        // no animation to wait for. Skipping the delay shaves a clear
+        // 200ms off the perceived "click confirm → receipt prints" gap.
         if (this.printerService.autoPrint()) {
-          setTimeout(() => void this.printerService.printReceipt(this.buildPayload()), 200);
+          const delay = this.printerService.helperEnabled() ? 0 : 200;
+          setTimeout(() => void this.printerService.printReceipt(this.buildPayload()), delay);
         }
       }
     });

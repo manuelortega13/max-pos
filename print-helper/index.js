@@ -509,6 +509,20 @@ async function writeToPrinterWindows(bytes) {
   const printerName = PRINTER_DEVICE
     .replace(/^\\\\\.\\/, '')
     .replace(/^\\\\\?\\/, '');
+
+  // Fast path: bun:ffi calls winspool.drv directly. No PowerShell spawn,
+  // no temp file, no .NET load — straight from the bun runtime into the
+  // Win32 Print Spooler. Round-trip drops from ~400ms (PowerShell
+  // startup) to a few ms. The compiled binary always runs on Bun, so
+  // this is the production path.
+  if (typeof Bun !== 'undefined') {
+    await writeToPrinterWindowsFFI(printerName, bytes);
+    return;
+  }
+
+  // Fallback: per-call PowerShell. Only reached when someone is running
+  // `node index.js` directly on Windows (dev / debugging). Slower
+  // (~400ms PS startup) but doesn't need bun installed.
   const scriptPath = await ensurePrintScript();
   const dataPath = path.join(
     os.tmpdir(),
@@ -522,6 +536,102 @@ async function writeToPrinterWindows(bytes) {
     );
   } finally {
     await fs.unlink(dataPath).catch(() => {});
+  }
+}
+
+// ────────────── Windows: bun:ffi -> winspool.drv ──────────────────
+//
+// Bun-only fast path. Lazily binds the symbols on first use (so the
+// non-Windows runtime never even tries to dlopen winspool.drv) and
+// then reuses them for the lifetime of the helper.
+//
+// API contract for each call:
+//   OpenPrinterA      -> get a handle
+//   StartDocPrinterA  -> begin a doc, datatype "RAW" so the spooler
+//                        doesn't try to translate our ESC/POS bytes
+//   StartPagePrinter / WritePrinter / EndPagePrinter
+//   EndDocPrinter / ClosePrinter
+//
+// We use the ANSI ("A") variants because printer queue names + the
+// fixed strings "MaxPOS Receipt" / "RAW" are all ASCII — saves us
+// hand-rolling UTF-16LE encoding for LPWSTR args.
+let _winspool = null;
+async function getWinspool() {
+  if (_winspool) return _winspool;
+  const { dlopen, FFIType, ptr } = await import('bun:ffi');
+  const lib = dlopen('winspool.drv', {
+    OpenPrinterA: {
+      args: [FFIType.cstring, FFIType.ptr, FFIType.ptr],
+      returns: FFIType.i32,
+    },
+    StartDocPrinterA: {
+      args: [FFIType.ptr, FFIType.i32, FFIType.ptr],
+      returns: FFIType.i32,
+    },
+    StartPagePrinter: { args: [FFIType.ptr], returns: FFIType.i32 },
+    WritePrinter: {
+      args: [FFIType.ptr, FFIType.ptr, FFIType.i32, FFIType.ptr],
+      returns: FFIType.i32,
+    },
+    EndPagePrinter: { args: [FFIType.ptr], returns: FFIType.i32 },
+    EndDocPrinter: { args: [FFIType.ptr], returns: FFIType.i32 },
+    ClosePrinter: { args: [FFIType.ptr], returns: FFIType.i32 },
+  });
+  _winspool = { lib, ptr };
+  return _winspool;
+}
+
+async function writeToPrinterWindowsFFI(printerName, bytes) {
+  const { lib, ptr } = await getWinspool();
+  const sym = lib.symbols;
+
+  // OpenPrinterA writes the handle (HANDLE = void*, 8 bytes on x64)
+  // into the OUT param. Allocate an 8-byte buffer for it.
+  const handleBuf = Buffer.alloc(8);
+  if (!sym.OpenPrinterA(printerName, ptr(handleBuf), null)) {
+    throw new Error(`OpenPrinter failed for '${printerName}' (is the queue installed?)`);
+  }
+  // The handle value itself, as a BigInt — bun:ffi accepts BigInt for
+  // pointer args, so we can pass this directly to subsequent calls.
+  const hPrinter = handleBuf.readBigUInt64LE(0);
+
+  try {
+    // DOC_INFO_1A is three pointers (24 bytes on x64):
+    //   pDocName    -> "MaxPOS Receipt"
+    //   pOutputFile -> NULL (spool to printer, not a file)
+    //   pDatatype   -> "RAW" so the spooler passes our bytes through
+    //                  untouched (no driver-side glyph rendering).
+    // The string buffers MUST stay alive for the duration of the call —
+    // we hold them in locals so JS GC can't free them mid-call.
+    const docName = Buffer.from('MaxPOS Receipt\0', 'utf8');
+    const dataType = Buffer.from('RAW\0', 'utf8');
+    const docInfo = Buffer.alloc(24);
+    docInfo.writeBigUInt64LE(BigInt(ptr(docName)), 0);
+    docInfo.writeBigUInt64LE(0n, 8);
+    docInfo.writeBigUInt64LE(BigInt(ptr(dataType)), 16);
+
+    if (!sym.StartDocPrinterA(hPrinter, 1, ptr(docInfo))) {
+      throw new Error('StartDocPrinter failed');
+    }
+    try {
+      if (!sym.StartPagePrinter(hPrinter)) {
+        throw new Error('StartPagePrinter failed');
+      }
+      try {
+        // The payload Buffer also has to stay pinned during WritePrinter;
+        // it does (referenced through `bytes` until the call returns).
+        const written = Buffer.alloc(4);
+        if (!sym.WritePrinter(hPrinter, ptr(bytes), bytes.length, ptr(written))) {
+          throw new Error('WritePrinter failed');
+        }
+      } finally {
+        sym.EndPagePrinter(hPrinter);
+      }
+    } finally {
+      sym.EndDocPrinter(hPrinter);
+    }
+  } finally {
+    sym.ClosePrinter(hPrinter);
   }
 }
 
