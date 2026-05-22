@@ -14,7 +14,6 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
 import { Sale, SaleStatus } from '../../../core/models';
 import { AuthService } from '../../../core/services/auth.service';
-import { BusinessDayService } from '../../../core/services/business-day.service';
 import { SaleService } from '../../../core/services/sale.service';
 import { SettingsService } from '../../../core/services/settings.service';
 import { MoneyPipe } from '../../../shared/pipes/currency-symbol.pipe';
@@ -45,13 +44,11 @@ type StatusFilter = SaleStatus | 'all';
 export class TransactionsPage {
   private readonly saleService = inject(SaleService);
   private readonly authService = inject(AuthService);
-  private readonly businessDayService = inject(BusinessDayService);
   private readonly settingsService = inject(SettingsService);
   private readonly dialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
 
   protected readonly currentUser = this.authService.user;
-  protected readonly currentDay = this.businessDayService.current;
   protected readonly currencySymbol = computed(
     () => this.settingsService.settings().currencySymbol,
   );
@@ -66,16 +63,21 @@ export class TransactionsPage {
   protected readonly totalMax = signal<number | null>(null);
 
   /**
-   * Sales rung up by this cashier during the current open business day.
-   * When no day is open, the list is empty and the template shows a
-   * "Day closed" state — historical sales are reachable via admin reports.
+   * Sales rung up by this cashier today (cashier's local calendar day).
+   * Independent of the business-day open/close state — once a sale is on
+   * the books, the cashier can see it from this page until midnight,
+   * even after the admin has closed the day.
    */
   private readonly mySales = computed(() => {
     const user = this.currentUser();
-    const day = this.currentDay();
-    if (!user || !day) return [];
-    const openedAt = Date.parse(day.openedAt);
-    return this.saleService.byCashier(user.id).filter((s) => Date.parse(s.date) >= openedAt);
+    if (!user) return [];
+    const now = new Date();
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const endOfDay = startOfDay + 86_400_000;
+    return this.saleService.byCashier(user.id).filter((s) => {
+      const t = Date.parse(s.date);
+      return t >= startOfDay && t < endOfDay;
+    });
   });
 
   protected readonly filteredSales = computed(() => {
