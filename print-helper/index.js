@@ -346,6 +346,101 @@ function money(symbol, value) {
   return `${symbol ?? ''}${Number(value ?? 0).toFixed(2)}`;
 }
 
+// ─────────────────────── render: Z-report ─────────────────────────
+// End-of-day closing report. Different shape than a sale receipt —
+// no line items, instead a summary by payment method + cash drawer
+// reconciliation block. Same paper layout (header, body, footer, cut).
+function renderZReport(d) {
+  const sym = d.currencySymbol ?? '';
+  const day = d.day ?? {};
+  const out = [];
+  out.push(INIT, CODEPAGE_CP437);
+
+  // Header — store name big and bold, then address/phone.
+  out.push(ALIGN_CENTER, BOLD_ON, DOUBLE_ON);
+  out.push(toCP437(d.storeName ?? 'Store') + LF);
+  out.push(DOUBLE_OFF, BOLD_OFF);
+  if (d.address) out.push(toCP437(d.address) + LF);
+  if (d.phone) out.push(toCP437(d.phone) + LF);
+  out.push(LF);
+
+  // Report title.
+  out.push(BOLD_ON);
+  out.push('Z-REPORT (End of Day)' + LF);
+  out.push(BOLD_OFF);
+  out.push(LF);
+
+  // Opened / Closed meta.
+  out.push(ALIGN_LEFT);
+  const opened = day.openedAt ? new Date(day.openedAt).toLocaleString() : '—';
+  const closed = day.closedAt ? new Date(day.closedAt).toLocaleString() : '—';
+  out.push(`Opened : ${opened}` + LF);
+  if (day.openedByName) out.push(`        ${toCP437(day.openedByName)}` + LF);
+  out.push(`Closed : ${closed}` + LF);
+  if (day.closedByName) out.push(`        ${toCP437(day.closedByName)}` + LF);
+  out.push(repeat('-') + LF);
+
+  // Sales section.
+  out.push(BOLD_ON, 'SALES' + LF, BOLD_OFF);
+  out.push(pad('Transactions', String(day.salesCount ?? 0)) + LF);
+  out.push(pad('Items sold', String(day.itemsSold ?? 0)) + LF);
+  out.push(pad('Cash', money(sym, day.cashSales)) + LF);
+  out.push(pad('Card', money(sym, day.cardSales)) + LF);
+  out.push(pad('Transfer', money(sym, day.transferSales)) + LF);
+  out.push(BOLD_ON);
+  out.push(pad('TOTAL SALES', money(sym, day.totalSales)) + LF);
+  out.push(BOLD_OFF);
+  if (Number(day.totalRefunds ?? 0) > 0) {
+    out.push(pad('Refunds', '-' + money(sym, day.totalRefunds)) + LF);
+  }
+  out.push(repeat('-') + LF);
+
+  // Cash drawer reconciliation.
+  out.push(BOLD_ON, 'CASH DRAWER' + LF, BOLD_OFF);
+  out.push(pad('Opening float', money(sym, day.openingFloat)) + LF);
+  out.push(pad('+ Cash sales', money(sym, day.cashSales)) + LF);
+  if (Number(day.cashRefunds ?? 0) > 0) {
+    out.push(pad('- Cash refunds', money(sym, day.cashRefunds)) + LF);
+  }
+  out.push(pad('Expected cash', money(sym, day.expectedCash)) + LF);
+  out.push(pad('Counted cash', money(sym, day.countedCash)) + LF);
+  const variance = Number(day.variance ?? 0);
+  const varSign = variance > 0 ? '+' : '';
+  out.push(BOLD_ON);
+  out.push(pad('Variance', varSign + money(sym, day.variance)) + LF);
+  out.push(BOLD_OFF);
+  if (variance !== 0) {
+    out.push(LF);
+    out.push(ALIGN_CENTER);
+    out.push(variance > 0 ? '** OVER expected **' + LF : '** SHORT vs expected **' + LF);
+    out.push(ALIGN_LEFT);
+  }
+  if (day.notes) {
+    out.push(LF, 'Notes:' + LF, toCP437(String(day.notes)) + LF);
+  }
+  out.push(LF);
+
+  // Signature lines for cashier + manager sign-off.
+  out.push('Closed by: ____________________' + LF);
+  out.push('Verified : ____________________' + LF);
+  out.push(LF);
+
+  // Footer.
+  if (d.footer) {
+    out.push(ALIGN_CENTER);
+    for (const line of String(d.footer).split('\n')) {
+      out.push(toCP437(line) + LF);
+    }
+    out.push(ALIGN_LEFT);
+  }
+
+  // Feed + cut.
+  out.push(LF.repeat(4));
+  out.push(CUT);
+
+  return Buffer.from(out.join(''), 'binary');
+}
+
 // ─────────────────────────── render ────────────────────────────────
 function renderReceipt(d) {
   const out = [];
@@ -676,6 +771,16 @@ const server = http.createServer(async (req, res) => {
       );
       return send(res, 200, { ok: true, bytes: bytes.length });
     }
+    if (req.method === 'POST' && req.url === '/print-zreport') {
+      const payload = await readJson(req);
+      const bytes = renderZReport(payload);
+      await writeToPrinter(bytes);
+      console.log(
+        `[zreport] ${new Date().toISOString()} -> ${payload?.day?.id ?? '?'} ` +
+          `(${bytes.length} bytes)`,
+      );
+      return send(res, 200, { ok: true, bytes: bytes.length });
+    }
     if (req.method === 'POST' && req.url === '/kick') {
       // Standalone drawer-open. Sends only the kick command, no
       // receipt feed. Used for "no-sale" drawer access (making change,
@@ -715,5 +820,5 @@ server.listen(PORT, () => {
   console.log(`MaxPOS print helper listening on http://localhost:${PORT}`);
   console.log(`Printer device: ${PRINTER_DEVICE}`);
   console.log(`Paper width:    ${PAPER_WIDTH} chars`);
-  console.log(`Endpoints:      POST /print, POST /kick, POST /test, GET /health`);
+  console.log(`Endpoints:      POST /print, POST /print-zreport, POST /kick, POST /test, GET /health`);
 });

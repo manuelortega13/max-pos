@@ -6,3 +6,4 @@ export * from './cart.model';
 export * from './settings.model';
 export * from './auth.model';
 export * from './expense.model';
+export * from './business-day.model';

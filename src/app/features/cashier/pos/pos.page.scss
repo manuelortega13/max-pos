@@ -16,6 +16,25 @@
     grid-template-columns: 1fr;
   }
 
+  /* "Day closed" banner spanning both columns. Sticks at the top of the
+     grid so the cashier can't miss why their Charge button is disabled. */
+  &__day-banner {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.65rem 1.25rem;
+    background: var(--mat-sys-error-container);
+    color: var(--mat-sys-on-error-container);
+    border-bottom: 1px solid var(--mat-sys-error);
+    font-size: 0.9rem;
+    font-weight: 500;
+
+    mat-icon {
+      flex-shrink: 0;
+    }
+  }
+
   &__catalog {
     display: flex;
     flex-direction: column;

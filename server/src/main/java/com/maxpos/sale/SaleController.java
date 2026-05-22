@@ -41,8 +41,9 @@ public class SaleController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public SaleDto create(@Valid @RequestBody CreateSaleRequest req,
-                          @AuthenticationPrincipal AppUserDetails principal) {
-        return service.create(req, principal.getId());
+                          @AuthenticationPrincipal AppUserDetails principal,
+                          @RequestHeader(value = "X-Maxpos-Offline-Replay", required = false) Boolean offlineReplay) {
+        return service.create(req, principal.getId(), Boolean.TRUE.equals(offlineReplay));
     }
 
     @PostMapping("/{id}/refund")

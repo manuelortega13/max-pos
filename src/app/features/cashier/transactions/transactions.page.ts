@@ -14,6 +14,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
 import { Sale, SaleStatus } from '../../../core/models';
 import { AuthService } from '../../../core/services/auth.service';
+import { BusinessDayService } from '../../../core/services/business-day.service';
 import { SaleService } from '../../../core/services/sale.service';
 import { SettingsService } from '../../../core/services/settings.service';
 import { MoneyPipe } from '../../../shared/pipes/currency-symbol.pipe';
@@ -44,11 +45,13 @@ type StatusFilter = SaleStatus | 'all';
 export class TransactionsPage {
   private readonly saleService = inject(SaleService);
   private readonly authService = inject(AuthService);
+  private readonly businessDayService = inject(BusinessDayService);
   private readonly settingsService = inject(SettingsService);
   private readonly dialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
 
   protected readonly currentUser = this.authService.user;
+  protected readonly currentDay = this.businessDayService.current;
   protected readonly currencySymbol = computed(
     () => this.settingsService.settings().currencySymbol,
   );
@@ -62,10 +65,17 @@ export class TransactionsPage {
   protected readonly totalMin = signal<number | null>(null);
   protected readonly totalMax = signal<number | null>(null);
 
+  /**
+   * Sales rung up by this cashier during the current open business day.
+   * When no day is open, the list is empty and the template shows a
+   * "Day closed" state — historical sales are reachable via admin reports.
+   */
   private readonly mySales = computed(() => {
     const user = this.currentUser();
-    if (!user) return [];
-    return this.saleService.byCashier(user.id);
+    const day = this.currentDay();
+    if (!user || !day) return [];
+    const openedAt = Date.parse(day.openedAt);
+    return this.saleService.byCashier(user.id).filter((s) => Date.parse(s.date) >= openedAt);
   });
 
   protected readonly filteredSales = computed(() => {

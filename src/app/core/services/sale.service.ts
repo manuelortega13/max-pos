@@ -165,7 +165,11 @@ export class SaleService {
    * the queue entry is dropped. Used by {@link OfflineSyncService}.
    */
   replayQueued(payload: CreateSaleRequest, optimisticId: string): Observable<Sale> {
-    return this.http.post<Sale>('/api/sales', payload).pipe(
+    // Marks the request as an offline-queue replay so the backend skips
+    // the "day must be open" check — the sale was authored while
+    // disconnected, possibly before any day was opened today.
+    const headers = { 'X-Maxpos-Offline-Replay': 'true' };
+    return this.http.post<Sale>('/api/sales', payload, { headers }).pipe(
       tap((sale) => {
         this._sales.update((list) => {
           // Replace the optimistic record (keyed by its clientRef-as-id)

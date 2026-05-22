@@ -1,7 +1,20 @@
 import { DOCUMENT } from '@angular/common';
 import { Injectable, effect, inject, signal } from '@angular/core';
+import { BusinessDay } from '../models';
 
 export type PaperSize = '58mm' | '80mm' | 'a4';
+
+/** Structured Z-report sent to the local print helper. The helper renders
+ *  a payment-method breakdown + cash drawer reconciliation; the browser
+ *  fallback renders an equivalent .print-receipt DOM and calls window.print(). */
+export interface ZReportPayload {
+  storeName: string;
+  address: string;
+  phone: string;
+  footer: string;
+  currencySymbol: string;
+  day: BusinessDay;
+}
 
 /** Structured receipt sent to the local print helper. The helper turns
  *  this into ESC/POS bytes; the browser fallback ignores it (uses the
@@ -209,6 +222,23 @@ export class PrinterService {
     this.print();
   }
 
+  /**
+   * Print the end-of-day Z-report. Prefers the helper service so the
+   * report comes out as a single silent ESC/POS print like a regular
+   * receipt. When the helper is offline or disabled, falls back to a
+   * browser print of a hidden .print-receipt DOM with equivalent
+   * content — the cashier sees Chrome's preview but the report still
+   * lands on paper.
+   */
+  async printZReport(payload: ZReportPayload): Promise<void> {
+    if (this._helperEnabled() && this._helperUrl()) {
+      const ok = await this.postToHelper('/print-zreport', payload);
+      if (ok) return;
+      console.warn('[printer] helper unreachable for Z-report — falling back to browser print');
+    }
+    this.printZReportBrowser(payload);
+  }
+
   /** Ping /health to confirm the helper is up. Returned by the Settings
    *  "Test connection" button so the cashier knows wiring is good
    *  before they ring up a real sale. */
@@ -247,6 +277,92 @@ export class PrinterService {
 
   private joinUrl(base: string, path: string): string {
     return base.replace(/\/$/, '') + path;
+  }
+
+  /**
+   * Browser fallback for {@link printZReport}. Builds a hidden
+   * .print-receipt subtree with the report content, prints it, then
+   * removes it on the next tick. Same trick as {@link testPrint}.
+   */
+  private printZReportBrowser(payload: ZReportPayload): void {
+    const win = this.document.defaultView;
+    if (!win) return;
+    const container = this.document.createElement('section');
+    container.className = 'print-receipt';
+    container.innerHTML = this.renderZReportHtml(payload);
+    this.document.body.appendChild(container);
+    try {
+      win.print();
+    } finally {
+      container.remove();
+    }
+  }
+
+  /** Build the HTML for the browser Z-report fallback. Mirrors the
+   *  ESC/POS layout from print-helper's renderZReport so paper output
+   *  looks the same whichever path the cashier uses. */
+  private renderZReportHtml(p: ZReportPayload): string {
+    const d = p.day;
+    const money = (v: number | null | undefined) =>
+      `${p.currencySymbol}${Number(v ?? 0).toFixed(2)}`;
+    const esc = (s: string | null | undefined) =>
+      String(s ?? '').replace(/[&<>]/g, (c) =>
+        c === '&' ? '&amp;' : c === '<' ? '&lt;' : '&gt;',
+      );
+    const opened = d.openedAt ? new Date(d.openedAt).toLocaleString() : '—';
+    const closed = d.closedAt ? new Date(d.closedAt).toLocaleString() : '—';
+    const variance = Number(d.variance ?? 0);
+    const varSign = variance > 0 ? '+' : '';
+    const row = (label: string, value: string, grand = false) =>
+      `<div class="receipt__row${grand ? ' receipt__row--grand' : ''}">` +
+      `<span>${label}</span><span>${value}</span></div>`;
+    const refundsRow =
+      Number(d.totalRefunds ?? 0) > 0 ? row('Refunds', `-${money(d.totalRefunds)}`) : '';
+    const cashRefundsRow =
+      Number(d.cashRefunds ?? 0) > 0 ? row('− Cash refunds', money(d.cashRefunds)) : '';
+    const varianceBanner =
+      variance !== 0
+        ? `<div class="receipt__center"><strong>${variance > 0 ? '** OVER expected **' : '** SHORT vs expected **'}</strong></div>`
+        : '';
+    const notes = d.notes
+      ? `<div class="receipt__notes"><strong>Notes:</strong> ${esc(d.notes)}</div>`
+      : '';
+    return `
+      <header class="receipt__header">
+        <strong>${esc(p.storeName)}</strong>
+        ${p.address ? `<small>${esc(p.address)}</small>` : ''}
+        ${p.phone ? `<small>${esc(p.phone)}</small>` : ''}
+        <strong>Z-REPORT (End of Day)</strong>
+      </header>
+      <hr/>
+      <div class="receipt__meta">
+        <div>Opened: ${esc(opened)}${d.openedByName ? ` — ${esc(d.openedByName)}` : ''}</div>
+        <div>Closed: ${esc(closed)}${d.closedByName ? ` — ${esc(d.closedByName)}` : ''}</div>
+      </div>
+      <hr/>
+      <div class="receipt__section"><strong>SALES</strong></div>
+      ${row('Transactions', String(d.salesCount ?? 0))}
+      ${row('Items sold', String(d.itemsSold ?? 0))}
+      ${row('Cash', money(d.cashSales))}
+      ${row('Card', money(d.cardSales))}
+      ${row('Transfer', money(d.transferSales))}
+      ${row('TOTAL SALES', money(d.totalSales), true)}
+      ${refundsRow}
+      <hr/>
+      <div class="receipt__section"><strong>CASH DRAWER</strong></div>
+      ${row('Opening float', money(d.openingFloat))}
+      ${row('+ Cash sales', money(d.cashSales))}
+      ${cashRefundsRow}
+      ${row('Expected cash', money(d.expectedCash))}
+      ${row('Counted cash', money(d.countedCash))}
+      ${row('Variance', `${varSign}${money(d.variance)}`, true)}
+      ${varianceBanner}
+      ${notes}
+      <hr/>
+      <div>Closed by: ____________________</div>
+      <div>Verified : ____________________</div>
+      ${p.footer ? `<footer class="receipt__footer">${esc(p.footer).replace(/\n/g, '<br/>')}</footer>` : ''}
+    `;
   }
 
   /**

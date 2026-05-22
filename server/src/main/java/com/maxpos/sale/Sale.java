@@ -1,5 +1,6 @@
 package com.maxpos.sale;
 
+import com.maxpos.businessday.BusinessDay;
 import com.maxpos.user.User;
 import jakarta.persistence.*;
 
@@ -60,6 +61,10 @@ public class Sale {
     @Column(name = "refund_reason", columnDefinition = "TEXT")
     private String refundReason;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "business_day_id")
+    private BusinessDay businessDay;
+
     @OneToMany(mappedBy = "sale", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<SaleItem> items = new ArrayList<>();
 
@@ -89,6 +94,8 @@ public class Sale {
     public void setStatus(SaleStatus status) { this.status = status; }
     public String getRefundReason() { return refundReason; }
     public void setRefundReason(String refundReason) { this.refundReason = refundReason; }
+    public BusinessDay getBusinessDay() { return businessDay; }
+    public void setBusinessDay(BusinessDay businessDay) { this.businessDay = businessDay; }
     public DiscountType getDiscountType() { return discountType; }
     public void setDiscountType(DiscountType discountType) { this.discountType = discountType; }
     public BigDecimal getDiscountValue() { return discountValue; }

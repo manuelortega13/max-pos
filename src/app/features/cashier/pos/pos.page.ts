@@ -23,6 +23,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { BarcodeScannerService } from '../../../core/services/barcode-scanner.service';
+import { BusinessDayService } from '../../../core/services/business-day.service';
 import { CartService } from '../../../core/services/cart.service';
 import { ProductService } from '../../../core/services/product.service';
 import { SettingsService } from '../../../core/services/settings.service';
@@ -69,9 +70,15 @@ export class PosPage implements AfterViewInit {
   private readonly dialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
   private readonly scanner = inject(BarcodeScannerService);
+  private readonly businessDayService = inject(BusinessDayService);
 
   /** Hide the in-input camera button when the browser can't stream video. */
   protected readonly cameraSupported = this.scanner.isSupported;
+
+  /** True when an admin has opened the business day. POS checkout is
+   *  blocked until a day is open — the cashier sees a banner and the
+   *  Charge button is disabled. */
+  protected readonly dayOpen = this.businessDayService.isOpen;
 
   /** Store-level override: lets the cashier oversell past zero stock. */
   protected readonly allowNegativeStock = computed(
@@ -669,6 +676,14 @@ export class PosPage implements AfterViewInit {
 
   protected checkout(): void {
     if (this.isEmpty()) return;
+    if (!this.dayOpen()) {
+      this.snackBar.open(
+        'The business day is closed. Ask an admin to open the day before charging.',
+        'Dismiss',
+        { duration: 4000 },
+      );
+      return;
+    }
     const ref = this.dialog.open(CheckoutDialog, {
       width: '800px',
       maxWidth: '95vw',

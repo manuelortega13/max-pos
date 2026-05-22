@@ -12,6 +12,7 @@ import { BreakpointObserver, Breakpoints } from '@angular/cdk/layout';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { filter, map, startWith } from 'rxjs';
 import { AuthService } from '../../core/services/auth.service';
+import { BusinessDayService } from '../../core/services/business-day.service';
 import { CartService } from '../../core/services/cart.service';
 import { OfflineSyncService } from '../../core/services/offline-sync.service';
 import { RealtimeService } from '../../core/services/realtime.service';
@@ -50,6 +51,7 @@ export class CashierLayout implements OnInit, OnDestroy {
   private readonly settingsService = inject(SettingsService);
   private readonly refreshService = inject(RefreshService);
   private readonly printerService = inject(PrinterService);
+  private readonly businessDayService = inject(BusinessDayService);
   protected readonly refreshing = signal(false);
 
   protected readonly currentUser = this.authService.user;
@@ -57,6 +59,15 @@ export class CashierLayout implements OnInit, OnDestroy {
   protected readonly online = this.sync.online;
   protected readonly pendingSync = this.sync.pendingCount;
   protected readonly syncing = this.sync.syncing;
+  protected readonly currentDay = this.businessDayService.current;
+  /** Time the current day opened, formatted "HH:mm" in the cashier's
+   *  local zone. Empty string when no day is open. */
+  protected readonly dayOpenedLabel = computed(() => {
+    const d = this.currentDay();
+    if (!d) return '';
+    const opened = new Date(d.openedAt);
+    return `${opened.getHours().toString().padStart(2, '0')}:${opened.getMinutes().toString().padStart(2, '0')}`;
+  });
 
   /** Handset-class viewport (phones, any orientation). Drives the
    *  bottom-nav swap — tablets keep the top-bar nav. */
@@ -116,6 +127,9 @@ export class CashierLayout implements OnInit, OnDestroy {
     // Offline queue replay runner — scoped to the cashier shell so admins
     // don't get an unused service when they sign in.
     this.sync.start();
+    // Cache the current open business day so the POS page can gate
+    // checkout and the toolbar can show open/closed state.
+    this.businessDayService.refreshCurrent().subscribe();
   }
 
   ngOnDestroy(): void {

@@ -66,6 +66,12 @@ export const routes: Routes = [
         title: 'Reports — MaxPOS',
       },
       {
+        path: 'end-of-day',
+        loadComponent: () =>
+          import('./features/admin/end-of-day/end-of-day.page').then((m) => m.EndOfDayPage),
+        title: 'End of Day — MaxPOS',
+      },
+      {
         path: 'settings',
         loadComponent: () =>
           import('./features/admin/settings/settings.page').then((m) => m.SettingsPage),

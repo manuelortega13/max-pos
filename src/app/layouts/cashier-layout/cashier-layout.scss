@@ -156,6 +156,33 @@
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
+  &__day {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    height: 34px;
+    padding: 0 0.75rem;
+    border-radius: 999px;
+    border: 1px solid var(--mat-sys-outline-variant);
+    background: var(--mat-sys-tertiary-container);
+    color: var(--mat-sys-on-tertiary-container);
+    font-size: 0.8rem;
+    font-weight: 500;
+    white-space: nowrap;
+
+    mat-icon {
+      font-size: 1.1rem;
+      width: 1.1rem;
+      height: 1.1rem;
+    }
+
+    &--closed {
+      background: var(--mat-sys-error-container);
+      color: var(--mat-sys-on-error-container);
+      border-color: var(--mat-sys-error);
+    }
+  }
+
   &__sync {
     display: inline-flex;
     align-items: center;
@@ -272,12 +299,14 @@
     display: none; // free horizontal space; logo carries the brand
   }
 
-  .cashier-shell__sync {
+  .cashier-shell__sync,
+  .cashier-shell__day {
     padding: 0 0.5rem;
     height: 32px;
   }
 
-  .cashier-shell__sync-label {
+  .cashier-shell__sync-label,
+  .cashier-shell__day-label {
     display: none; // icon alone on narrow screens; tooltip carries the detail
   }
 }

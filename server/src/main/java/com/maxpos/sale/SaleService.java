@@ -1,5 +1,7 @@
 package com.maxpos.sale;
 
+import com.maxpos.businessday.BusinessDay;
+import com.maxpos.businessday.BusinessDayRepository;
 import com.maxpos.common.ConflictException;
 import com.maxpos.common.NotFoundException;
 import com.maxpos.notification.NotificationEvent;
@@ -42,6 +44,7 @@ public class SaleService {
     private final UserRepository users;
     private final StoreSettingsRepository settings;
     private final NotificationPublisher notifications;
+    private final BusinessDayRepository businessDays;
 
     public SaleService(SaleRepository sales,
                        ProductRepository products,
@@ -49,7 +52,8 @@ public class SaleService {
                        ProductService productService,
                        UserRepository users,
                        StoreSettingsRepository settings,
-                       NotificationPublisher notifications) {
+                       NotificationPublisher notifications,
+                       BusinessDayRepository businessDays) {
         this.sales = sales;
         this.products = products;
         this.batches = batches;
@@ -57,6 +61,7 @@ public class SaleService {
         this.users = users;
         this.settings = settings;
         this.notifications = notifications;
+        this.businessDays = businessDays;
     }
 
     public List<SaleDto> list() {
@@ -77,9 +82,13 @@ public class SaleService {
      * from batches in FEFO order (earliest expiry first, with NULL expiry last),
      * and writes the sale + line items in a single transaction. Any failure
      * rolls back the entire operation.
+     *
+     * @param offlineReplay  true when the request is a replay from the cashier's
+     *   offline queue (X-Maxpos-Offline-Replay header). Replays bypass the
+     *   open-day check so sales rung up while disconnected still land on sync.
      */
     @Transactional
-    public SaleDto create(CreateSaleRequest req, UUID cashierId) {
+    public SaleDto create(CreateSaleRequest req, UUID cashierId, boolean offlineReplay) {
         // Idempotent replay: if the caller supplied a clientRef (from the
         // offline queue) and a sale with that reference already exists,
         // return the existing record instead of creating a duplicate.
@@ -88,6 +97,14 @@ public class SaleService {
             if (existing.isPresent()) {
                 return SaleDto.from(existing.get());
             }
+        }
+
+        // Live sales require a currently-open business day. Offline replays
+        // bypass this — they were authored while disconnected and we accept
+        // them regardless, attaching to the current open day if one exists.
+        BusinessDay openDay = businessDays.findFirstByClosedAtIsNull().orElse(null);
+        if (!offlineReplay && openDay == null) {
+            throw new ConflictException("No business day is open. An admin must open the day before sales can be rung up.");
         }
 
         User cashier = users.findById(cashierId)
@@ -109,6 +126,7 @@ public class SaleService {
         sale.setCashierName(cashier.getName());
         sale.setPaymentMethod(req.paymentMethod());
         sale.setStatus(SaleStatus.COMPLETED);
+        sale.setBusinessDay(openDay);
 
         BigDecimal subtotal = BigDecimal.ZERO;
 

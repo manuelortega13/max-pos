@@ -11,5 +11,6 @@ public interface SaleRepository extends JpaRepository<Sale, UUID> {
     List<Sale> findAllByCashierIdOrderByDateDesc(UUID cashierId);
     List<Sale> findAllByDateBetweenOrderByDateDesc(Instant start, Instant end);
     List<Sale> findAllByOrderByDateDesc();
+    List<Sale> findAllByBusinessDayId(UUID businessDayId);
     Optional<Sale> findByReference(String reference);
 }

@@ -1,4 +1,13 @@
 <div class="pos">
+  @if (!dayOpen()) {
+    <div class="pos__day-banner" role="status" aria-live="polite">
+      <mat-icon>event_busy</mat-icon>
+      <span>
+        The business day is closed. Ask an admin to open the day before ringing
+        up sales.
+      </span>
+    </div>
+  }
   <section class="pos__catalog">
     <header class="pos__catalog-header">
       <div class="pos__search-row">
@@ -327,8 +336,8 @@
           mat-flat-button
           color="primary"
           class="pos__checkout"
-          [disabled]="isEmpty()"
-          matTooltip="Ctrl / ⌘ + Enter"
+          [disabled]="isEmpty() || !dayOpen()"
+          [matTooltip]="!dayOpen() ? 'Business day is closed' : 'Ctrl / ⌘ + Enter'"
           (click)="checkout()"
         >
           <mat-icon>point_of_sale</mat-icon>

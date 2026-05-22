@@ -1,0 +1,36 @@
+/**
+ * One open-close cycle of the register. `closedAt == null` means the
+ * day is still open; once closed, the snapshot fields are populated
+ * and frozen for the Z-report.
+ */
+export interface BusinessDay {
+  readonly id: string;
+  readonly openedAt: string;
+  readonly openedById: string;
+  readonly openedByName: string;
+  readonly openingFloat: number;
+  readonly closedAt: string | null;
+  readonly closedById: string | null;
+  readonly closedByName: string | null;
+  readonly countedCash: number | null;
+  readonly notes: string | null;
+  readonly expectedCash: number | null;
+  readonly variance: number | null;
+  readonly totalSales: number | null;
+  readonly totalRefunds: number | null;
+  readonly cashSales: number | null;
+  readonly cashRefunds: number | null;
+  readonly cardSales: number | null;
+  readonly transferSales: number | null;
+  readonly salesCount: number | null;
+  readonly itemsSold: number | null;
+}
+
+export interface OpenDayRequest {
+  readonly openingFloat: number;
+}
+
+export interface CloseDayRequest {
+  readonly countedCash: number;
+  readonly notes?: string | null;
+}

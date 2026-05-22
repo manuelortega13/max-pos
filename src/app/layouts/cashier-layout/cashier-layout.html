@@ -42,6 +42,21 @@
 
     <span class="cashier-shell__spacer"></span>
 
+    <span
+      class="cashier-shell__day"
+      [class.cashier-shell__day--closed]="!currentDay()"
+      [matTooltip]="currentDay() ? 'Business day open since ' + dayOpenedLabel() : 'No business day is open — sales are blocked'"
+    >
+      <mat-icon>{{ currentDay() ? 'event_available' : 'event_busy' }}</mat-icon>
+      <span class="cashier-shell__day-label">
+        @if (currentDay()) {
+          Day open · {{ dayOpenedLabel() }}
+        } @else {
+          Day closed
+        }
+      </span>
+    </span>
+
     @if (showSyncBadge()) {
       <button
         type="button"

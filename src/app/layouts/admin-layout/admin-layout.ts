@@ -15,6 +15,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { map } from 'rxjs';
 import { ExpiringBatch } from '../../core/models';
 import { AuthService } from '../../core/services/auth.service';
+import { BusinessDayService } from '../../core/services/business-day.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { PushService } from '../../core/services/push.service';
 import { RealtimeService } from '../../core/services/realtime.service';
@@ -35,6 +36,7 @@ const NAV_ITEMS: readonly NavItem[] = [
   { path: 'sales', label: 'Sales', icon: 'receipt_long' },
   { path: 'users', label: 'Users', icon: 'group' },
   { path: 'reports', label: 'Reports', icon: 'bar_chart' },
+  { path: 'end-of-day', label: 'End of Day', icon: 'event_busy' },
   { path: 'settings', label: 'Settings', icon: 'settings' },
 ];
 
@@ -68,6 +70,7 @@ export class AdminLayout implements OnInit, OnDestroy {
   private readonly pushService = inject(PushService);
   private readonly snackBar = inject(MatSnackBar);
   private readonly refreshService = inject(RefreshService);
+  private readonly businessDayService = inject(BusinessDayService);
   protected readonly refreshing = signal(false);
 
   protected readonly navItems = NAV_ITEMS;
@@ -89,6 +92,9 @@ export class AdminLayout implements OnInit, OnDestroy {
     this.notifications.start();
     this.realtime.start();
     this.pushService.refreshState();
+    // Cache the current open business day so the End-of-Day page and
+    // the cross-cutting open/closed indicator have data on first render.
+    this.businessDayService.refreshCurrent().subscribe();
   }
 
   ngOnDestroy(): void {

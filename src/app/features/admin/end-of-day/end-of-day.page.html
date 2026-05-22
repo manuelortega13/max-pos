@@ -1,0 +1,174 @@
+<section class="eod">
+  <header class="eod__page-header">
+    <div>
+      <h1>End of Day</h1>
+      <p>Open and close the business day, count the drawer, print Z-reports.</p>
+    </div>
+  </header>
+
+  <mat-card class="eod__status-card" appearance="outlined">
+    @if (currentDay(); as day) {
+      <mat-card-content class="eod__status-content">
+        <div class="eod__status-head">
+          <mat-chip class="eod__status-chip eod__status-chip--open" disabled>
+            <mat-icon matChipAvatar>event_available</mat-icon>
+            Day open
+          </mat-chip>
+          <div class="eod__status-meta">
+            <small>Opened {{ day.openedAt | date: 'mediumDate' }} · {{ day.openedAt | date: 'shortTime' }} by {{ day.openedByName }}</small>
+            <small>Float: <strong>{{ day.openingFloat | money }}</strong></small>
+          </div>
+        </div>
+
+        <mat-divider></mat-divider>
+
+        <div class="eod__live-grid">
+          <div>
+            <small>Transactions</small>
+            <strong>{{ preview().salesCount }}</strong>
+          </div>
+          <div>
+            <small>Items sold</small>
+            <strong>{{ preview().itemsSold }}</strong>
+          </div>
+          <div>
+            <small>Cash sales</small>
+            <strong>{{ preview().cashSales | money }}</strong>
+          </div>
+          <div>
+            <small>Card sales</small>
+            <strong>{{ preview().cardSales | money }}</strong>
+          </div>
+          <div>
+            <small>Transfer sales</small>
+            <strong>{{ preview().transferSales | money }}</strong>
+          </div>
+          <div>
+            <small>Total sales</small>
+            <strong>{{ preview().totalSales | money }}</strong>
+          </div>
+          @if (preview().totalRefunds > 0) {
+            <div class="eod__refunds">
+              <small>Refunds</small>
+              <strong>−{{ preview().totalRefunds | money }}</strong>
+            </div>
+          }
+          <div class="eod__expected">
+            <small>Expected cash</small>
+            <strong>{{ expectedCash() | money }}</strong>
+          </div>
+        </div>
+
+        <div class="eod__actions">
+          <button mat-flat-button color="warn" (click)="closeDay()">
+            <mat-icon>event_busy</mat-icon>
+            Close day
+          </button>
+        </div>
+      </mat-card-content>
+    } @else {
+      <mat-card-content class="eod__status-content eod__status-content--closed">
+        <div class="eod__status-head">
+          <mat-chip class="eod__status-chip eod__status-chip--closed" disabled>
+            <mat-icon matChipAvatar>event_busy</mat-icon>
+            Day closed
+          </mat-chip>
+          <div class="eod__status-meta">
+            <small>Cashiers can't ring up sales until you open the day.</small>
+          </div>
+        </div>
+        <div class="eod__actions">
+          <button mat-flat-button color="primary" (click)="openDay()">
+            <mat-icon>event_available</mat-icon>
+            Open day
+          </button>
+        </div>
+      </mat-card-content>
+    }
+  </mat-card>
+
+  <mat-card class="eod__history-card" appearance="outlined">
+    <mat-card-header>
+      <mat-card-title>History</mat-card-title>
+      <mat-card-subtitle>Closed business days, most recent first.</mat-card-subtitle>
+    </mat-card-header>
+    <mat-card-content>
+      @if (loading()) {
+        <div class="eod__loading">
+          <mat-spinner diameter="36"></mat-spinner>
+        </div>
+      } @else {
+        <div class="eod__history-table">
+          <table mat-table [dataSource]="history()" class="mat-elevation-z0">
+            <ng-container matColumnDef="opened">
+              <th mat-header-cell *matHeaderCellDef>Opened</th>
+              <td mat-cell *matCellDef="let d">
+                {{ d.openedAt | date: 'mediumDate' }} · {{ d.openedAt | date: 'shortTime' }}
+                <small class="eod__by">by {{ d.openedByName }}</small>
+              </td>
+            </ng-container>
+
+            <ng-container matColumnDef="closed">
+              <th mat-header-cell *matHeaderCellDef>Closed</th>
+              <td mat-cell *matCellDef="let d">
+                @if (d.closedAt) {
+                  {{ d.closedAt | date: 'mediumDate' }} · {{ d.closedAt | date: 'shortTime' }}
+                } @else {
+                  <mat-chip class="eod__status-chip eod__status-chip--open" disabled>open</mat-chip>
+                }
+              </td>
+            </ng-container>
+
+            <ng-container matColumnDef="total">
+              <th mat-header-cell *matHeaderCellDef>Sales</th>
+              <td mat-cell *matCellDef="let d">
+                {{ (d.totalSales ?? 0) | money }}
+                <small class="eod__by">{{ d.salesCount ?? 0 }} txns</small>
+              </td>
+            </ng-container>
+
+            <ng-container matColumnDef="variance">
+              <th mat-header-cell *matHeaderCellDef>Variance</th>
+              <td
+                mat-cell
+                *matCellDef="let d"
+                [class.eod__variance--off]="d.variance != null && d.variance !== 0"
+              >
+                @if (d.variance == null) {
+                  —
+                } @else {
+                  @if (d.variance > 0) { + }
+                  {{ d.variance | money }}
+                }
+              </td>
+            </ng-container>
+
+            <ng-container matColumnDef="closedBy">
+              <th mat-header-cell *matHeaderCellDef>Closed by</th>
+              <td mat-cell *matCellDef="let d">
+                {{ d.closedByName ?? '—' }}
+                @if (d.closedAt) {
+                  <button
+                    mat-icon-button
+                    matTooltip="Reprint Z-report"
+                    (click)="reprint(d)"
+                  >
+                    <mat-icon>print</mat-icon>
+                  </button>
+                }
+              </td>
+            </ng-container>
+
+            <tr mat-header-row *matHeaderRowDef="historyColumns"></tr>
+            <tr mat-row *matRowDef="let row; columns: historyColumns"></tr>
+            <tr *matNoDataRow>
+              <td [attr.colspan]="historyColumns.length" class="eod__empty">
+                No business days yet. Open one above to get started.
+              </td>
+            </tr>
+          </table>
+        </div>
+      }
+    </mat-card-content>
+  </mat-card>
+</section>
