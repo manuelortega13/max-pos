@@ -114,3 +114,19 @@
     }
   }
 }
+
+/* Icon autocomplete options — emoji on the left, friendly name on the
+   right. Compact row so the dropdown can show many at a time without
+   the user scrolling. Targets the global overlay (mat-autocomplete
+   renders outside the dialog DOM) so :host scoping doesn't reach. */
+::ng-deep .icon-option__char {
+  display: inline-block;
+  width: 1.75rem;
+  font-size: 1.2rem;
+  text-align: center;
+  margin-right: 0.5rem;
+}
+::ng-deep .icon-option__name {
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.9rem;
+}

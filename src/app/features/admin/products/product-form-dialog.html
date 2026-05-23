@@ -80,7 +80,27 @@
 
       <mat-form-field appearance="outline" class="form-dialog__image">
         <mat-label>Icon fallback</mat-label>
-        <input matInput formControlName="image" placeholder="🥤" maxlength="16" />
+        <input
+          matInput
+          formControlName="image"
+          placeholder="🥤 or type a name…"
+          maxlength="16"
+          autocomplete="off"
+          [matAutocomplete]="iconAuto"
+        />
+        <mat-autocomplete
+          #iconAuto="matAutocomplete"
+          (optionSelected)="onIconPicked($event.option.value)"
+          class="icon-autocomplete-panel"
+        >
+          @for (icon of iconOptions(); track icon.char) {
+            <mat-option [value]="icon.char">
+              <span class="icon-option__char">{{ icon.char }}</span>
+              <span class="icon-option__name">{{ icon.name }}</span>
+            </mat-option>
+          }
+        </mat-autocomplete>
+        <mat-hint>Search by name (coffee, soap…) or paste an emoji directly.</mat-hint>
       </mat-form-field>
     </div>
 

@@ -10,6 +10,7 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
+import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatButtonModule } from '@angular/material/button';
 import { MatChipsModule, MatChipInputEvent } from '@angular/material/chips';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -19,8 +20,11 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { startWith } from 'rxjs';
 import { Product, ProductUpsertRequest } from '../../../core/models';
 import { BarcodeScannerService } from '../../../core/services/barcode-scanner.service';
+import { PRODUCT_ICONS, ProductIcon } from './product-icons.const';
 import { CategoryService } from '../../../core/services/category.service';
 import { ProductService } from '../../../core/services/product.service';
 import { SettingsService } from '../../../core/services/settings.service';
@@ -39,6 +43,7 @@ const SKU_PATTERN = /^([A-Z]+)-?(\d+)$/;
   selector: 'app-product-form-dialog',
   imports: [
     ReactiveFormsModule,
+    MatAutocompleteModule,
     MatDialogModule,
     MatButtonModule,
     MatChipsModule,
@@ -83,6 +88,26 @@ export class ProductFormDialog {
    */
   protected readonly barcodes = signal<string[]>([]);
 
+  /**
+   * Searchable autocomplete of curated product emojis. The user can
+   * still type any character directly (the field is free-form) — the
+   * autocomplete just surfaces matches as they type. Filter rule:
+   * the query (lowercased) is a substring of the icon's name OR
+   * any of its aliases. When the field is empty we show everything.
+   */
+  protected readonly iconOptions = computed<readonly ProductIcon[]>(() => {
+    const raw = this.iconQuery() ?? '';
+    const q = raw.trim().toLowerCase();
+    if (!q) return PRODUCT_ICONS;
+    // Already-selected emoji shouldn't filter against itself. If the
+    // value is exactly an icon char, show all so the user can re-pick.
+    if (PRODUCT_ICONS.some((i) => i.char === raw)) return PRODUCT_ICONS;
+    return PRODUCT_ICONS.filter((i) => {
+      if (i.name.toLowerCase().includes(q)) return true;
+      return i.aliases?.some((a) => a.toLowerCase().includes(q)) ?? false;
+    });
+  });
+
   protected readonly form = this.fb.nonNullable.group({
     name: ['', [Validators.required, Validators.maxLength(255)]],
     sku: ['', [Validators.required, Validators.maxLength(64)]],
@@ -95,6 +120,12 @@ export class ProductFormDialog {
     description: ['', [Validators.maxLength(2048)]],
     active: [true],
   });
+
+  /** Live text of the icon input — drives the autocomplete filter. */
+  private readonly iconQuery = toSignal(
+    this.form.controls.image.valueChanges.pipe(startWith('')),
+    { initialValue: '' },
+  );
 
   /** Flips true the moment the user types into the SKU field, so we stop
    *  auto-suggesting and let them own it. */
@@ -168,6 +199,14 @@ export class ProductFormDialog {
     const code = event.value.trim();
     if (code) this.addBarcode(code);
     event.chipInput.clear();
+  }
+
+  /** Autocomplete option click — commits the chosen emoji to the
+   *  form control. The mat-autocomplete already sets the value via
+   *  its standard binding; this hook just blurs so the dropdown
+   *  closes cleanly instead of immediately re-filtering. */
+  protected onIconPicked(_char: string): void {
+    this.form.controls.image.markAsDirty();
   }
 
   protected removeBarcode(code: string): void {
