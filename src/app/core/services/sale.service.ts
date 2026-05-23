@@ -5,7 +5,7 @@ import { catchError } from 'rxjs/operators';
 import { CreateSaleRequest, Sale, SaleItem } from '../models';
 import { computeDiscount } from './cart.service';
 import { AuthService } from './auth.service';
-import { OfflineQueueService } from './offline-queue.service';
+import { OfflineQueueService, QueuedRefund, QueuedSale } from './offline-queue.service';
 import { ProductService } from './product.service';
 import { SettingsService } from './settings.service';
 
@@ -150,12 +150,29 @@ export class SaleService {
     );
   }
 
+  /**
+   * Refund a sale. Falls back to the offline queue on network failure
+   * (status 0) when offline mode is enabled, optimistically marking the
+   * sale REFUNDED in the local list. A replay attempt that lands on an
+   * already-refunded sale (409) is treated as success — refunds are
+   * idempotent from the caller's perspective.
+   */
   refund(id: string, reason?: string | null): Observable<Sale> {
-    const body = reason && reason.trim() ? { reason: reason.trim() } : {};
+    const trimmed = reason && reason.trim() ? reason.trim() : null;
+    const body = trimmed ? { reason: trimmed } : {};
+    const offlineEnabled = this.settingsService.settings().offlineModeEnabled;
+
     return this.http.post<Sale>(`/api/sales/${id}/refund`, body).pipe(
       tap((updated) =>
         this._sales.update((list) => list.map((s) => (s.id === id ? updated : s))),
       ),
+      catchError((err: HttpErrorResponse) => {
+        if (err.status === 0 && offlineEnabled) {
+          const optimistic = this.enqueueOfflineRefund(id, trimmed);
+          if (optimistic) return of(optimistic);
+        }
+        return throwError(() => err);
+      }),
     );
   }
 
@@ -164,18 +181,15 @@ export class SaleService {
    * Sale in the list is swapped for the canonical one (matching ids) and
    * the queue entry is dropped. Used by {@link OfflineSyncService}.
    */
-  replayQueued(payload: CreateSaleRequest, optimisticId: string): Observable<Sale> {
+  replayQueuedSale(entry: QueuedSale): Observable<Sale> {
     // Marks the request as an offline-queue replay so the backend skips
     // the "day must be open" check — the sale was authored while
     // disconnected, possibly before any day was opened today.
     const headers = { 'X-Maxpos-Offline-Replay': 'true' };
-    return this.http.post<Sale>('/api/sales', payload, { headers }).pipe(
+    return this.http.post<Sale>('/api/sales', entry.request, { headers }).pipe(
       tap((sale) => {
         this._sales.update((list) => {
-          // Replace the optimistic record (keyed by its clientRef-as-id)
-          // with the backend's canonical one; fall back to prepending if
-          // it's no longer in the list for whatever reason.
-          const idx = list.findIndex((s) => s.id === optimisticId);
+          const idx = list.findIndex((s) => s.id === entry.optimistic.id);
           if (idx < 0) return [sale, ...list];
           const next = list.slice();
           next[idx] = sale;
@@ -185,6 +199,44 @@ export class SaleService {
     );
   }
 
+  /**
+   * Replay a previously queued refund. On success swap the optimistic
+   * REFUNDED row for the canonical one. The 409 "already refunded"
+   * case is handled by {@link OfflineSyncService}, not here.
+   */
+  replayQueuedRefund(entry: QueuedRefund): Observable<Sale> {
+    const body = entry.reason ? { reason: entry.reason } : {};
+    return this.http.post<Sale>(`/api/sales/${entry.saleId}/refund`, body).pipe(
+      tap((updated) =>
+        this._sales.update((list) =>
+          list.map((s) => (s.id === entry.saleId ? updated : s)),
+        ),
+      ),
+    );
+  }
+
+  /**
+   * Optimistically mark the targeted sale REFUNDED locally and enqueue
+   * the refund POST for replay. Returns the updated sale, or null when
+   * the target isn't in the local list (treated as a precondition
+   * failure — the cashier can't refund what they can't see).
+   */
+  private enqueueOfflineRefund(saleId: string, reason: string | null): Sale | null {
+    const target = this._sales().find((s) => s.id === saleId);
+    if (!target) return null;
+    const optimistic: Sale = { ...target, status: 'REFUNDED', refundReason: reason };
+    this._sales.update((list) => list.map((s) => (s.id === saleId ? optimistic : s)));
+    this.offlineQueue.enqueue({
+      kind: 'refund',
+      clientRef: this.generateClientRef(),
+      saleId,
+      reason,
+      enqueuedAt: new Date().toISOString(),
+      attempts: 0,
+    });
+    return optimistic;
+  }
+
   private enqueueOffline(
     payload: CreateSaleRequest,
     clientRef: string,
@@ -192,6 +244,7 @@ export class SaleService {
   ): Sale {
     const optimistic = this.buildOptimisticSale(payload, clientRef);
     this.offlineQueue.enqueue({
+      kind: 'sale',
       clientRef,
       request: payload,
       optimistic,

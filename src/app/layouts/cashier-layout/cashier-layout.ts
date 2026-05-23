@@ -55,6 +55,7 @@ export class CashierLayout implements OnInit, OnDestroy {
   protected readonly refreshing = signal(false);
 
   protected readonly currentUser = this.authService.user;
+  protected readonly offlineSession = this.authService.offlineSession;
   protected readonly cartItemCount = this.cartService.itemCount;
   protected readonly online = this.sync.online;
   protected readonly pendingSync = this.sync.pendingCount;

@@ -29,15 +29,41 @@
   ],
   "dataGroups": [
     {
-      "name": "api-freshness",
+      "name": "api-stable",
       "urls": [
-        "/api/**"
+        "/api/products/**",
+        "/api/products",
+        "/api/categories/**",
+        "/api/categories",
+        "/api/settings/**",
+        "/api/settings",
+        "/api/users/**",
+        "/api/users"
+      ],
+      "cacheConfig": {
+        "strategy": "performance",
+        "maxSize": 500,
+        "maxAge": "30d",
+        "timeout": "3s"
+      }
+    },
+    {
+      "name": "api-fresh",
+      "urls": [
+        "/api/sales/**",
+        "/api/sales",
+        "/api/business-days/**",
+        "/api/business-days",
+        "/api/auth/me",
+        "/api/health",
+        "/api/expenses/**",
+        "/api/expenses"
       ],
       "cacheConfig": {
         "strategy": "freshness",
-        "maxSize": 100,
-        "maxAge": "1h",
-        "timeout": "10s"
+        "maxSize": 500,
+        "maxAge": "30d",
+        "timeout": "3s"
       }
     },
     {

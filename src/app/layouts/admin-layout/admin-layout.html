@@ -104,6 +104,18 @@
           </div>
           <mat-divider></mat-divider>
         }
+        <button mat-menu-item (click)="syncNow()" [disabled]="syncing()">
+          <mat-icon [class.admin-shell__sync-icon--spin]="syncing()">sync</mat-icon>
+          <span>
+            @if (syncing()) {
+              Syncing…
+            } @else if (lastSyncLabel(); as label) {
+              Sync now <small class="admin-shell__menu-hint">· {{ label }}</small>
+            } @else {
+              Sync now
+            }
+          </span>
+        </button>
         <button mat-menu-item (click)="goHome()">
           <mat-icon>home</mat-icon>
           <span>Home</span>

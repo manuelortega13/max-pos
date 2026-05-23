@@ -275,3 +275,20 @@
   &--soon     { border-left-color: #f59e0b; }
   &--expired  { border-left-color: #ef4444; background: rgba(239, 68, 68, 0.05); }
 }
+
+/* "Sync now" menu item — relative-time hint after the label, plus a
+   spinning icon while a refresh is in flight. Scoped to the global
+   .admin-shell namespace so it doesn't leak. */
+.admin-shell__menu-hint {
+  color: var(--mat-sys-on-surface-variant);
+  font-weight: 400;
+}
+
+.admin-shell__sync-icon--spin {
+  animation: admin-shell-sync-spin 1.2s linear infinite;
+}
+
+@keyframes admin-shell-sync-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}

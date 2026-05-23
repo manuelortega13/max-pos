@@ -156,6 +156,13 @@
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
+  &__user-offline {
+    display: block;
+    color: var(--mat-sys-error);
+    font-size: 0.7rem;
+    margin-top: 0.15rem;
+  }
+
   &__day {
     display: inline-flex;
     align-items: center;

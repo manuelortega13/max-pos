@@ -1,7 +1,12 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
-import { OfflineQueueService } from './offline-queue.service';
+import {
+  OfflineQueueService,
+  QueuedMutation,
+  QueuedRefund,
+  QueuedSale,
+} from './offline-queue.service';
 import { SaleService } from './sale.service';
 
 /**
@@ -99,26 +104,24 @@ export class OfflineSyncService {
   }
 
   /**
-   * Walk the queue FIFO, replaying each sale. The HTTP outcome also
-   * updates the online signal so the UI reflects reality instead of
-   * whatever navigator.onLine happens to be lying about. Stops early on
-   * the first status-0 failure (preserves order; next poller tick will
-   * try again); 4xx bumps the attempts counter and moves on.
+   * Walk the queue FIFO, replaying each mutation. The HTTP outcome
+   * also updates the online signal so the UI reflects reality instead
+   * of whatever navigator.onLine happens to be lying about. Stops
+   * early on the first status-0 failure (preserves order; next poller
+   * tick will try again); 4xx bumps the attempts counter and moves on.
    */
   private async drain(): Promise<void> {
     if (this._syncing()) return;
     const snapshot = this.queue.peekAll();
     if (snapshot.length === 0) return;
 
-    console.info('[offline-sync] draining', snapshot.length, 'queued sale(s)');
+    console.info('[offline-sync] draining', snapshot.length, 'queued mutation(s)');
     this._syncing.set(true);
     try {
       for (const entry of snapshot) {
         try {
-          await firstValueFrom(
-            this.saleService.replayQueued(entry.request, entry.optimistic.id),
-          );
-          console.info('[offline-sync] replayed', entry.clientRef);
+          await this.replay(entry);
+          console.info('[offline-sync] replayed', entry.kind, entry.clientRef);
           this.queue.remove(entry.clientRef);
           // A successful HTTP round-trip is the most reliable "I'm
           // online" signal we can get — promote the flag even if the
@@ -133,8 +136,18 @@ export class OfflineSyncService {
             if (this._online()) this._online.set(false);
             break;
           }
+          // Idempotent "already refunded" surfaces as 409 on replay —
+          // the canonical refund already exists, so drop the queue
+          // entry and move on. Same logic as a successful replay.
+          if (entry.kind === 'refund' && httpErr.status === 409) {
+            console.info('[offline-sync] refund already applied server-side', entry.clientRef);
+            this.queue.remove(entry.clientRef);
+            if (!this._online()) this._online.set(true);
+            continue;
+          }
           console.warn(
             '[offline-sync] replay failed for',
+            entry.kind,
             entry.clientRef,
             httpErr.status,
             httpErr.error,
@@ -142,12 +155,26 @@ export class OfflineSyncService {
           this.queue.markAttempted(entry.clientRef, this.describe(httpErr));
           // A real 4xx / 5xx means we ARE online — keep the flag honest
           // so the UI doesn't say "Offline" when the backend is reachable
-          // but rejecting specific sales.
+          // but rejecting specific entries.
           if (!this._online()) this._online.set(true);
         }
       }
     } finally {
       this._syncing.set(false);
+    }
+  }
+
+  /** Dispatch the replay HTTP call by mutation kind. */
+  private replay(entry: QueuedMutation): Promise<unknown> {
+    switch (entry.kind) {
+      case 'sale':
+        return firstValueFrom(
+          this.saleService.replayQueuedSale(entry as QueuedSale),
+        );
+      case 'refund':
+        return firstValueFrom(
+          this.saleService.replayQueuedRefund(entry as QueuedRefund),
+        );
     }
   }
 

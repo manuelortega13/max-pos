@@ -87,6 +87,9 @@
         <div class="cashier-shell__user-info" disabled>
           <strong>{{ user.name }}</strong>
           <small>{{ user.role | titlecase }}</small>
+          @if (offlineSession()) {
+            <small class="cashier-shell__user-offline">Offline session · re-sign when online</small>
+          }
         </div>
         <mat-divider></mat-divider>
       }

@@ -1,12 +1,25 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { Observable, tap } from 'rxjs';
+import { Observable, catchError, from, of, switchMap, tap, throwError } from 'rxjs';
 import { AuthResponse, AuthUser, LoginRequest } from '../models';
+import { LocalStoreService } from './local-store.service';
+import {
+  hashPassword,
+  isLocalJwt,
+  newDeviceSecret,
+  signLocalJwt,
+  verifyPassword,
+} from './local-crypto.util';
 
 const TOKEN_KEY = 'maxpos.token';
 const USER_KEY = 'maxpos.user';
+const DEVICE_SECRET_KEY = 'maxpos.device-secret';
+/** Lifetime of a locally-minted JWT issued while offline. Eight hours
+ *  matches the server-issued TTL (JWT_TTL_MINUTES=480) so the offline
+ *  session lasts a typical shift. */
+const LOCAL_JWT_TTL_SECONDS = 8 * 60 * 60;
 /** setTimeout's millisecond delay is internally clamped to a signed 32-bit
  *  int, so anything beyond ~24.85 days silently fires immediately. Clamp
  *  our scheduled expiry to that ceiling — in practice JWT TTLs are minutes
@@ -18,15 +31,20 @@ export class AuthService {
   private readonly http = inject(HttpClient);
   private readonly router = inject(Router);
   private readonly snackBar = inject(MatSnackBar);
+  private readonly localStore = inject(LocalStoreService);
 
   private readonly _token = signal<string | null>(null);
   private readonly _user = signal<AuthUser | null>(null);
+  /** True when the current session was minted locally because the
+   *  network was unreachable at login. Drives the "Offline" banner. */
+  private readonly _offlineSession = signal<boolean>(false);
   /** Timer that fires expireSession() the moment the JWT's `exp` is hit,
    *  so an idle tab doesn't sit "logged in" past its real validity. */
   private expiryTimer: ReturnType<typeof setTimeout> | null = null;
 
   readonly token = this._token.asReadonly();
   readonly user = this._user.asReadonly();
+  readonly offlineSession = this._offlineSession.asReadonly();
 
   /**
    * A session is only considered authenticated when BOTH the token and the
@@ -45,9 +63,31 @@ export class AuthService {
     this.restoreSession();
   }
 
+  /**
+   * Authenticate. Tries the server first; on network failure (status 0)
+   * falls back to a locally-cached hash from the last successful login
+   * on this device. A real 401 (wrong password) is NOT recovered — the
+   * offline path also requires the password to match the cached hash.
+   *
+   * On successful online login the password is hashed client-side
+   * (PBKDF2) and stashed in IndexedDB so subsequent offline attempts
+   * work. The server-side bcrypt hash never crosses the wire.
+   */
   login(credentials: LoginRequest): Observable<AuthResponse> {
     return this.http.post<AuthResponse>('/api/auth/login', credentials).pipe(
-      tap((response) => this.storeSession(response)),
+      tap((response) => this.storeSession(response, false)),
+      tap((response) => void this.cacheCredentials(credentials, response.user)),
+      catchError((err: HttpErrorResponse) => {
+        // status 0 == network unreachable (CORS preflight failed, DNS
+        // failure, server unreachable). Everything else (401, 5xx) is
+        // a real server response that we should NOT paper over.
+        if (err.status !== 0) return throwError(() => err);
+        return from(this.tryLocalLogin(credentials)).pipe(
+          switchMap((local) =>
+            local ? of(local) : throwError(() => err),
+          ),
+        );
+      }),
     );
   }
 
@@ -76,9 +116,84 @@ export class AuthService {
     void this.router.navigate(['/login']);
   }
 
+  private validateWithServer(): void {
+    // Fire-and-forget. A 401 here is caught by unauthorizedInterceptor,
+    // which calls expireSession() and routes the user to /login. We
+    // don't care about the body — only that the request succeeded.
+    this.http.get('/api/auth/me').subscribe({ error: () => {} });
+  }
+
+  /** Cache the password hash + user record after a successful online
+   *  login so the same credentials can unlock the app while offline. */
+  private async cacheCredentials(
+    credentials: LoginRequest,
+    user: AuthUser,
+  ): Promise<void> {
+    try {
+      const hash = await hashPassword(credentials.password);
+      await this.localStore.saveCachedUser({
+        email: credentials.email,
+        userId: user.id,
+        name: user.name,
+        role: user.role,
+        localHash: JSON.stringify(hash),
+        lastUsedAt: Date.now(),
+      });
+    } catch (err) {
+      console.warn('[auth] failed to cache credentials for offline login', err);
+    }
+  }
+
+  /**
+   * Offline login fallback. Returns a synthesized AuthResponse on
+   * success (which the outer `login()` pipe treats identically to a
+   * server response) or null when no cached user matches.
+   */
+  private async tryLocalLogin(credentials: LoginRequest): Promise<AuthResponse | null> {
+    try {
+      const cached = await this.localStore.getCachedUser(credentials.email);
+      if (!cached) return null;
+      const hash = JSON.parse(cached.localHash);
+      const ok = await verifyPassword(credentials.password, hash);
+      if (!ok) return null;
+      const secret = await this.ensureDeviceSecret();
+      const token = await signLocalJwt(
+        { sub: cached.userId, email: cached.email, role: cached.role },
+        secret,
+        LOCAL_JWT_TTL_SECONDS,
+      );
+      const user: AuthUser = {
+        id: cached.userId,
+        email: cached.email,
+        name: cached.name,
+        role: cached.role,
+      };
+      const response: AuthResponse = { token, user };
+      this.storeSession(response, true);
+      // Bump lastUsedAt so a stale-cleanup job (future) can purge
+      // accounts that haven't been used on this device in a while.
+      await this.localStore.saveCachedUser({ ...cached, lastUsedAt: Date.now() });
+      return response;
+    } catch (err) {
+      console.warn('[auth] offline login attempt failed', err);
+      return null;
+    }
+  }
+
+  /** First call on each device generates a 32-byte HMAC key and
+   *  persists it; subsequent calls just read it. */
+  private async ensureDeviceSecret(): Promise<string> {
+    const existing = await this.localStore.kvGet<string>(DEVICE_SECRET_KEY);
+    if (existing) return existing;
+    const fresh = newDeviceSecret();
+    await this.localStore.kvSet(DEVICE_SECRET_KEY, fresh);
+    return fresh;
+  }
+
   private clearStorageAndTimer(): void {
     this._token.set(null);
     this._user.set(null);
+    this._offlineSession.set(false);
     try {
       localStorage.removeItem(TOKEN_KEY);
       localStorage.removeItem(USER_KEY);
@@ -100,9 +215,19 @@ export class AuthService {
     // request, which is confusing and lets through whichever screen they
     // last landed on before a refresh.
     if (token && user && !this.isTokenExpired(token)) {
+      const local = isLocalJwt(token);
       this._token.set(token);
       this._user.set(user);
+      this._offlineSession.set(local);
       this.scheduleExpiry(token);
+      // Skip the server-validation ping for local-issued tokens — the
+      // backend would reject the signature with 401, kicking the user
+      // to /login before they ever see whether the app is offline.
+      // For real server tokens, the `exp` claim being in the future
+      // only proves the token isn't *structurally* expired; ping
+      // /api/auth/me so a server-side rejection (rotated JWT_SECRET,
+      // user deleted, token revoked) trips unauthorizedInterceptor.
+      if (!local) this.validateWithServer();
       return;
     }
 
@@ -118,9 +243,10 @@ export class AuthService {
     }
   }
 
-  private storeSession(response: AuthResponse): void {
+  private storeSession(response: AuthResponse, offline: boolean): void {
     this._token.set(response.token);
     this._user.set(response.user);
+    this._offlineSession.set(offline);
     try {
       localStorage.setItem(TOKEN_KEY, response.token);
       localStorage.setItem(USER_KEY, JSON.stringify(response.user));
