@@ -1,0 +1,113 @@
+@let s = state();
+
+<div class="display" [attr.data-state]="s.kind">
+
+  @switch (s.kind) {
+
+    @case ('idle') {
+      <section class="display__idle">
+        <div class="display__logo">{{ storeInitials() }}</div>
+        <h1 class="display__store">{{ s.storeName }}</h1>
+        <p class="display__greeting">{{ greeting() }}!</p>
+        <p class="display__sub">We'll be with you shortly.</p>
+        @if (s.cashierName) {
+          <p class="display__cashier">Cashier · {{ s.cashierName }}</p>
+        }
+      </section>
+    }
+
+    @case ('active') {
+      <header class="display__head">
+        <div class="display__head-brand">
+          <span class="display__head-mark">{{ storeInitials() }}</span>
+          <span class="display__head-name">{{ s.storeName }}</span>
+        </div>
+        <div class="display__head-meta">
+          @if (s.cashierName) {
+            <span>Cashier · {{ s.cashierName }}</span>
+          }
+          <span class="display__head-count">
+            {{ itemCount() }} {{ itemCount() === 1 ? 'item' : 'items' }}
+          </span>
+        </div>
+      </header>
+
+      <main class="display__main">
+        <ol class="display__items">
+          @for (item of s.items; track item.productId) {
+            <li class="display__item">
+              <span class="display__item-qty">{{ item.quantity }}×</span>
+              <span class="display__item-name">{{ item.name }}</span>
+              <span class="display__item-amt">
+                @if (item.discountAmount && item.discountAmount > 0) {
+                  <span class="display__item-strike">
+                    {{ money(item.unitPrice * item.quantity, s.currency) }}
+                  </span>
+                }
+                {{ money(item.lineTotal, s.currency) }}
+              </span>
+            </li>
+          }
+        </ol>
+
+        <aside class="display__totals">
+          <div class="display__row">
+            <span>Subtotal</span>
+            <span>{{ money(s.subtotal, s.currency) }}</span>
+          </div>
+          @if (s.lineDiscountTotal > 0) {
+            <div class="display__row display__row--discount">
+              <span>Line discounts</span>
+              <span>−{{ money(s.lineDiscountTotal, s.currency) }}</span>
+            </div>
+          }
+          @if (s.orderDiscountAmount > 0) {
+            <div class="display__row display__row--discount">
+              <span>Order discount</span>
+              <span>−{{ money(s.orderDiscountAmount, s.currency) }}</span>
+            </div>
+          }
+          @if (s.tax > 0) {
+            <div class="display__row">
+              <span>Tax</span>
+              <span>{{ money(s.tax, s.currency) }}</span>
+            </div>
+          }
+          <div class="display__row display__row--grand">
+            <span>Total</span>
+            <span>{{ money(s.total, s.currency) }}</span>
+          </div>
+        </aside>
+      </main>
+    }
+
+    @case ('completed') {
+      <section class="display__done">
+        <div class="display__done-icon" aria-hidden="true">✓</div>
+        <h1 class="display__done-title">Thank you!</h1>
+        <div class="display__done-total">
+          <small>Total</small>
+          <strong>{{ money(s.total, s.currency) }}</strong>
+        </div>
+        @if (s.cashReceived !== null && s.change !== null) {
+          <div class="display__done-tender">
+            <div>
+              <small>Cash received</small>
+              <span>{{ money(s.cashReceived, s.currency) }}</span>
+            </div>
+            <div>
+              <small>Your change</small>
+              <span class="display__done-change">{{ money(s.change, s.currency) }}</span>
+            </div>
+          </div>
+        }
+        @if (s.cashierName) {
+          <p class="display__done-foot">Served by {{ s.cashierName }} · {{ s.storeName }}</p>
+        } @else {
+          <p class="display__done-foot">{{ s.storeName }}</p>
+        }
+      </section>
+    }
+
+  }
+</div>

@@ -4,6 +4,7 @@ import {
   Component,
   ElementRef,
   HostListener,
+  OnDestroy,
   computed,
   effect,
   inject,
@@ -25,6 +26,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { BarcodeScannerService } from '../../../core/services/barcode-scanner.service';
 import { BusinessDayService } from '../../../core/services/business-day.service';
 import { CartService } from '../../../core/services/cart.service';
+import { CustomerDisplayService } from '../../../core/services/customer-display.service';
 import { ProductService } from '../../../core/services/product.service';
 import { SettingsService } from '../../../core/services/settings.service';
 import { CartLine, Product } from '../../../core/models';
@@ -63,7 +65,7 @@ import { StockLimitDialog, StockLimitDialogData } from './stock-limit-dialog';
   templateUrl: './pos.page.html',
   styleUrl: './pos.page.scss',
 })
-export class PosPage implements AfterViewInit {
+export class PosPage implements AfterViewInit, OnDestroy {
   private readonly productService = inject(ProductService);
   private readonly cartService = inject(CartService);
   private readonly settingsService = inject(SettingsService);
@@ -71,6 +73,7 @@ export class PosPage implements AfterViewInit {
   private readonly snackBar = inject(MatSnackBar);
   private readonly scanner = inject(BarcodeScannerService);
   private readonly businessDayService = inject(BusinessDayService);
+  private readonly customerDisplay = inject(CustomerDisplayService);
 
   /** Hide the in-input camera button when the browser can't stream video. */
   protected readonly cameraSupported = this.scanner.isSupported;
@@ -282,6 +285,22 @@ export class PosPage implements AfterViewInit {
       const input = this.searchInputRef()?.nativeElement;
       input?.focus({ preventScroll: true });
     });
+    // Begin pushing cart changes to any open customer-display tab. The
+    // BroadcastChannel is fire-and-forget — no display open = no-op.
+    this.customerDisplay.startPublishing();
+  }
+
+  ngOnDestroy(): void {
+    // Flip the display back to "idle" when the cashier leaves POS so
+    // a stale cart isn't shown across page navigations.
+    this.customerDisplay.stopPublishing();
+  }
+
+  /** Open the customer-facing display in a new tab. The new tab
+   *  shares localStorage (auth) with this one and immediately pings
+   *  for the current cart state via BroadcastChannel. */
+  protected openCustomerDisplay(): void {
+    window.open('/display', 'maxpos-customer-display', 'noopener');
   }
 
   /**

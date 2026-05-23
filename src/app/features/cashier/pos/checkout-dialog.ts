@@ -23,6 +23,7 @@ import { CartLine, DiscountInput, PaymentMethod, Sale } from '../../../core/mode
 import { SettingsService } from '../../../core/services/settings.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { SaleService } from '../../../core/services/sale.service';
+import { CustomerDisplayService } from '../../../core/services/customer-display.service';
 import { PrinterService, ReceiptPayload } from '../../../core/services/printer.service';
 import { MoneyPipe } from '../../../shared/pipes/currency-symbol.pipe';
 
@@ -66,6 +67,7 @@ export class CheckoutDialog {
   private readonly authService = inject(AuthService);
   private readonly saleService = inject(SaleService);
   private readonly printerService = inject(PrinterService);
+  private readonly customerDisplay = inject(CustomerDisplayService);
   protected readonly data = inject<CheckoutData>(MAT_DIALOG_DATA);
 
   protected readonly settings = this.settingsService.settings;
@@ -253,6 +255,15 @@ export class CheckoutDialog {
           if (this.printerService.openDrawer()) {
             void this.printerService.kickDrawer();
           }
+          // Push the "thank-you" frame to the customer display before
+          // the cashier moves on to the receipt step — the customer
+          // sees their change immediately.
+          const isCash = this.paymentMethod() === 'CASH';
+          this.customerDisplay.broadcastCompleted(
+            this.data.total,
+            isCash ? this.cashReceived() : null,
+            isCash ? this.change() : null,
+          );
           this.step.set('receipt');
         },
         error: (err: HttpErrorResponse) => {

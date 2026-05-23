@@ -48,6 +48,17 @@
           <span>Quantity</span>
           <kbd class="pos__kbd">F3</kbd>
         </button>
+
+        <button
+          type="button"
+          mat-stroked-button
+          class="pos__qty-btn"
+          matTooltip="Open customer-facing display in a new tab"
+          (click)="openCustomerDisplay()"
+        >
+          <mat-icon>monitor</mat-icon>
+          <span>Customer display</span>
+        </button>
       </div>
 
       @if (pendingQuantity(); as qty) {

@@ -1,0 +1,349 @@
+/* Customer-facing display.
+ *
+ * Tuned for a large, readable presentation across the counter — large
+ * typography, calm colors, no interactive chrome. Three layouts driven
+ * by the `data-state` attribute on the root: idle (welcome), active
+ * (live cart), completed (thank-you).
+ *
+ * The page intentionally avoids Material components so it can fill the
+ * viewport edge-to-edge without the framework's default paddings.
+ */
+
+@keyframes display-fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+@keyframes display-pulse {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.04); }
+}
+
+.display {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--mat-sys-surface);
+  color: var(--mat-sys-on-surface);
+  font-family: 'Roboto', system-ui, sans-serif;
+  overflow: hidden;
+  /* Numbers tabular so totals don't shift width when digits change. */
+  font-variant-numeric: tabular-nums;
+
+  /* ────────────────────────────── IDLE ─────────────────────────────── */
+
+  &__idle {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1.25rem;
+    padding: 3rem;
+    text-align: center;
+    background:
+      radial-gradient(circle at 30% 20%,
+        color-mix(in srgb, var(--mat-sys-primary) 8%, transparent),
+        transparent 50%),
+      radial-gradient(circle at 80% 80%,
+        color-mix(in srgb, var(--mat-sys-tertiary) 6%, transparent),
+        transparent 55%);
+    animation: display-fade-in 400ms ease-out;
+  }
+
+  &__logo {
+    width: 12rem;
+    height: 12rem;
+    border-radius: 50%;
+    background: var(--mat-sys-primary-container);
+    color: var(--mat-sys-on-primary-container);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 5rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    box-shadow: var(--mat-sys-level2);
+  }
+
+  &__store {
+    margin: 0.5rem 0 0;
+    font-size: 3rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+
+  &__greeting {
+    margin: 0;
+    font-size: 2.5rem;
+    color: var(--mat-sys-primary);
+    font-weight: 500;
+  }
+
+  &__sub {
+    margin: 0;
+    font-size: 1.25rem;
+    color: var(--mat-sys-on-surface-variant);
+  }
+
+  &__cashier {
+    margin-top: 1.5rem;
+    font-size: 1rem;
+    color: var(--mat-sys-on-surface-variant);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  /* ───────────────────────────── ACTIVE ────────────────────────────── */
+
+  &__head {
+    flex-shrink: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.25rem 2rem;
+    background: var(--mat-sys-surface-container);
+    border-bottom: 1px solid var(--mat-sys-outline-variant);
+
+    &-brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    &-mark {
+      width: 2.75rem;
+      height: 2.75rem;
+      border-radius: 50%;
+      background: var(--mat-sys-primary-container);
+      color: var(--mat-sys-on-primary-container);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 1rem;
+    }
+
+    &-name {
+      font-size: 1.25rem;
+      font-weight: 600;
+    }
+
+    &-meta {
+      display: flex;
+      gap: 1.5rem;
+      align-items: center;
+      color: var(--mat-sys-on-surface-variant);
+      font-size: 1rem;
+    }
+
+    &-count {
+      padding: 0.25rem 0.75rem;
+      border-radius: 999px;
+      background: var(--mat-sys-secondary-container);
+      color: var(--mat-sys-on-secondary-container);
+      font-weight: 600;
+    }
+  }
+
+  &__main {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 26rem;
+    min-height: 0;
+
+    @media (max-width: 900px) {
+      grid-template-columns: 1fr;
+      grid-template-rows: 1fr auto;
+    }
+  }
+
+  &__items {
+    list-style: none;
+    margin: 0;
+    padding: 1.5rem 2rem;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+
+  &__item {
+    display: grid;
+    grid-template-columns: 4rem 1fr auto;
+    align-items: baseline;
+    gap: 1rem;
+    padding: 0.85rem 1rem;
+    border-radius: 0.75rem;
+    background: var(--mat-sys-surface-container-low);
+    font-size: 1.4rem;
+    /* Each newly-tracked @for entry plays this on first mount. */
+    animation: display-fade-in 220ms ease-out;
+
+    &-qty {
+      font-weight: 700;
+      color: var(--mat-sys-primary);
+      font-size: 1.5rem;
+    }
+
+    &-name {
+      font-weight: 500;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    &-amt {
+      font-weight: 600;
+      display: inline-flex;
+      align-items: baseline;
+      gap: 0.5rem;
+    }
+
+    &-strike {
+      font-size: 1rem;
+      font-weight: 400;
+      color: var(--mat-sys-on-surface-variant);
+      text-decoration: line-through;
+    }
+  }
+
+  &__totals {
+    padding: 1.5rem 2rem;
+    background: var(--mat-sys-surface-container-high);
+    border-left: 1px solid var(--mat-sys-outline-variant);
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    justify-content: flex-end;
+
+    @media (max-width: 900px) {
+      border-left: none;
+      border-top: 1px solid var(--mat-sys-outline-variant);
+    }
+  }
+
+  &__row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: 1.4rem;
+    color: var(--mat-sys-on-surface-variant);
+
+    &--discount {
+      color: var(--mat-sys-tertiary);
+    }
+
+    &--grand {
+      margin-top: 1rem;
+      padding-top: 1rem;
+      border-top: 2px solid var(--mat-sys-outline-variant);
+      color: var(--mat-sys-on-surface);
+      font-size: 2.6rem;
+      font-weight: 700;
+
+      span:last-child {
+        color: var(--mat-sys-primary);
+      }
+    }
+  }
+
+  /* ──────────────────────────── COMPLETED ──────────────────────────── */
+
+  &__done {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1.5rem;
+    padding: 3rem;
+    text-align: center;
+    background:
+      radial-gradient(circle at center,
+        color-mix(in srgb, var(--color-success, #10b981) 12%, transparent),
+        transparent 60%);
+    animation: display-fade-in 300ms ease-out;
+
+    &-icon {
+      width: 9rem;
+      height: 9rem;
+      border-radius: 50%;
+      background: var(--color-success, #10b981);
+      color: #fff;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 5rem;
+      font-weight: 700;
+      animation: display-pulse 1.2s ease-in-out infinite;
+      box-shadow: 0 10px 40px color-mix(in srgb, var(--color-success, #10b981) 35%, transparent);
+    }
+
+    &-title {
+      margin: 0;
+      font-size: 4rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+
+    &-total {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.25rem;
+
+      small {
+        font-size: 1.1rem;
+        color: var(--mat-sys-on-surface-variant);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      strong {
+        font-size: 4rem;
+        font-weight: 700;
+        color: var(--mat-sys-primary);
+      }
+    }
+
+    &-tender {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2rem;
+      margin-top: 0.5rem;
+
+      div {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.25rem;
+        padding: 1rem 1.5rem;
+        border-radius: 0.75rem;
+        background: var(--mat-sys-surface-container);
+        min-width: 12rem;
+      }
+
+      small {
+        font-size: 0.95rem;
+        color: var(--mat-sys-on-surface-variant);
+      }
+
+      span {
+        font-size: 2rem;
+        font-weight: 600;
+      }
+    }
+
+    &-change {
+      color: var(--color-success, #10b981) !important;
+    }
+
+    &-foot {
+      margin: 1rem 0 0;
+      font-size: 1rem;
+      color: var(--mat-sys-on-surface-variant);
+    }
+  }
+}

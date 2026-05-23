@@ -80,6 +80,18 @@ export const routes: Routes = [
     ],
   },
   {
+    // Customer-facing display — fullscreen, no layout. Cashier opens
+    // this in a second browser tab; it syncs to the POS cart via
+    // BroadcastChannel and shows items/totals to the customer.
+    path: 'display',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/customer-display/customer-display.page').then(
+        (m) => m.CustomerDisplayPage,
+      ),
+    title: 'Customer Display — MaxPOS',
+  },
+  {
     path: 'cashier',
     canActivate: [authGuard],
     loadComponent: () =>
