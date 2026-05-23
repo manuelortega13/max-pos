@@ -85,6 +85,7 @@ Prettier config lives in `package.json`: `printWidth: 100`, `singleQuote: true`,
 ## Git conventions
 
 - **Do not add a `Co-Authored-By: Claude …` trailer to commit messages.** Commits should be authored solely by the human contributor.
+- **Never commit or push without explicit per-change authorization.** Finish the work, summarize it, then stop. If commit/push seems like the obvious next step, ask first (e.g. "ready to commit?") and wait. A prior "commit and push" instruction applies only to the change then in flight — it is *not* a standing permission for later unrelated changes in the same session. When the user does say "commit", that means commit *and* push in the same step.
 
 ## Testing notes
 
