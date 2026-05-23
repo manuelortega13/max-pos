@@ -5,6 +5,7 @@ import com.maxpos.category.CategoryRepository;
 import com.maxpos.common.ConflictException;
 import com.maxpos.common.NotFoundException;
 import com.maxpos.notification.NotificationPublisher;
+import com.maxpos.sale.SaleItemRepository;
 import com.maxpos.product.dto.ExpiringBatchDto;
 import com.maxpos.product.dto.ProductBatchDto;
 import com.maxpos.product.dto.ProductDto;
@@ -37,6 +38,7 @@ public class ProductService {
     private final ProductBatchRepository batches;
     private final CategoryRepository categories;
     private final NotificationPublisher notifications;
+    private final SaleItemRepository saleItems;
 
     @PersistenceContext
     private EntityManager em;
@@ -44,11 +46,13 @@ public class ProductService {
     public ProductService(ProductRepository products,
                           ProductBatchRepository batches,
                           CategoryRepository categories,
-                          NotificationPublisher notifications) {
+                          NotificationPublisher notifications,
+                          SaleItemRepository saleItems) {
         this.products = products;
         this.batches = batches;
         this.categories = categories;
         this.notifications = notifications;
+        this.saleItems = saleItems;
     }
 
     /**
@@ -123,9 +127,22 @@ public class ProductService {
         return ProductDto.from(p);
     }
 
+    /**
+     * Hard-delete a product. Rejects with 409 when the product is
+     * referenced by any historical sale_items row — the FK from
+     * sale_items.product_id is RESTRICT, so trying to drop the row
+     * anyway would otherwise produce a bare 500. Admins should
+     * deactivate (active = false) instead in that case.
+     */
     @Transactional
     public void delete(UUID id) {
-        if (!products.existsById(id)) throw new NotFoundException("Product not found");
+        Product p = products.findById(id)
+                .orElseThrow(() -> new NotFoundException("Product not found"));
+        if (saleItems.existsByProductId(id)) {
+            throw new ConflictException(
+                    "Cannot delete \"" + p.getName() + "\" because it has sales history. " +
+                    "Deactivate it instead so cashiers can't ring it up.");
+        }
         products.deleteById(id);
         notifications.publishInventoryChanged();
     }
