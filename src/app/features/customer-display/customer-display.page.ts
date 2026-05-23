@@ -34,18 +34,6 @@ export class CustomerDisplayPage implements OnInit, OnDestroy {
     return 'Good evening';
   });
 
-  /** First letters of the store name — used as a logo placeholder
-   *  when no actual logo is available. */
-  protected readonly storeInitials = computed(() => {
-    const s = this.state();
-    return s.storeName
-      .split(/\s+/)
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((w) => w.charAt(0).toUpperCase())
-      .join('') || 'M';
-  });
-
   /** Total item count for the small badge in the active header. */
   protected readonly itemCount = computed(() => {
     const s = this.state();

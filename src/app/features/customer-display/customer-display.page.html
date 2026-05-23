@@ -6,7 +6,12 @@
 
     @case ('idle') {
       <section class="display__idle">
-        <div class="display__logo">{{ storeInitials() }}</div>
+        <img
+          src="/icons/icon-512.png"
+          alt=""
+          class="display__logo"
+          aria-hidden="true"
+        />
         <h1 class="display__store">{{ s.storeName }}</h1>
         <p class="display__greeting">{{ greeting() }}!</p>
         <p class="display__sub">We'll be with you shortly.</p>
@@ -19,7 +24,12 @@
     @case ('active') {
       <header class="display__head">
         <div class="display__head-brand">
-          <span class="display__head-mark">{{ storeInitials() }}</span>
+          <img
+            src="/icons/icon-192.png"
+            alt=""
+            class="display__head-mark"
+            aria-hidden="true"
+          />
           <span class="display__head-name">{{ s.storeName }}</span>
         </div>
         <div class="display__head-meta">
