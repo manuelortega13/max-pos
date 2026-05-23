@@ -18,6 +18,7 @@ import { Sale, SaleStatus } from '../../../core/models';
 import { SaleService } from '../../../core/services/sale.service';
 import { UserService } from '../../../core/services/user.service';
 import { ConfirmDialog } from '../../../shared/dialogs/confirm-dialog';
+import { SaleItemsDialog } from '../../../shared/dialogs/sale-items-dialog';
 import { MoneyPipe } from '../../../shared/pipes/currency-symbol.pipe';
 
 type StatusFilter = SaleStatus | 'all';
@@ -85,6 +86,16 @@ export class SalesPage {
 
   protected retry(): void {
     this.saleService.load();
+  }
+
+  protected viewItems(sale: Sale): void {
+    this.dialog.open(SaleItemsDialog, {
+      width: '560px',
+      maxWidth: '95vw',
+      panelClass: 'dialog-fullscreen-mobile',
+      autoFocus: false,
+      data: sale,
+    });
   }
 
   protected confirmRefund(sale: Sale): void {

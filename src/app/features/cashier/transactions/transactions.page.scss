@@ -240,3 +240,41 @@
   &--refunded { background: var(--mat-sys-error-container) !important; color: var(--mat-sys-error) !important; }
   &--pending { background: var(--color-warning-container) !important; color: var(--color-warning) !important; }
 }
+
+/* Same look as the admin sales page's items column — clickable pill
+   that opens the SaleItemsDialog. Defined per page so we don't have
+   to plumb a shared stylesheet for one button. */
+.items-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--mat-sys-on-surface);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+
+  mat-icon {
+    font-size: 1rem;
+    width: 1rem;
+    height: 1rem;
+    color: var(--mat-sys-on-surface-variant);
+  }
+
+  &:hover {
+    background: var(--mat-sys-secondary-container);
+    color: var(--mat-sys-on-secondary-container);
+    border-color: var(--mat-sys-outline-variant);
+
+    mat-icon { color: inherit; }
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--mat-sys-primary);
+    outline-offset: 2px;
+  }
+}

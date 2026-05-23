@@ -227,7 +227,17 @@
           </ng-container>
           <ng-container matColumnDef="items">
             <th mat-header-cell *matHeaderCellDef>Items</th>
-            <td mat-cell *matCellDef="let s">{{ s.items.length }}</td>
+            <td mat-cell *matCellDef="let s">
+              <button
+                type="button"
+                class="items-link"
+                (click)="viewItems(s)"
+                [attr.aria-label]="'View ' + s.items.length + ' item(s) in ' + s.reference"
+              >
+                {{ s.items.length }}
+                <mat-icon>visibility</mat-icon>
+              </button>
+            </td>
           </ng-container>
           <ng-container matColumnDef="payment">
             <th mat-header-cell *matHeaderCellDef>Payment</th>
@@ -256,6 +266,10 @@
                 <mat-icon>more_vert</mat-icon>
               </button>
               <mat-menu #rowMenu="matMenu">
+                <button mat-menu-item (click)="viewItems(s)">
+                  <mat-icon>visibility</mat-icon>
+                  <span>View items</span>
+                </button>
                 <button
                   mat-menu-item
                   [disabled]="s.status === 'REFUNDED'"

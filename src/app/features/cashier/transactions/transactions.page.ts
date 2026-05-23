@@ -17,6 +17,7 @@ import { AuthService } from '../../../core/services/auth.service';
 import { SaleService } from '../../../core/services/sale.service';
 import { SettingsService } from '../../../core/services/settings.service';
 import { MoneyPipe } from '../../../shared/pipes/currency-symbol.pipe';
+import { SaleItemsDialog } from '../../../shared/dialogs/sale-items-dialog';
 import { RefundDialog, RefundDialogData, RefundDialogResult } from './refund-dialog';
 
 type StatusFilter = SaleStatus | 'all';
@@ -195,6 +196,16 @@ export class TransactionsPage {
     this.status.set('all');
     this.clearTime();
     this.clearTotal();
+  }
+
+  protected viewItems(sale: Sale): void {
+    this.dialog.open(SaleItemsDialog, {
+      width: '560px',
+      maxWidth: '95vw',
+      panelClass: 'dialog-fullscreen-mobile',
+      autoFocus: false,
+      data: sale,
+    });
   }
 
   protected confirmRefund(sale: Sale): void {
