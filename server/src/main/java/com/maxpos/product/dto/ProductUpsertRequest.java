@@ -3,12 +3,19 @@ package com.maxpos.product.dto;
 import jakarta.validation.constraints.*;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.UUID;
 
 public record ProductUpsertRequest(
         @NotBlank @Size(max = 255) String name,
         @NotBlank @Size(max = 64) String sku,
-        @Size(max = 64) String barcode,
+        /**
+         * Scan codes for this product. Empty list = no barcodes
+         * (the product can only be looked up by name/SKU). Each code
+         * is max 64 chars; the whole list is capped at 32 entries
+         * so a runaway client can't bloat the row.
+         */
+        @Size(max = 32) List<@Size(max = 64) String> barcodes,
         @NotNull @DecimalMin("0.00") BigDecimal price,
         @NotNull @DecimalMin("0.00") BigDecimal cost,
         @Min(0) int stock,

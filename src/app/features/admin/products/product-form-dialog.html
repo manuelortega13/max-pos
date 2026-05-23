@@ -112,8 +112,24 @@
       </mat-form-field>
 
       <mat-form-field appearance="outline" class="form-dialog__grow">
-        <mat-label>Barcode</mat-label>
-        <input matInput formControlName="barcode" autocomplete="off" />
+        <mat-label>Barcodes</mat-label>
+        <mat-chip-grid #barcodeGrid aria-label="Scan codes for this product">
+          @for (code of barcodes(); track code) {
+            <mat-chip-row (removed)="removeBarcode(code)">
+              {{ code }}
+              <button matChipRemove [attr.aria-label]="'Remove ' + code">
+                <mat-icon>cancel</mat-icon>
+              </button>
+            </mat-chip-row>
+          }
+          <input
+            [matChipInputFor]="barcodeGrid"
+            [matChipInputAddOnBlur]="true"
+            (matChipInputTokenEnd)="onBarcodeAdd($event)"
+            placeholder="Type code, press Enter"
+            autocomplete="off"
+          />
+        </mat-chip-grid>
         @if (cameraSupported) {
           <button
             matSuffix
@@ -126,7 +142,7 @@
             <mat-icon>photo_camera</mat-icon>
           </button>
         }
-        <mat-hint>Optional</mat-hint>
+        <mat-hint>Enter or comma to add another. Scan with the camera if you'd rather.</mat-hint>
       </mat-form-field>
     </div>
 

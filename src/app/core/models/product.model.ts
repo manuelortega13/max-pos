@@ -2,7 +2,12 @@ export interface Product {
   readonly id: string;
   name: string;
   sku: string;
-  barcode: string | null;
+  /**
+   * Scan codes that resolve to this product. Zero or more — most have
+   * one, some have several (multi-supplier SKUs, inner-pack vs outer-
+   * pack codes, etc.). All entries are valid scan targets.
+   */
+  barcodes: readonly string[];
   price: number;
   cost: number;
   stock: number;
@@ -17,7 +22,7 @@ export interface Product {
 export interface ProductUpsertRequest {
   name: string;
   sku: string;
-  barcode: string | null;
+  barcodes: string[];
   price: number;
   cost: number;
   stock: number;

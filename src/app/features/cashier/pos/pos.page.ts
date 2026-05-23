@@ -130,7 +130,7 @@ export class PosPage implements AfterViewInit, OnDestroy {
       if (!term) return true;
       return (
         product.name.toLowerCase().includes(term) ||
-        (product.barcode?.includes(term) ?? false) ||
+        product.barcodes.some((b) => b.includes(term)) ||
         product.sku.toLowerCase().includes(term)
       );
     });
@@ -324,11 +324,13 @@ export class PosPage implements AfterViewInit, OnDestroy {
     queueMicrotask(() => this.searchInputRef()?.nativeElement.focus());
   }
 
-  /** Exact (case-sensitive) barcode match across active products. */
+  /** Exact (case-sensitive) barcode match across active products.
+   *  Returns the first product whose `barcodes` list contains the
+   *  exact term — supports a product carrying multiple scan codes. */
   private findByExactBarcode(term: string): Product | undefined {
     return this.productService
       .activeProducts()
-      .find((p) => p.barcode === term);
+      .find((p) => p.barcodes.includes(term));
   }
 
   /**

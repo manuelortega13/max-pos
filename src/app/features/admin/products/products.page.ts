@@ -72,7 +72,7 @@ export class ProductsPage {
       return (
         product.name.toLowerCase().includes(term) ||
         product.sku.toLowerCase().includes(term) ||
-        (product.barcode?.includes(term) ?? false)
+        product.barcodes.some((b) => b.includes(term))
       );
     });
   });

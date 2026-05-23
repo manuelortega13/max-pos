@@ -11,6 +11,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
+import { MatChipsModule, MatChipInputEvent } from '@angular/material/chips';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
@@ -40,6 +41,7 @@ const SKU_PATTERN = /^([A-Z]+)-?(\d+)$/;
     ReactiveFormsModule,
     MatDialogModule,
     MatButtonModule,
+    MatChipsModule,
     MatFormFieldModule,
     MatIconModule,
     MatInputModule,
@@ -73,10 +75,17 @@ export class ProductFormDialog {
   protected readonly error = signal<string | null>(null);
   protected readonly imageUrl = signal<string | null>(null);
 
+  /**
+   * Editable list of scan codes. Held outside the reactive form
+   * because mat-chip-grid doesn't bind cleanly to a FormControl
+   * holding an array — the chip events update this signal directly,
+   * and submit() reads it back into the upsert request.
+   */
+  protected readonly barcodes = signal<string[]>([]);
+
   protected readonly form = this.fb.nonNullable.group({
     name: ['', [Validators.required, Validators.maxLength(255)]],
     sku: ['', [Validators.required, Validators.maxLength(64)]],
-    barcode: ['', [Validators.maxLength(64)]],
     cost: [0, [Validators.required, Validators.min(0)]],
     markup: [0, [Validators.min(-100)]],
     price: [0, [Validators.required, Validators.min(0)]],
@@ -141,16 +150,34 @@ export class ProductFormDialog {
   }
 
   /**
-   * Open the camera scanner and, on a successful read, write the decoded
-   * string into the Barcode form control. No product lookup here — the
-   * admin is defining what this product's barcode is.
+   * Open the camera scanner and, on a successful read, append the
+   * decoded string to the barcodes list. No product lookup — the
+   * admin is defining what scans should map to this product.
    */
   protected async scanBarcode(): Promise<void> {
     const code = await this.scanner.scan();
     if (!code) return;
-    this.form.controls.barcode.setValue(code);
-    this.form.controls.barcode.markAsDirty();
+    this.addBarcode(code);
     this.snackBar.open(`Scanned ${code}`, 'Dismiss', { duration: 1500 });
+  }
+
+  /** Chip input handler — fires on Enter / comma / blur. Adds the
+   *  typed code if it isn't blank or already in the list, then
+   *  clears the input so the admin can immediately type the next. */
+  protected onBarcodeAdd(event: MatChipInputEvent): void {
+    const code = event.value.trim();
+    if (code) this.addBarcode(code);
+    event.chipInput.clear();
+  }
+
+  protected removeBarcode(code: string): void {
+    this.barcodes.update((list) => list.filter((c) => c !== code));
+  }
+
+  private addBarcode(code: string): void {
+    const trimmed = code.trim();
+    if (!trimmed) return;
+    this.barcodes.update((list) => (list.includes(trimmed) ? list : [...list, trimmed]));
   }
 
   protected submit(): void {
@@ -166,7 +193,7 @@ export class ProductFormDialog {
     const request: ProductUpsertRequest = {
       name: raw.name,
       sku: raw.sku,
-      barcode: raw.barcode.trim() === '' ? null : raw.barcode.trim(),
+      barcodes: this.barcodes(),
       price: raw.price,
       cost: raw.cost,
       stock: raw.stock,
@@ -201,7 +228,6 @@ export class ProductFormDialog {
     this.form.patchValue({
       name: this.data.mode === 'duplicate' ? `${p.name} (copy)` : p.name,
       sku: this.data.mode === 'duplicate' ? '' : p.sku,
-      barcode: this.data.mode === 'duplicate' ? '' : (p.barcode ?? ''),
       price: p.price,
       cost: p.cost,
       stock: this.data.mode === 'duplicate' ? 0 : p.stock,
@@ -210,6 +236,9 @@ export class ProductFormDialog {
       description: p.description ?? '',
       active: p.active,
     });
+    // Duplicating mints a fresh product — barcodes are globally
+    // UNIQUE, so we can't carry the source's codes across.
+    this.barcodes.set(this.data.mode === 'duplicate' ? [] : [...p.barcodes]);
     // Derive markup from existing cost/price.
     this.form.controls.markup.setValue(this.deriveMarkup(p.cost, p.price), {
       emitEvent: false,

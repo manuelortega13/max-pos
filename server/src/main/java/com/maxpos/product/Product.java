@@ -6,6 +6,8 @@ import org.hibernate.annotations.Formula;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -22,8 +24,14 @@ public class Product {
     @Column(nullable = false, unique = true, length = 64)
     private String sku;
 
-    @Column(unique = true, length = 64)
-    private String barcode;
+    /**
+     * Scan codes that resolve to this product. Many-to-one from the
+     * codes' side; here they're loaded eagerly because the codes are
+     * tiny (length 64 each, typically 1–3 per product) and every
+     * place that reads a product to render it also wants the codes.
+     */
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+    private List<ProductBarcode> barcodes = new ArrayList<>();
 
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal price;
@@ -79,8 +87,14 @@ public class Product {
     public void setName(String name) { this.name = name; }
     public String getSku() { return sku; }
     public void setSku(String sku) { this.sku = sku; }
-    public String getBarcode() { return barcode; }
-    public void setBarcode(String barcode) { this.barcode = barcode; }
+    public List<ProductBarcode> getBarcodes() { return barcodes; }
+    /** Convenience adder that wires the back-reference. */
+    public void addBarcode(String code) {
+        ProductBarcode b = new ProductBarcode();
+        b.setProduct(this);
+        b.setCode(code);
+        barcodes.add(b);
+    }
     public BigDecimal getPrice() { return price; }
     public void setPrice(BigDecimal price) { this.price = price; }
     public BigDecimal getCost() { return cost; }

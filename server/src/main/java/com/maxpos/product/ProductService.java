@@ -36,6 +36,7 @@ public class ProductService {
 
     private final ProductRepository products;
     private final ProductBatchRepository batches;
+    private final ProductBarcodeRepository productBarcodes;
     private final CategoryRepository categories;
     private final NotificationPublisher notifications;
     private final SaleItemRepository saleItems;
@@ -45,11 +46,13 @@ public class ProductService {
 
     public ProductService(ProductRepository products,
                           ProductBatchRepository batches,
+                          ProductBarcodeRepository productBarcodes,
                           CategoryRepository categories,
                           NotificationPublisher notifications,
                           SaleItemRepository saleItems) {
         this.products = products;
         this.batches = batches;
+        this.productBarcodes = productBarcodes;
         this.categories = categories;
         this.notifications = notifications;
         this.saleItems = saleItems;
@@ -91,10 +94,7 @@ public class ProductService {
         if (products.existsBySkuIgnoreCase(req.sku())) {
             throw new ConflictException("SKU already exists");
         }
-        if (req.barcode() != null && !req.barcode().isBlank()
-                && products.existsByBarcode(req.barcode())) {
-            throw new ConflictException("Barcode already exists");
-        }
+        rejectDuplicateBarcodes(req, /* existingProductId */ null);
         Category category = categories.findById(req.categoryId())
                 .orElseThrow(() -> new NotFoundException("Category not found"));
 
@@ -120,6 +120,7 @@ public class ProductService {
     public ProductDto update(UUID id, ProductUpsertRequest req) {
         Product p = products.findById(id)
                 .orElseThrow(() -> new NotFoundException("Product not found"));
+        rejectDuplicateBarcodes(req, id);
         Category category = categories.findById(req.categoryId())
                 .orElseThrow(() -> new NotFoundException("Category not found"));
         apply(p, req, category);
@@ -275,7 +276,6 @@ public class ProductService {
     private void apply(Product p, ProductUpsertRequest req, Category category) {
         p.setName(req.name());
         p.setSku(req.sku());
-        p.setBarcode(req.barcode() == null || req.barcode().isBlank() ? null : req.barcode());
         p.setPrice(req.price());
         p.setCost(req.cost());
         p.setCategory(category);
@@ -283,5 +283,57 @@ public class ProductService {
         p.setImageUrl(req.imageUrl());
         p.setDescription(req.description());
         p.setActive(req.active());
+        syncBarcodes(p, normalizeBarcodes(req.barcodes()));
+    }
+
+    /**
+     * Clean + de-dup the incoming barcode list. Trim each entry, drop
+     * blanks, drop duplicates *within the request* (case-sensitive,
+     * since barcodes are typically numeric). Order is preserved.
+     */
+    private List<String> normalizeBarcodes(List<String> raw) {
+        if (raw == null || raw.isEmpty()) return List.of();
+        var seen = new java.util.LinkedHashSet<String>();
+        for (String code : raw) {
+            if (code == null) continue;
+            String trimmed = code.trim();
+            if (trimmed.isEmpty()) continue;
+            seen.add(trimmed);
+        }
+        return List.copyOf(seen);
+    }
+
+    /**
+     * Replace the product's barcode list to match the request. Codes
+     * not in the new list are detached (orphan-removed); new codes
+     * are added with the back-reference wired. Existing codes that
+     * appear in both stay untouched so their `created_at` survives.
+     */
+    private void syncBarcodes(Product p, List<String> desired) {
+        // Remove codes no longer in the desired set.
+        p.getBarcodes().removeIf(b -> !desired.contains(b.getCode()));
+        // Add any codes the product doesn't already carry.
+        var existing = p.getBarcodes().stream().map(ProductBarcode::getCode).toList();
+        for (String code : desired) {
+            if (!existing.contains(code)) p.addBarcode(code);
+        }
+    }
+
+    /**
+     * Pre-check the request's barcodes against the live product_barcodes
+     * table so we can return a clean 409 instead of letting the DB throw
+     * a constraint violation. Skips codes already owned by the product
+     * being updated (so re-saving the same product with unchanged
+     * codes doesn't trip on itself).
+     */
+    private void rejectDuplicateBarcodes(ProductUpsertRequest req, UUID existingProductId) {
+        for (String code : normalizeBarcodes(req.barcodes())) {
+            var owner = productBarcodes.findByCode(code);
+            if (owner.isPresent() && !owner.get().getProduct().getId().equals(existingProductId)) {
+                throw new ConflictException(
+                        "Barcode \"" + code + "\" already belongs to "
+                        + owner.get().getProduct().getName() + ".");
+            }
+        }
     }
 }

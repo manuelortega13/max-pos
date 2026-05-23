@@ -91,7 +91,7 @@ export class InventoryPage {
         const hit =
           p.name.toLowerCase().includes(term) ||
           p.sku.toLowerCase().includes(term) ||
-          (p.barcode?.toLowerCase().includes(term) ?? false);
+          p.barcodes.some((b) => b.toLowerCase().includes(term));
         if (!hit) return false;
       }
       switch (stock) {
