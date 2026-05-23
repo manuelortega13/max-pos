@@ -103,4 +103,17 @@
     outline: 2px solid var(--mat-sys-primary);
     outline-offset: 2px;
   }
+
+  /* Variant for the Sale # column — left-aligned (no left padding
+     until hover), square-ish corners, same hover treatment so the
+     affordance still reads as "this is a button". */
+  &--ref {
+    padding-left: 0;
+    padding-right: 0.55rem;
+    border-radius: 0.5rem;
+
+    &:hover {
+      padding-left: 0.55rem;
+    }
+  }
 }

@@ -69,7 +69,16 @@
         <table mat-table [dataSource]="rows()" class="w-full">
           <ng-container matColumnDef="id">
             <th mat-header-cell *matHeaderCellDef>Sale #</th>
-            <td mat-cell *matCellDef="let s"><strong>{{ s.reference }}</strong></td>
+            <td mat-cell *matCellDef="let s">
+              <button
+                type="button"
+                class="items-link items-link--ref"
+                (click)="viewItems(s)"
+                [attr.aria-label]="'View items in sale ' + s.reference"
+              >
+                {{ s.reference }}
+              </button>
+            </td>
           </ng-container>
           <ng-container matColumnDef="date">
             <th mat-header-cell *matHeaderCellDef>Date</th>

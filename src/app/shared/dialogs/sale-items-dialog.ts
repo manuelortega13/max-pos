@@ -133,15 +133,23 @@ import { MoneyPipe } from '../pipes/currency-symbol.pipe';
       .items__title {
         display: flex;
         align-items: center;
-        gap: 0.6rem;
+        gap: 0.75rem;
         margin: 0;
-        font-size: 1.1rem;
+        font-size: 1.05rem;
+        min-width: 0;
       }
       .items__title-text {
         flex: 1;
+        min-width: 0;
         display: flex;
         flex-direction: column;
         line-height: 1.25;
+        gap: 0.15rem;
+        /* Long references shrink + ellipsize instead of wrapping into a
+           second row that crowds the top corner. */
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
 
         small {
           font-size: 0.8rem;

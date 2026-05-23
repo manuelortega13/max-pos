@@ -292,6 +292,25 @@ mat-icon {
 }
 
 /* ──────────────────────────────────────────────────────────────────
+   SaleItemsDialog spacing — opened from admin Sales and cashier My
+   Transactions to view a sale's line items. Material's default
+   dialog padding (6px top on title, 0 vertical on content) leaves
+   the receipt_long icon and the status chip pressed against the 28px
+   rounded corners. Use a slightly larger gutter so the inner content
+   sits comfortably inside the curve.
+   ────────────────────────────────────────────────────────────────── */
+.sale-items-panel .mat-mdc-dialog-title {
+  padding: 1.25rem 1.75rem 0.5rem;
+}
+.sale-items-panel .mat-mdc-dialog-content {
+  padding: 0.5rem 1.75rem 1rem;
+}
+.sale-items-panel .mat-mdc-dialog-actions {
+  padding: 0.75rem 1.75rem 1.25rem;
+  gap: 0.5rem;
+}
+
+/* ──────────────────────────────────────────────────────────────────
    Mobile full-screen dialogs.
    Any dialog opened with panelClass containing "dialog-fullscreen-mobile"
    expands to fill the viewport below 640px. Above that the class is a

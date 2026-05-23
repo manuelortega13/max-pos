@@ -277,4 +277,14 @@
     outline: 2px solid var(--mat-sys-primary);
     outline-offset: 2px;
   }
+
+  &--ref {
+    padding-left: 0;
+    padding-right: 0.55rem;
+    border-radius: 0.5rem;
+
+    &:hover {
+      padding-left: 0.55rem;
+    }
+  }
 }

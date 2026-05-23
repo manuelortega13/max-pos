@@ -202,7 +202,7 @@ export class TransactionsPage {
     this.dialog.open(SaleItemsDialog, {
       width: '560px',
       maxWidth: '95vw',
-      panelClass: 'dialog-fullscreen-mobile',
+      panelClass: ['sale-items-panel', 'dialog-fullscreen-mobile'],
       autoFocus: false,
       data: sale,
     });
