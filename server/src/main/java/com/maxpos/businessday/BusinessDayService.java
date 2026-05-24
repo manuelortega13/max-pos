@@ -93,16 +93,19 @@ public class BusinessDayService {
         int salesCount = 0;
         int itemsSold = 0;
 
+        // Gross accounting: every sale that rang up during the day
+        // counts toward the sales totals — refunds are reported as a
+        // separate offsetting line. This matches the physical cash-
+        // drawer flow: cash came IN when the sale rang, then went OUT
+        // when the refund was issued, so both events must be counted.
+        // Earlier draft skipped refunded sales from cashSales but still
+        // added their amount to cashRefunds, producing a negative
+        // expectedCash whenever refunds exceeded same-day completed
+        // cash sales (e.g. 3 cash sales, 2 refunded later that day).
         for (Sale s : windowSales) {
             BigDecimal t = s.getTotal();
-            if (s.getStatus() == SaleStatus.REFUNDED) {
-                totalRefunds = totalRefunds.add(t);
-                if (s.getPaymentMethod() == PaymentMethod.CASH) {
-                    cashRefunds = cashRefunds.add(t);
-                }
-                continue;
-            }
-            // COMPLETED (and any future PENDING) counts toward sales.
+            boolean refunded = s.getStatus() == SaleStatus.REFUNDED;
+
             totalSales = totalSales.add(t);
             salesCount++;
             itemsSold += s.getItems().stream().mapToInt(i -> i.getQuantity()).sum();
@@ -110,6 +113,16 @@ public class BusinessDayService {
                 case CASH -> cashSales = cashSales.add(t);
                 case CARD -> cardSales = cardSales.add(t);
                 case TRANSFER -> transferSales = transferSales.add(t);
+            }
+            if (refunded) {
+                totalRefunds = totalRefunds.add(t);
+                // Card / transfer refunds don't touch the cash drawer
+                // (the customer's bank pulls the money back out of the
+                // settlement account), so they don't enter the cash
+                // reconciliation math.
+                if (s.getPaymentMethod() == PaymentMethod.CASH) {
+                    cashRefunds = cashRefunds.add(t);
+                }
             }
         }
 

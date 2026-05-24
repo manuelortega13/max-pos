@@ -83,13 +83,15 @@ export class EndOfDayPage implements OnInit {
       totalRefunds = 0,
       salesCount = 0,
       itemsSold = 0;
+    // Gross accounting — must mirror BusinessDayService.close on the
+    // backend. Every sale counts toward the sales totals; refunds are
+    // a separate offsetting line. Skipping refunded sales from
+    // cashSales would produce a negative expectedCash whenever
+    // same-day refunds exceeded same-day completed cash sales (e.g.
+    // 3 cash sales, 2 of which got refunded later in the day).
     for (const s of this.saleService.sales()) {
       if (Date.parse(s.date) < openedAt) continue;
-      if (s.status === 'REFUNDED') {
-        totalRefunds += s.total;
-        if (s.paymentMethod === 'CASH') cashRefunds += s.total;
-        continue;
-      }
+      const refunded = s.status === 'REFUNDED';
       totalSales += s.total;
       salesCount++;
       itemsSold += s.items.reduce((n, i) => n + i.quantity, 0);
@@ -103,6 +105,12 @@ export class EndOfDayPage implements OnInit {
         case 'TRANSFER':
           transferSales += s.total;
           break;
+      }
+      if (refunded) {
+        totalRefunds += s.total;
+        // Only cash refunds affect the drawer; card/transfer refunds
+        // flow back through the customer's bank, not the till.
+        if (s.paymentMethod === 'CASH') cashRefunds += s.total;
       }
     }
     return { cashSales, cashRefunds, cardSales, transferSales, totalSales, totalRefunds, salesCount, itemsSold };
