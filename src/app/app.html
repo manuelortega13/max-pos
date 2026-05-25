@@ -1,1 +1,14 @@
 <router-outlet></router-outlet>
+
+@if (updateReady()) {
+  <button
+    type="button"
+    class="app-update-banner"
+    (click)="applyUpdate()"
+    aria-label="Reload to apply update"
+  >
+    <span class="app-update-banner__dot" aria-hidden="true"></span>
+    <span class="app-update-banner__text">App update available</span>
+    <span class="app-update-banner__cta">Reload</span>
+  </button>
+}

@@ -29,7 +29,7 @@
   ],
   "dataGroups": [
     {
-      "name": "api-stable",
+      "name": "api-data",
       "urls": [
         "/api/products/**",
         "/api/products",
@@ -38,18 +38,7 @@
         "/api/settings/**",
         "/api/settings",
         "/api/users/**",
-        "/api/users"
-      ],
-      "cacheConfig": {
-        "strategy": "performance",
-        "maxSize": 500,
-        "maxAge": "30d",
-        "timeout": "3s"
-      }
-    },
-    {
-      "name": "api-fresh",
-      "urls": [
+        "/api/users",
         "/api/sales/**",
         "/api/sales",
         "/api/business-days/**",
