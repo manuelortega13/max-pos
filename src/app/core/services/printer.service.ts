@@ -1,12 +1,28 @@
 import { DOCUMENT } from '@angular/common';
 import { Injectable, effect, inject, signal } from '@angular/core';
-import { BusinessDay } from '../models';
+import { BusinessDay, CreditorPayment } from '../models';
 
 export type PaperSize = '58mm' | '80mm' | 'a4';
 
 /** Structured Z-report sent to the local print helper. The helper renders
  *  a payment-method breakdown + cash drawer reconciliation; the browser
  *  fallback renders an equivalent .print-receipt DOM and calls window.print(). */
+/** Structured credit-payment receipt sent to the local print helper.
+ *  Browser fallback renders the equivalent DOM via .print-receipt
+ *  and calls window.print(). */
+export interface CreditPaymentReceiptPayload {
+  storeName: string;
+  address: string;
+  phone: string;
+  footer: string;
+  currencySymbol: string;
+  payment: CreditorPayment;
+  /** Outstanding balance before this payment. */
+  balanceBefore: number;
+  /** Outstanding balance after this payment. */
+  balanceAfter: number;
+}
+
 export interface ZReportPayload {
   storeName: string;
   address: string;
@@ -230,6 +246,21 @@ export class PrinterService {
    * content — the cashier sees Chrome's preview but the report still
    * lands on paper.
    */
+  /**
+   * Print a credit-payment receipt. Helper-first (silent ESC/POS)
+   * with a browser-print fallback so registers without the helper
+   * still produce paper. Failure on either path snackbars upstream;
+   * here we just log and move on.
+   */
+  async printCreditPayment(payload: CreditPaymentReceiptPayload): Promise<void> {
+    if (this._helperEnabled() && this._helperUrl()) {
+      const ok = await this.postToHelper('/print-credit-payment', payload);
+      if (ok) return;
+      console.warn('[printer] helper unreachable for credit payment — falling back to browser');
+    }
+    this.printCreditPaymentBrowser(payload);
+  }
+
   async printZReport(payload: ZReportPayload): Promise<void> {
     if (this._helperEnabled() && this._helperUrl()) {
       const ok = await this.postToHelper('/print-zreport', payload);
@@ -277,6 +308,59 @@ export class PrinterService {
 
   private joinUrl(base: string, path: string): string {
     return base.replace(/\/$/, '') + path;
+  }
+
+  /** Browser fallback for {@link printCreditPayment}. */
+  private printCreditPaymentBrowser(payload: CreditPaymentReceiptPayload): void {
+    const win = this.document.defaultView;
+    if (!win) return;
+    const container = this.document.createElement('section');
+    container.className = 'print-receipt';
+    container.innerHTML = this.renderCreditPaymentHtml(payload);
+    this.document.body.appendChild(container);
+    try {
+      win.print();
+    } finally {
+      container.remove();
+    }
+  }
+
+  private renderCreditPaymentHtml(p: CreditPaymentReceiptPayload): string {
+    const money = (v: number | null | undefined) =>
+      `${p.currencySymbol}${Number(v ?? 0).toFixed(2)}`;
+    const esc = (s: string | null | undefined) =>
+      String(s ?? '').replace(/[&<>]/g, (c) =>
+        c === '&' ? '&amp;' : c === '<' ? '&lt;' : '&gt;',
+      );
+    const date = p.payment.date ? new Date(p.payment.date).toLocaleString() : '—';
+    return `
+      <header class="receipt__header">
+        <strong>${esc(p.storeName)}</strong>
+        ${p.address ? `<small>${esc(p.address)}</small>` : ''}
+        ${p.phone ? `<small>${esc(p.phone)}</small>` : ''}
+        <strong>CREDIT PAYMENT RECEIPT</strong>
+      </header>
+      <hr/>
+      <div class="receipt__meta">
+        <div>Ref     : ${esc(p.payment.reference)}</div>
+        <div>Date    : ${esc(date)}</div>
+        <div>From    : ${esc(p.payment.creditorName)}</div>
+        <div>Cashier : ${esc(p.payment.cashierName)}</div>
+        <div>Method  : ${esc(p.payment.paymentMethod)}</div>
+      </div>
+      <hr/>
+      <div class="receipt__row receipt__row--grand">
+        <span>Amount paid</span><span>${money(p.payment.amount)}</span>
+      </div>
+      <hr/>
+      <div class="receipt__row"><span>Balance before</span><span>${money(p.balanceBefore)}</span></div>
+      <div class="receipt__row"><span>Balance after</span><span>${money(p.balanceAfter)}</span></div>
+      ${p.payment.notes ? `<hr/><div class="receipt__notes"><strong>Notes:</strong> ${esc(p.payment.notes)}</div>` : ''}
+      <hr/>
+      <div>Received by: ____________________</div>
+      <div>Customer  : ____________________</div>
+      ${p.footer ? `<footer class="receipt__footer">${esc(p.footer).replace(/\n/g, '<br/>')}</footer>` : ''}
+    `;
   }
 
   /**
@@ -346,6 +430,7 @@ export class PrinterService {
       ${row('Cash', money(d.cashSales))}
       ${row('Card', money(d.cardSales))}
       ${row('Transfer', money(d.transferSales))}
+      ${Number(d.creditSales ?? 0) > 0 ? row('Credit', money(d.creditSales)) : ''}
       ${row('TOTAL SALES', money(d.totalSales), true)}
       ${refundsRow}
       <hr/>

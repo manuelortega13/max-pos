@@ -1,6 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { DatePipe } from '@angular/common';
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatChipsModule } from '@angular/material/chips';
@@ -10,8 +10,9 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
-import { BusinessDay } from '../../../core/models';
+import { BusinessDay, CreditorPayment } from '../../../core/models';
 import { BusinessDayService } from '../../../core/services/business-day.service';
+import { CreditorPaymentService } from '../../../core/services/creditor-payment.service';
 import { PrinterService } from '../../../core/services/printer.service';
 import { SaleService } from '../../../core/services/sale.service';
 import { SettingsService } from '../../../core/services/settings.service';
@@ -39,10 +40,18 @@ import { OpenDayDialog, OpenDayDialogResult } from './open-day-dialog';
 export class EndOfDayPage implements OnInit {
   private readonly businessDayService = inject(BusinessDayService);
   private readonly saleService = inject(SaleService);
+  private readonly paymentService = inject(CreditorPaymentService);
   private readonly settingsService = inject(SettingsService);
   private readonly printer = inject(PrinterService);
   private readonly dialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
+
+  /**
+   * Credit payments loaded for the live preview. Filtered against
+   * the current open day's businessDayId so we don't accidentally
+   * count yesterday's payments when an open day rolls over.
+   */
+  protected readonly allPayments = signal<CreditorPayment[]>([]);
 
   protected readonly currentDay = this.businessDayService.current;
   protected readonly history = this.businessDayService.history;
@@ -68,6 +77,12 @@ export class EndOfDayPage implements OnInit {
       cashRefunds: 0,
       cardSales: 0,
       transferSales: 0,
+      creditSales: 0,
+      /** Cash credit payments collected today — added to expected cash. */
+      cashCreditPayments: 0,
+      /** Total credit payments (cash + card + transfer) — shown on
+       *  the report. Card/transfer payments don't enter the till. */
+      totalCreditPayments: 0,
       totalSales: 0,
       totalRefunds: 0,
       salesCount: 0,
@@ -79,6 +94,7 @@ export class EndOfDayPage implements OnInit {
       cashRefunds = 0,
       cardSales = 0,
       transferSales = 0,
+      creditSales = 0,
       totalSales = 0,
       totalRefunds = 0,
       salesCount = 0,
@@ -105,6 +121,9 @@ export class EndOfDayPage implements OnInit {
         case 'TRANSFER':
           transferSales += s.total;
           break;
+        case 'CREDIT':
+          creditSales += s.total;
+          break;
       }
       if (refunded) {
         totalRefunds += s.total;
@@ -113,14 +132,40 @@ export class EndOfDayPage implements OnInit {
         if (s.paymentMethod === 'CASH') cashRefunds += s.total;
       }
     }
-    return { cashSales, cashRefunds, cardSales, transferSales, totalSales, totalRefunds, salesCount, itemsSold };
+
+    // Walk this day's credit payments. Voided payments are excluded
+    // from totals — they don't affect the drawer or the daily take.
+    let cashCreditPayments = 0;
+    let totalCreditPayments = 0;
+    for (const p of this.allPayments()) {
+      if (p.voidedAt !== null) continue;
+      if (p.businessDayId !== day.id) continue;
+      totalCreditPayments += p.amount;
+      if (p.paymentMethod === 'CASH') cashCreditPayments += p.amount;
+    }
+
+    return {
+      cashSales,
+      cashRefunds,
+      cardSales,
+      transferSales,
+      creditSales,
+      cashCreditPayments,
+      totalCreditPayments,
+      totalSales,
+      totalRefunds,
+      salesCount,
+      itemsSold,
+    };
   });
 
   protected readonly expectedCash = computed(() => {
     const day = this.currentDay();
     if (!day) return 0;
     const p = this.preview();
-    return day.openingFloat + p.cashSales - p.cashRefunds;
+    // float + cash in (sales + credit payments) − cash out (refunds).
+    // Card / transfer credit payments don't touch the drawer.
+    return day.openingFloat + p.cashSales + p.cashCreditPayments - p.cashRefunds;
   });
 
   protected readonly historyColumns = ['opened', 'closed', 'total', 'variance', 'closedBy'] as const;
@@ -132,6 +177,16 @@ export class EndOfDayPage implements OnInit {
     this.businessDayService.loadHistory();
     // Pull the admin sales list so the live preview has data to aggregate.
     this.saleService.load();
+    // Same for credit payments — feeds into the cash-drawer math
+    // and the "Credit payments" preview row.
+    this.paymentService.listAll().subscribe({
+      next: (list) => this.allPayments.set(list),
+      error: () => {
+        // Soft failure — preview just renders zeros. The close action
+        // re-aggregates server-side so the actual snapshot still gets
+        // the right numbers.
+      },
+    });
   }
 
   protected openDay(): void {

@@ -23,8 +23,14 @@ import { CartLine, DiscountInput, PaymentMethod, Sale } from '../../../core/mode
 import { SettingsService } from '../../../core/services/settings.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { SaleService } from '../../../core/services/sale.service';
+import { CreditorService } from '../../../core/services/creditor.service';
 import { CustomerDisplayService } from '../../../core/services/customer-display.service';
 import { PrinterService, ReceiptPayload } from '../../../core/services/printer.service';
+import { Creditor } from '../../../core/models';
+import { MatAutocompleteModule } from '@angular/material/autocomplete';
+import { ConfirmDialog } from '../../../shared/dialogs/confirm-dialog';
+import { MatDialog } from '@angular/material/dialog';
+import { firstValueFrom } from 'rxjs';
 import { MoneyPipe } from '../../../shared/pipes/currency-symbol.pipe';
 
 export interface CheckoutData {
@@ -48,6 +54,7 @@ type Step = 'payment' | 'receipt';
   imports: [
     DatePipe,
     FormsModule,
+    MatAutocompleteModule,
     MatDialogModule,
     MatButtonModule,
     MatButtonToggleModule,
@@ -68,6 +75,8 @@ export class CheckoutDialog {
   private readonly saleService = inject(SaleService);
   private readonly printerService = inject(PrinterService);
   private readonly customerDisplay = inject(CustomerDisplayService);
+  private readonly creditorService = inject(CreditorService);
+  private readonly confirmDialog = inject(MatDialog);
   protected readonly data = inject<CheckoutData>(MAT_DIALOG_DATA);
 
   protected readonly settings = this.settingsService.settings;
@@ -98,6 +107,58 @@ export class CheckoutDialog {
     return received < due;
   });
 
+  // ─────────────────────── Credit payment ──────────────────────────
+
+  /** Live query bound to the creditor autocomplete input. */
+  protected readonly creditorQuery = signal<string>('');
+  /** Picked creditor — null until the cashier confirms a selection. */
+  protected readonly selectedCreditor = signal<Creditor | null>(null);
+
+  /** Active creditors filtered by the query (name or phone substring). */
+  protected readonly creditorOptions = computed<readonly Creditor[]>(() => {
+    const q = this.creditorQuery().trim().toLowerCase();
+    const all = this.creditorService.active();
+    if (!q) return all;
+    // Already-picked: query holds the displayWith string. Show all
+    // so the cashier can re-pick easily.
+    const picked = this.selectedCreditor();
+    if (picked && this.displayCreditor(picked).toLowerCase() === q) return all;
+    return all.filter(
+      (c) =>
+        c.fullName.toLowerCase().includes(q) ||
+        c.phone.toLowerCase().includes(q),
+    );
+  });
+
+  /** Confirm button gate. CASH requires sufficient cash; CREDIT
+   *  requires a picked creditor; CARD/TRANSFER are unconditional. */
+  protected readonly canConfirm = computed(() => {
+    switch (this.paymentMethod()) {
+      case 'CASH': return !this.insufficientCash();
+      case 'CREDIT': return this.selectedCreditor() !== null;
+      default: return true;
+    }
+  });
+
+  /** mat-autocomplete displayWith — what shows in the input after pick. */
+  protected readonly displayCreditor = (c: Creditor | string | null): string => {
+    if (!c) return '';
+    if (typeof c === 'string') return c;
+    return `${c.fullName} · ${c.phone}`;
+  };
+
+  protected onCreditorPicked(c: Creditor): void {
+    this.selectedCreditor.set(c);
+    this.creditorQuery.set(this.displayCreditor(c));
+  }
+
+  /** Plain string formatter for the over-limit confirm dialog —
+   *  inline pipe in the message text doesn't work since the dialog
+   *  is opened with a literal string `message`. */
+  private formatMoney(v: number): string {
+    return `${this.settings().currencySymbol}${v.toFixed(2)}`;
+  }
+
   protected normalizeCash(): void {
     this.cashReceivedText.set(this.cashReceived().toFixed(2));
   }
@@ -126,6 +187,11 @@ export class CheckoutDialog {
   private readonly newSaleBtnRef = viewChild('newSaleBtn', { read: ElementRef });
 
   constructor() {
+    // Lazily fetch the active creditors list — the picker needs it
+    // when the cashier flips to CREDIT, and it's cheap enough to
+    // always have ready. The cashier endpoint doesn't require admin.
+    this.creditorService.loadActive();
+
     effect(() => {
       const step = this.step();
 
@@ -226,8 +292,38 @@ export class CheckoutDialog {
     };
   }
 
-  protected confirm(): void {
-    if (this.insufficientCash() || this.submitting()) return;
+  protected async confirm(): Promise<void> {
+    if (!this.canConfirm() || this.submitting()) return;
+
+    // Soft credit-limit warning. The backend doesn't enforce; we
+    // ask the cashier to confirm before posting whenever the new
+    // total would push the creditor past their limit.
+    if (this.paymentMethod() === 'CREDIT') {
+      const c = this.selectedCreditor();
+      if (c?.creditLimit != null) {
+        const projected = c.outstandingBalance + this.data.total;
+        if (projected > c.creditLimit) {
+          const proceed = await firstValueFrom(
+            this.confirmDialog
+              .open(ConfirmDialog, {
+                width: '460px',
+                data: {
+                  title: 'Over credit limit',
+                  message:
+                    `This sale puts ${c.fullName} at ${this.formatMoney(projected)}, ` +
+                    `which is over their limit of ${this.formatMoney(c.creditLimit)}. ` +
+                    `Continue anyway?`,
+                  confirmLabel: 'Continue',
+                  destructive: false,
+                  icon: 'warning',
+                },
+              })
+              .afterClosed(),
+          );
+          if (!proceed) return;
+        }
+      }
+    }
 
     this.submitting.set(true);
     this.submitError.set(null);
@@ -241,6 +337,9 @@ export class CheckoutDialog {
         })),
         paymentMethod: this.paymentMethod(),
         discount: this.data.orderDiscount ?? undefined,
+        creditorId: this.paymentMethod() === 'CREDIT'
+          ? this.selectedCreditor()?.id
+          : undefined,
       })
       .subscribe({
         next: (sale) => {

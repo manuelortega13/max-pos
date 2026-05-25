@@ -22,6 +22,8 @@ export interface BusinessDay {
   readonly cashRefunds: number | null;
   readonly cardSales: number | null;
   readonly transferSales: number | null;
+  /** Charge-on-account total. Doesn't touch the cash drawer. */
+  readonly creditSales: number | null;
   readonly salesCount: number | null;
   readonly itemsSold: number | null;
 }

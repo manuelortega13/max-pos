@@ -68,6 +68,19 @@ public class BusinessDay {
     @Column(name = "transfer_sales", precision = 12, scale = 2)
     private BigDecimal transferSales;
 
+    /** Charge-on-account sales — no money in the till, but the
+     *  day's credit volume still belongs on the Z-report. */
+    @Column(name = "credit_sales", precision = 12, scale = 2)
+    private BigDecimal creditSales;
+
+    /** Cash collected as creditor settlements during this day.
+     *  Adds to the till the same way cashSales does — included in
+     *  the expected-cash formula at close. Card / transfer credit
+     *  payments don't enter the cash reconciliation; they live at
+     *  the payment row level. */
+    @Column(name = "cash_credit_payments", precision = 12, scale = 2)
+    private BigDecimal cashCreditPayments;
+
     @Column(name = "sales_count")
     private Integer salesCount;
 
@@ -105,6 +118,10 @@ public class BusinessDay {
     public void setCardSales(BigDecimal cardSales) { this.cardSales = cardSales; }
     public BigDecimal getTransferSales() { return transferSales; }
     public void setTransferSales(BigDecimal transferSales) { this.transferSales = transferSales; }
+    public BigDecimal getCreditSales() { return creditSales; }
+    public void setCreditSales(BigDecimal creditSales) { this.creditSales = creditSales; }
+    public BigDecimal getCashCreditPayments() { return cashCreditPayments; }
+    public void setCashCreditPayments(BigDecimal cashCreditPayments) { this.cashCreditPayments = cashCreditPayments; }
     public Integer getSalesCount() { return salesCount; }
     public void setSalesCount(Integer salesCount) { this.salesCount = salesCount; }
     public Integer getItemsSold() { return itemsSold; }

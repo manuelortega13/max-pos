@@ -37,6 +37,15 @@
           <mat-icon>history</mat-icon>
           My Transactions
         </a>
+        <a
+          mat-button
+          class="cashier-shell__nav-link"
+          routerLink="credit-payment"
+          routerLinkActive="cashier-shell__nav-link--active"
+        >
+          <mat-icon>payments</mat-icon>
+          Credit Payment
+        </a>
       </nav>
     }
 
@@ -137,6 +146,14 @@
       >
         <mat-icon>history</mat-icon>
         <span>Transactions</span>
+      </a>
+      <a
+        class="cashier-shell__bottom-link"
+        routerLink="credit-payment"
+        routerLinkActive="cashier-shell__bottom-link--active"
+      >
+        <mat-icon>payments</mat-icon>
+        <span>Payment</span>
       </a>
     </nav>
   }

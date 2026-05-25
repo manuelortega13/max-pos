@@ -3,6 +3,8 @@ package com.maxpos.sale;
 import com.maxpos.businessday.BusinessDay;
 import com.maxpos.businessday.BusinessDayRepository;
 import com.maxpos.common.ConflictException;
+import com.maxpos.creditor.Creditor;
+import com.maxpos.creditor.CreditorRepository;
 import com.maxpos.common.NotFoundException;
 import com.maxpos.notification.NotificationEvent;
 import com.maxpos.notification.NotificationPublisher;
@@ -45,6 +47,7 @@ public class SaleService {
     private final StoreSettingsRepository settings;
     private final NotificationPublisher notifications;
     private final BusinessDayRepository businessDays;
+    private final CreditorRepository creditors;
 
     public SaleService(SaleRepository sales,
                        ProductRepository products,
@@ -53,7 +56,8 @@ public class SaleService {
                        UserRepository users,
                        StoreSettingsRepository settings,
                        NotificationPublisher notifications,
-                       BusinessDayRepository businessDays) {
+                       BusinessDayRepository businessDays,
+                       CreditorRepository creditors) {
         this.sales = sales;
         this.products = products;
         this.batches = batches;
@@ -62,6 +66,7 @@ public class SaleService {
         this.settings = settings;
         this.notifications = notifications;
         this.businessDays = businessDays;
+        this.creditors = creditors;
     }
 
     public List<SaleDto> list() {
@@ -119,6 +124,11 @@ public class SaleService {
                 ? req.clientRef().trim()
                 : generateReference();
 
+        // CREDIT sales must reference an active creditor; everything
+        // else must NOT carry a creditorId. Surfacing as 400 here keeps
+        // the DB-level check constraint from producing a 500.
+        Creditor creditor = resolveCreditor(req);
+
         Sale sale = new Sale();
         sale.setReference(reference);
         sale.setDate(Instant.now());
@@ -127,6 +137,7 @@ public class SaleService {
         sale.setPaymentMethod(req.paymentMethod());
         sale.setStatus(SaleStatus.COMPLETED);
         sale.setBusinessDay(openDay);
+        sale.setCreditor(creditor);
 
         BigDecimal subtotal = BigDecimal.ZERO;
 
@@ -194,6 +205,29 @@ public class SaleService {
         notifications.publishInventoryChanged();
         publishDiscountNotificationIfAny(saved, cashier);
         return SaleDto.from(saved);
+    }
+
+    /**
+     * Enforce the "payment method ↔ creditorId" symmetry from the
+     * V18 schema check. Throws a clean 400 / 409 instead of the bare
+     * DataIntegrityViolation 500 a violated constraint would produce.
+     */
+    private Creditor resolveCreditor(CreateSaleRequest req) {
+        boolean isCredit = req.paymentMethod() == PaymentMethod.CREDIT;
+        UUID id = req.creditorId();
+        if (isCredit && id == null) {
+            throw new ConflictException("Credit sales require a creditor.");
+        }
+        if (!isCredit && id != null) {
+            throw new ConflictException("Only credit sales can be linked to a creditor.");
+        }
+        if (id == null) return null;
+        Creditor c = creditors.findById(id)
+                .orElseThrow(() -> new NotFoundException("Creditor not found"));
+        if (!c.isActive()) {
+            throw new ConflictException("Creditor \"" + c.getFullName() + "\" is inactive.");
+        }
+        return c;
     }
 
     /**

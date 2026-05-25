@@ -1,0 +1,197 @@
+<section class="cp">
+  <header class="cp__page-header">
+    <div>
+      <h1 class="cp__title">Receive credit payment</h1>
+      <p class="cp__subtitle">
+        Record a creditor paying down their balance. Use the POS to ring a new
+        sale on credit instead.
+      </p>
+    </div>
+  </header>
+
+  @if (!dayOpen()) {
+    <mat-card appearance="outlined" class="cp__warning">
+      <mat-card-content>
+        <mat-icon>event_busy</mat-icon>
+        <span>The business day is closed. Open the day before recording payments.</span>
+      </mat-card-content>
+    </mat-card>
+  }
+
+  @if (receipt(); as r) {
+    <!-- ────── Success screen ────── -->
+    <mat-card appearance="outlined" class="cp__success">
+      <mat-card-content class="cp__success-content">
+        <div class="cp__success-icon" aria-hidden="true">
+          <mat-icon>check_circle</mat-icon>
+        </div>
+        <h2 class="cp__success-title">Payment recorded</h2>
+        <p class="cp__success-summary">
+          {{ r.creditorName }} paid
+          <strong>{{ r.amount | money }}</strong>
+          ({{ r.paymentMethod }}).
+        </p>
+        <dl class="cp__success-detail">
+          <div><dt>Reference</dt><dd>{{ r.reference }}</dd></div>
+          <div><dt>Cashier</dt><dd>{{ r.cashierName }}</dd></div>
+        </dl>
+        <button mat-flat-button color="primary" type="button" (click)="newPayment()">
+          <mat-icon>add</mat-icon>
+          New payment
+        </button>
+      </mat-card-content>
+    </mat-card>
+  } @else {
+    <!-- ────── Form ────── -->
+    <mat-card appearance="outlined" class="cp__step">
+      <mat-card-header>
+        <mat-card-title>1. Pick the creditor</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        <mat-form-field appearance="outline" class="cp__field">
+          <mat-label>Search by name or phone</mat-label>
+          <input
+            matInput
+            type="text"
+            autocomplete="off"
+            placeholder="Type a name or phone"
+            [value]="creditorQuery()"
+            (input)="creditorQuery.set($any($event.target).value)"
+            [matAutocomplete]="creditorAuto"
+          />
+          <mat-icon matPrefix>person_search</mat-icon>
+          @if (selectedCreditor()) {
+            <button
+              matSuffix
+              mat-icon-button
+              type="button"
+              aria-label="Clear creditor"
+              (click)="clearCreditor()"
+            >
+              <mat-icon>close</mat-icon>
+            </button>
+          }
+          <mat-autocomplete
+            #creditorAuto="matAutocomplete"
+            [displayWith]="displayCreditor"
+            (optionSelected)="onCreditorPicked($event.option.value)"
+            class="creditor-autocomplete-panel"
+          >
+            @for (c of creditorOptions(); track c.id) {
+              <mat-option [value]="c">
+                <div class="creditor-option">
+                  <span class="creditor-option__name">{{ c.fullName }}</span>
+                  <span class="creditor-option__phone">{{ c.phone }}</span>
+                  <span class="creditor-option__balance">
+                    {{ c.outstandingBalance | money }}
+                  </span>
+                </div>
+              </mat-option>
+            }
+          </mat-autocomplete>
+        </mat-form-field>
+
+        @if (selectedCreditor(); as c) {
+          <div class="cp__selected">
+            <div>
+              <small>Name</small>
+              <strong>{{ c.fullName }}</strong>
+            </div>
+            <div>
+              <small>Phone</small>
+              <strong>{{ c.phone }}</strong>
+            </div>
+            <div>
+              <small>Payment term</small>
+              <strong>{{ termLabel(c.paymentTerm) }}</strong>
+            </div>
+            <div>
+              <small>Outstanding</small>
+              <strong>{{ c.outstandingBalance | money }}</strong>
+            </div>
+          </div>
+        }
+      </mat-card-content>
+    </mat-card>
+
+    @if (selectedCreditor()) {
+      <mat-card appearance="outlined" class="cp__step">
+        <mat-card-header>
+          <mat-card-title>2. Amount &amp; method</mat-card-title>
+        </mat-card-header>
+        <mat-card-content>
+          <mat-form-field appearance="outline" class="cp__field">
+            <mat-label>Amount</mat-label>
+            <span matTextPrefix>{{ currencySymbol() }}&nbsp;</span>
+            <input
+              matInput
+              type="text"
+              inputmode="decimal"
+              [ngModel]="amountText()"
+              (ngModelChange)="amountText.set($event)"
+              (blur)="normalizeAmount()"
+              [ngModelOptions]="{ standalone: true }"
+            />
+            <span matTextSuffix>
+              &nbsp;/ {{ balance() | money }} due
+            </span>
+            @if (overBalance()) {
+              <mat-error>Amount can't exceed the outstanding balance</mat-error>
+            }
+            <mat-hint>
+              After this payment, balance will be {{ balanceAfter() | money }}.
+            </mat-hint>
+          </mat-form-field>
+
+          <div class="cp__method">
+            <label class="cp__label">Payment method</label>
+            <mat-button-toggle-group
+              [value]="paymentMethod()"
+              (change)="paymentMethod.set($event.value)"
+              name="paymentMethod"
+            >
+              <mat-button-toggle value="CASH">
+                <mat-icon>payments</mat-icon>
+                Cash
+              </mat-button-toggle>
+              <mat-button-toggle value="CARD">
+                <mat-icon>credit_card</mat-icon>
+                Card
+              </mat-button-toggle>
+              <mat-button-toggle value="TRANSFER">
+                <mat-icon>account_balance</mat-icon>
+                Transfer
+              </mat-button-toggle>
+            </mat-button-toggle-group>
+          </div>
+
+          <mat-form-field appearance="outline" class="cp__field">
+            <mat-label>Notes (optional)</mat-label>
+            <textarea
+              matInput
+              rows="2"
+              maxlength="2048"
+              placeholder="Reference number, comments, anything for the audit trail"
+              [ngModel]="notes()"
+              (ngModelChange)="notes.set($event)"
+              [ngModelOptions]="{ standalone: true }"
+            ></textarea>
+          </mat-form-field>
+
+          <div class="cp__actions">
+            <button
+              mat-flat-button
+              color="primary"
+              type="button"
+              [disabled]="!canSubmit() || submitting()"
+              (click)="submit()"
+            >
+              <mat-icon>{{ submitting() ? 'hourglass_empty' : 'check' }}</mat-icon>
+              {{ submitting() ? 'Recording…' : 'Record payment' }}
+            </button>
+          </div>
+        </mat-card-content>
+      </mat-card>
+    }
+  }
+</section>

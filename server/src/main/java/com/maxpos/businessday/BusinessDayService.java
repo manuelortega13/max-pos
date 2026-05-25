@@ -5,6 +5,8 @@ import com.maxpos.businessday.dto.CloseDayRequest;
 import com.maxpos.businessday.dto.OpenDayRequest;
 import com.maxpos.common.ConflictException;
 import com.maxpos.common.NotFoundException;
+import com.maxpos.creditor.CreditorPayment;
+import com.maxpos.creditor.CreditorPaymentRepository;
 import com.maxpos.sale.PaymentMethod;
 import com.maxpos.sale.Sale;
 import com.maxpos.sale.SaleRepository;
@@ -32,13 +34,16 @@ public class BusinessDayService {
 
     private final BusinessDayRepository days;
     private final SaleRepository sales;
+    private final CreditorPaymentRepository creditorPayments;
     private final UserRepository users;
 
     public BusinessDayService(BusinessDayRepository days,
                               SaleRepository sales,
+                              CreditorPaymentRepository creditorPayments,
                               UserRepository users) {
         this.days = days;
         this.sales = sales;
+        this.creditorPayments = creditorPayments;
         this.users = users;
     }
 
@@ -90,6 +95,8 @@ public class BusinessDayService {
         BigDecimal cashRefunds = BigDecimal.ZERO;
         BigDecimal cardSales = BigDecimal.ZERO;
         BigDecimal transferSales = BigDecimal.ZERO;
+        BigDecimal creditSales = BigDecimal.ZERO;
+        BigDecimal cashCreditPayments = BigDecimal.ZERO;
         int salesCount = 0;
         int itemsSold = 0;
 
@@ -113,6 +120,7 @@ public class BusinessDayService {
                 case CASH -> cashSales = cashSales.add(t);
                 case CARD -> cardSales = cardSales.add(t);
                 case TRANSFER -> transferSales = transferSales.add(t);
+                case CREDIT -> creditSales = creditSales.add(t);
             }
             if (refunded) {
                 totalRefunds = totalRefunds.add(t);
@@ -126,7 +134,20 @@ public class BusinessDayService {
             }
         }
 
-        BigDecimal expectedCash = d.getOpeningFloat().add(cashSales).subtract(cashRefunds);
+        // Cash credit payments add to the till — sum the day's
+        // non-voided payments. Card / transfer payments don't enter
+        // the cash drawer math, only the snapshot total per method.
+        for (CreditorPayment p : creditorPayments.findAllByBusinessDayId(d.getId())) {
+            if (p.getVoidedAt() != null) continue;
+            if (p.getPaymentMethod() == PaymentMethod.CASH) {
+                cashCreditPayments = cashCreditPayments.add(p.getAmount());
+            }
+        }
+
+        BigDecimal expectedCash = d.getOpeningFloat()
+                .add(cashSales)
+                .add(cashCreditPayments)
+                .subtract(cashRefunds);
         BigDecimal variance = req.countedCash().subtract(expectedCash);
 
         d.setClosedAt(closedAt);
@@ -141,6 +162,8 @@ public class BusinessDayService {
         d.setCashRefunds(cashRefunds);
         d.setCardSales(cardSales);
         d.setTransferSales(transferSales);
+        d.setCreditSales(creditSales);
+        d.setCashCreditPayments(cashCreditPayments);
         d.setSalesCount(salesCount);
         d.setItemsSold(itemsSold);
         return BusinessDayDto.from(d);

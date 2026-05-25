@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { DatePipe, TitleCasePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -12,8 +12,9 @@ import { MatInputModule } from '@angular/material/input';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
-import { Sale, SaleStatus } from '../../../core/models';
+import { CreditorPayment, Sale, SaleStatus } from '../../../core/models';
 import { AuthService } from '../../../core/services/auth.service';
+import { CreditorPaymentService } from '../../../core/services/creditor-payment.service';
 import { SaleService } from '../../../core/services/sale.service';
 import { SettingsService } from '../../../core/services/settings.service';
 import { MoneyPipe } from '../../../shared/pipes/currency-symbol.pipe';
@@ -42,12 +43,48 @@ type StatusFilter = SaleStatus | 'all';
   templateUrl: './transactions.page.html',
   styleUrl: './transactions.page.scss',
 })
-export class TransactionsPage {
+export class TransactionsPage implements OnInit {
   private readonly saleService = inject(SaleService);
+  private readonly paymentService = inject(CreditorPaymentService);
   private readonly authService = inject(AuthService);
   private readonly settingsService = inject(SettingsService);
   private readonly dialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
+
+  /** Credit payments the cashier recorded today. Fetched on init —
+   *  payment volume per cashier per day is small (handful of rows),
+   *  no pagination needed. */
+  protected readonly todayPayments = signal<CreditorPayment[]>([]);
+
+  protected readonly paymentColumns = [
+    'ref',
+    'date',
+    'creditor',
+    'method',
+    'amount',
+    'status',
+  ] as const;
+
+  ngOnInit(): void {
+    this.paymentService.listMine().subscribe({
+      next: (list) => {
+        const now = new Date();
+        const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+        const endOfDay = startOfDay + 86_400_000;
+        this.todayPayments.set(
+          list.filter((p) => {
+            const t = Date.parse(p.date);
+            return t >= startOfDay && t < endOfDay;
+          }),
+        );
+      },
+      error: () => {
+        // Quiet failure — payments are additive context; sales remain
+        // the primary view of "my day". A snackbar would feel like a
+        // hard error for a soft feature.
+      },
+    });
+  }
 
   protected readonly currentUser = this.authService.user;
   protected readonly currencySymbol = computed(

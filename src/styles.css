@@ -395,3 +395,32 @@ mat-icon {
     padding-right: 1rem !important;
   }
 }
+
+/* Creditor autocomplete row layout — used by the POS checkout
+   dialog AND the cashier credit-payment page. mat-autocomplete
+   renders the panel into the global CDK overlay outside any
+   component's encapsulation, so these rules have to live globally
+   instead of in a component's `::ng-deep` (which only injects when
+   that specific component is mounted). */
+.creditor-option {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  width: 100%;
+}
+.creditor-option__name {
+  font-weight: 600;
+  flex: 0 1 auto;
+}
+.creditor-option__phone {
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.9rem;
+  flex: 1 1 auto;
+}
+.creditor-option__balance {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.85rem;
+  color: var(--mat-sys-on-surface-variant);
+  flex-shrink: 0;
+}

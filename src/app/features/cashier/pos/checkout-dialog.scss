@@ -281,3 +281,9 @@ h2[mat-dialog-title] {
     margin: 0 1rem 0.5rem;
   }
 }
+
+/* (Creditor autocomplete row styles moved to global styles.css so
+   they apply on every page that hosts the picker — checkout dialog
+   AND the cashier credit-payment page. mat-autocomplete renders
+   in the global overlay so component-scoped ::ng-deep only worked
+   when the originating component was the mounted one.) */

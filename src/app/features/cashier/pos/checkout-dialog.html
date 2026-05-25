@@ -53,6 +53,10 @@
             <mat-icon>account_balance</mat-icon>
             Transfer
           </mat-button-toggle>
+          <mat-button-toggle value="CREDIT">
+            <mat-icon>account_balance_wallet</mat-icon>
+            Credit
+          </mat-button-toggle>
         </mat-button-toggle-group>
       </div>
 
@@ -78,6 +82,54 @@
           <span>Change</span>
           <strong>{{ change() | money }}</strong>
         </div>
+      } @else if (paymentMethod() === 'CREDIT') {
+        <mat-form-field appearance="outline">
+          <mat-label>Charge to creditor</mat-label>
+          <input
+            #creditorInput
+            matInput
+            type="text"
+            autocomplete="off"
+            placeholder="Search by name or phone"
+            [value]="creditorQuery()"
+            (input)="creditorQuery.set($any($event.target).value)"
+            [matAutocomplete]="creditorAuto"
+          />
+          <mat-icon matPrefix>person_search</mat-icon>
+          <mat-autocomplete
+            #creditorAuto="matAutocomplete"
+            [displayWith]="displayCreditor"
+            (optionSelected)="onCreditorPicked($event.option.value)"
+            class="creditor-autocomplete-panel"
+          >
+            @for (c of creditorOptions(); track c.id) {
+              <mat-option [value]="c">
+                <div class="creditor-option">
+                  <span class="creditor-option__name">{{ c.fullName }}</span>
+                  <span class="creditor-option__phone">{{ c.phone }}</span>
+                  <span class="creditor-option__balance">
+                    @if (c.creditLimit == null) {
+                      Balance {{ c.outstandingBalance | money }}
+                    } @else {
+                      {{ c.outstandingBalance | money }} / {{ c.creditLimit | money }}
+                    }
+                  </span>
+                </div>
+              </mat-option>
+              @if (creditorOptions().length === 0) {
+                <mat-option disabled>No active creditors found</mat-option>
+              }
+            }
+          </mat-autocomplete>
+          <mat-hint>
+            @if (selectedCreditor(); as c) {
+              {{ c.fullName }} · pays
+              {{ c.paymentTerm === 'FIFTEENTH' ? 'on the 15th' : 'end of month' }}
+            } @else {
+              Pick a creditor to enable Confirm
+            }
+          </mat-hint>
+        </mat-form-field>
       }
     </mat-dialog-content>
     @if (submitError(); as message) {
@@ -95,7 +147,7 @@
         type="submit"
         mat-flat-button
         color="primary"
-        [disabled]="insufficientCash() || submitting()"
+        [disabled]="!canConfirm() || submitting()"
       >
         <mat-icon>{{ submitting() ? 'hourglass_empty' : 'check' }}</mat-icon>
         {{ submitting() ? 'Processing…' : 'Confirm payment' }}

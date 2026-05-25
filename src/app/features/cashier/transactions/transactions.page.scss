@@ -288,3 +288,10 @@
     }
   }
 }
+
+/* Voided credit-payment rows — strikethrough so a skim of the
+   table makes it obvious which rows don't add to the day's take. */
+td.voided {
+  text-decoration: line-through;
+  color: var(--mat-sys-on-surface-variant);
+}

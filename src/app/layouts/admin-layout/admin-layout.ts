@@ -36,6 +36,7 @@ const NAV_ITEMS: readonly NavItem[] = [
   { path: 'sales', label: 'Sales', icon: 'receipt_long' },
   { path: 'users', label: 'Users', icon: 'group' },
   { path: 'reports', label: 'Reports', icon: 'bar_chart' },
+  { path: 'creditors', label: 'Creditors', icon: 'account_balance_wallet' },
   { path: 'end-of-day', label: 'End of Day', icon: 'event_busy' },
   { path: 'settings', label: 'Settings', icon: 'settings' },
 ];

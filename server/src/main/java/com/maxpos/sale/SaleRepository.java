@@ -12,5 +12,7 @@ public interface SaleRepository extends JpaRepository<Sale, UUID> {
     List<Sale> findAllByDateBetweenOrderByDateDesc(Instant start, Instant end);
     List<Sale> findAllByOrderByDateDesc();
     List<Sale> findAllByBusinessDayId(UUID businessDayId);
+    /** Drives the Creditor sales-history view in the admin Creditors page. */
+    List<Sale> findAllByCreditorIdOrderByDateDesc(UUID creditorId);
     Optional<Sale> findByReference(String reference);
 }

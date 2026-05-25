@@ -1,6 +1,7 @@
 package com.maxpos.sale;
 
 import com.maxpos.businessday.BusinessDay;
+import com.maxpos.creditor.Creditor;
 import com.maxpos.user.User;
 import jakarta.persistence.*;
 
@@ -65,6 +66,17 @@ public class Sale {
     @JoinColumn(name = "business_day_id")
     private BusinessDay businessDay;
 
+    /**
+     * Set when paymentMethod = CREDIT, null otherwise. The DB check
+     * constraint sales_credit_creditor_consistent enforces this
+     * symmetry at the storage layer; SaleService.create enforces it
+     * at the application layer so the user gets a 400 instead of a
+     * DataIntegrityViolation 500.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "creditor_id")
+    private Creditor creditor;
+
     @OneToMany(mappedBy = "sale", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<SaleItem> items = new ArrayList<>();
 
@@ -96,6 +108,8 @@ public class Sale {
     public void setRefundReason(String refundReason) { this.refundReason = refundReason; }
     public BusinessDay getBusinessDay() { return businessDay; }
     public void setBusinessDay(BusinessDay businessDay) { this.businessDay = businessDay; }
+    public Creditor getCreditor() { return creditor; }
+    public void setCreditor(Creditor creditor) { this.creditor = creditor; }
     public DiscountType getDiscountType() { return discountType; }
     public void setDiscountType(DiscountType discountType) { this.discountType = discountType; }
     public BigDecimal getDiscountValue() { return discountValue; }

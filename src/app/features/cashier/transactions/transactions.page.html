@@ -305,4 +305,70 @@
       </div>
     </mat-card-content>
   </mat-card>
+
+  <mat-card appearance="outlined">
+    <mat-card-header>
+      <mat-card-title>Credit payments today</mat-card-title>
+      <mat-card-subtitle>
+        Payments you've recorded against creditor balances during this shift.
+      </mat-card-subtitle>
+    </mat-card-header>
+    <mat-card-content>
+      <div class="table-wrap">
+        <table mat-table [dataSource]="todayPayments()" class="w-full">
+          <ng-container matColumnDef="ref">
+            <th mat-header-cell *matHeaderCellDef>Ref #</th>
+            <td mat-cell *matCellDef="let p" [class.voided]="p.voidedAt">
+              <strong>{{ p.reference }}</strong>
+            </td>
+          </ng-container>
+          <ng-container matColumnDef="date">
+            <th mat-header-cell *matHeaderCellDef>Date</th>
+            <td mat-cell *matCellDef="let p" [class.voided]="p.voidedAt">
+              {{ p.date | date: 'MMM d, y, h:mm a' }}
+            </td>
+          </ng-container>
+          <ng-container matColumnDef="creditor">
+            <th mat-header-cell *matHeaderCellDef>From</th>
+            <td mat-cell *matCellDef="let p" [class.voided]="p.voidedAt">
+              {{ p.creditorName }}
+            </td>
+          </ng-container>
+          <ng-container matColumnDef="method">
+            <th mat-header-cell *matHeaderCellDef>Method</th>
+            <td mat-cell *matCellDef="let p" [class.voided]="p.voidedAt">
+              {{ p.paymentMethod | titlecase }}
+            </td>
+          </ng-container>
+          <ng-container matColumnDef="amount">
+            <th mat-header-cell *matHeaderCellDef>Amount</th>
+            <td mat-cell *matCellDef="let p" [class.voided]="p.voidedAt">
+              <strong>{{ p.amount | money }}</strong>
+            </td>
+          </ng-container>
+          <ng-container matColumnDef="status">
+            <th mat-header-cell *matHeaderCellDef>Status</th>
+            <td mat-cell *matCellDef="let p">
+              @if (p.voidedAt) {
+                <mat-chip class="status-chip status-chip--refunded" disableRipple>
+                  Voided
+                </mat-chip>
+              } @else {
+                <mat-chip class="status-chip status-chip--completed" disableRipple>
+                  Recorded
+                </mat-chip>
+              }
+            </td>
+          </ng-container>
+          <tr mat-header-row *matHeaderRowDef="paymentColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: paymentColumns"></tr>
+          <tr *matNoDataRow>
+            <td [attr.colspan]="paymentColumns.length" class="no-data">
+              No credit payments recorded today.
+            </td>
+          </tr>
+        </table>
+      </div>
+    </mat-card-content>
+  </mat-card>
 </section>

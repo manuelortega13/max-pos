@@ -387,6 +387,9 @@ function renderZReport(d) {
   out.push(pad('Cash', money(sym, day.cashSales)) + LF);
   out.push(pad('Card', money(sym, day.cardSales)) + LF);
   out.push(pad('Transfer', money(sym, day.transferSales)) + LF);
+  if (Number(day.creditSales ?? 0) > 0) {
+    out.push(pad('Credit', money(sym, day.creditSales)) + LF);
+  }
   out.push(BOLD_ON);
   out.push(pad('TOTAL SALES', money(sym, day.totalSales)) + LF);
   out.push(BOLD_OFF);

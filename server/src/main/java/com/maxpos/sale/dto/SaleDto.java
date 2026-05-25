@@ -25,6 +25,12 @@ public record SaleDto(
         DiscountType discountType,
         BigDecimal discountValue,
         BigDecimal discountAmount,
+        /** Set only when paymentMethod = CREDIT, null otherwise. */
+        UUID creditorId,
+        /** Creditor's name at sale time. Snapshotted via the entity
+         *  relationship — if the creditor is later renamed, the
+         *  rendered name updates too. Acceptable for now. */
+        String creditorName,
         List<SaleItemDto> items
 ) {
     public static SaleDto from(Sale s) {
@@ -43,6 +49,8 @@ public record SaleDto(
                 s.getDiscountType(),
                 s.getDiscountValue(),
                 s.getDiscountAmount(),
+                s.getCreditor() != null ? s.getCreditor().getId() : null,
+                s.getCreditor() != null ? s.getCreditor().getFullName() : null,
                 s.getItems().stream().map(SaleItemDto::from).toList()
         );
     }

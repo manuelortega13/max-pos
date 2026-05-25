@@ -29,6 +29,8 @@ public record BusinessDayDto(
         BigDecimal cashRefunds,
         BigDecimal cardSales,
         BigDecimal transferSales,
+        BigDecimal creditSales,
+        BigDecimal cashCreditPayments,
         Integer salesCount,
         Integer itemsSold
 ) {
@@ -52,6 +54,8 @@ public record BusinessDayDto(
                 d.getCashRefunds(),
                 d.getCardSales(),
                 d.getTransferSales(),
+                d.getCreditSales(),
+                d.getCashCreditPayments(),
                 d.getSalesCount(),
                 d.getItemsSold()
         );

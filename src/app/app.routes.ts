@@ -66,6 +66,20 @@ export const routes: Routes = [
         title: 'Reports — MaxPOS',
       },
       {
+        path: 'creditors',
+        loadComponent: () =>
+          import('./features/admin/creditors/creditors.page').then((m) => m.CreditorsPage),
+        title: 'Creditors — MaxPOS',
+      },
+      {
+        path: 'creditors/:id',
+        loadComponent: () =>
+          import('./features/admin/creditors/creditor-detail.page').then(
+            (m) => m.CreditorDetailPage,
+          ),
+        title: 'Creditor — MaxPOS',
+      },
+      {
         path: 'end-of-day',
         loadComponent: () =>
           import('./features/admin/end-of-day/end-of-day.page').then((m) => m.EndOfDayPage),
@@ -111,6 +125,14 @@ export const routes: Routes = [
             (m) => m.TransactionsPage,
           ),
         title: 'My transactions — MaxPOS',
+      },
+      {
+        path: 'credit-payment',
+        loadComponent: () =>
+          import('./features/cashier/credit-payment/credit-payment.page').then(
+            (m) => m.CreditPaymentPage,
+          ),
+        title: 'Credit payment — MaxPOS',
       },
     ],
   },

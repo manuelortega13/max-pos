@@ -1,0 +1,177 @@
+.cdetail {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding: 1.25rem 1.5rem;
+
+  &__back {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    align-self: flex-start;
+    padding: 0.35rem 0.65rem 0.35rem 0.25rem;
+    border-radius: 999px;
+    text-decoration: none;
+    color: var(--mat-sys-on-surface-variant);
+    font-size: 0.9rem;
+    transition: background 0.12s ease;
+
+    mat-icon {
+      font-size: 1.1rem;
+      width: 1.1rem;
+      height: 1.1rem;
+    }
+
+    &:hover {
+      background: color-mix(in srgb, var(--mat-sys-on-surface) 6%, transparent);
+      color: var(--mat-sys-on-surface);
+    }
+  }
+
+  &__loading {
+    display: flex;
+    justify-content: center;
+    padding: 2.5rem;
+  }
+
+  &__error mat-card-content {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+  }
+
+  &__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  &__name {
+    margin: 0 0 0.2rem;
+    font-size: 1.85rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  &__sub {
+    margin: 0;
+    color: var(--mat-sys-on-surface-variant);
+  }
+
+  &__meta-card mat-card-content {
+    padding-top: 1rem;
+  }
+
+  &__meta {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+    gap: 0.85rem;
+
+    div {
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+      padding: 0.7rem 0.85rem;
+      border-radius: 0.65rem;
+      background: var(--mat-sys-surface-container-low);
+    }
+
+    small {
+      font-size: 0.7rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--mat-sys-on-surface-variant);
+    }
+
+    strong {
+      font-size: 1.1rem;
+      font-variant-numeric: tabular-nums;
+    }
+    .over { color: var(--mat-sys-error); }
+  }
+
+  &__table-wrap {
+    overflow-x: auto;
+  }
+
+  &__table {
+    width: 100%;
+  }
+
+  &__empty {
+    text-align: center;
+    padding: 1.5rem;
+    color: var(--mat-sys-on-surface-variant);
+  }
+}
+
+.ref-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 0.5rem;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--mat-sys-on-surface);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+
+  mat-icon {
+    font-size: 1rem;
+    width: 1rem;
+    height: 1rem;
+    color: var(--mat-sys-on-surface-variant);
+  }
+  &:hover {
+    background: var(--mat-sys-secondary-container);
+    color: var(--mat-sys-on-secondary-container);
+    border-color: var(--mat-sys-outline-variant);
+    mat-icon { color: inherit; }
+  }
+  &:focus-visible {
+    outline: 2px solid var(--mat-sys-primary);
+    outline-offset: 2px;
+  }
+}
+
+.status-chip {
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+.status-chip--active,
+.status-chip--completed {
+  background: rgba(16, 185, 129, 0.15) !important;
+  color: #047857 !important;
+}
+.status-chip--inactive {
+  background: rgba(107, 114, 128, 0.2) !important;
+  color: var(--mat-sys-on-surface-variant) !important;
+}
+.status-chip--refunded {
+  background: rgba(239, 68, 68, 0.15) !important;
+  color: #b91c1c !important;
+}
+.status-chip--pending {
+  background: rgba(245, 158, 11, 0.15) !important;
+  color: #b45309 !important;
+}
+
+/* Voided payment rows — strikethrough text + faded color so a
+   skim of the table makes clear which rows don't count toward
+   the balance. */
+.cdetail__table td.voided {
+  text-decoration: line-through;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.status-chip--voided {
+  background: rgba(239, 68, 68, 0.15) !important;
+  color: #b91c1c !important;
+  margin-left: 0.5rem;
+  font-size: 0.7rem !important;
+  font-weight: 600;
+}

@@ -1,0 +1,218 @@
+<section class="cdetail">
+  <a class="cdetail__back" routerLink="/admin/creditors">
+    <mat-icon>arrow_back</mat-icon>
+    <span>Back to creditors</span>
+  </a>
+
+  @if (loading()) {
+    <div class="cdetail__loading">
+      <mat-spinner diameter="40"></mat-spinner>
+    </div>
+  } @else if (error(); as message) {
+    <mat-card appearance="outlined" class="cdetail__error">
+      <mat-card-content>
+        <mat-icon>error_outline</mat-icon>
+        <span>{{ message }}</span>
+      </mat-card-content>
+    </mat-card>
+  } @else if (creditor(); as c) {
+    <header class="cdetail__header">
+      <div>
+        <h1 class="cdetail__name">{{ c.fullName }}</h1>
+        <p class="cdetail__sub">
+          {{ c.phone }}
+          @if (c.address) { · {{ c.address }} }
+        </p>
+      </div>
+      <mat-chip
+        class="cdetail__status status-chip"
+        [class]="'status-chip ' + (c.active ? 'status-chip--active' : 'status-chip--inactive')"
+        disableRipple
+      >
+        {{ c.active ? 'Active' : 'Inactive' }}
+      </mat-chip>
+    </header>
+
+    <mat-card appearance="outlined" class="cdetail__meta-card">
+      <mat-card-content class="cdetail__meta">
+        <div>
+          <small>Outstanding</small>
+          <strong [class.over]="overLimit()">{{ c.outstandingBalance | money }}</strong>
+        </div>
+        <div>
+          <small>Credit limit</small>
+          <strong>
+            @if (c.creditLimit == null) {
+              No limit
+            } @else {
+              {{ c.creditLimit | money }}
+            }
+          </strong>
+        </div>
+        <div>
+          <small>Payment term</small>
+          <strong>{{ termLabel(c.paymentTerm) }}</strong>
+        </div>
+        <div>
+          <small>Transactions</small>
+          <strong>{{ totalCount() }}</strong>
+        </div>
+        <div>
+          <small>Lifetime paid</small>
+          <strong>{{ lifetimePaid() | money }}</strong>
+        </div>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card appearance="outlined">
+      <mat-card-header>
+        <mat-card-title>Purchase history</mat-card-title>
+        <mat-card-subtitle>
+          Every credit sale rung up against this creditor, newest first.
+          Click a sale to see its line items.
+        </mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <div class="cdetail__table-wrap">
+          <table mat-table [dataSource]="sales()" class="cdetail__table">
+            <ng-container matColumnDef="ref">
+              <th mat-header-cell *matHeaderCellDef>Sale #</th>
+              <td mat-cell *matCellDef="let s">
+                <button
+                  type="button"
+                  class="ref-link"
+                  (click)="openItems(s)"
+                  [attr.aria-label]="'View items in ' + s.reference"
+                >
+                  {{ s.reference }}
+                </button>
+              </td>
+            </ng-container>
+
+            <ng-container matColumnDef="date">
+              <th mat-header-cell *matHeaderCellDef>Date</th>
+              <td mat-cell *matCellDef="let s">
+                {{ s.date | date: 'MMM d, y, h:mm a' }}
+              </td>
+            </ng-container>
+
+            <ng-container matColumnDef="items">
+              <th mat-header-cell *matHeaderCellDef>Items</th>
+              <td mat-cell *matCellDef="let s">
+                <button
+                  type="button"
+                  class="ref-link"
+                  (click)="openItems(s)"
+                >
+                  {{ s.items.length }}
+                  <mat-icon>visibility</mat-icon>
+                </button>
+              </td>
+            </ng-container>
+
+            <ng-container matColumnDef="total">
+              <th mat-header-cell *matHeaderCellDef>Total</th>
+              <td mat-cell *matCellDef="let s">
+                <strong>{{ s.total | money }}</strong>
+              </td>
+            </ng-container>
+
+            <ng-container matColumnDef="status">
+              <th mat-header-cell *matHeaderCellDef>Status</th>
+              <td mat-cell *matCellDef="let s">
+                <mat-chip
+                  [class]="'status-chip status-chip--' + s.status.toLowerCase()"
+                  disableRipple
+                >
+                  {{ s.status | titlecase }}
+                </mat-chip>
+              </td>
+            </ng-container>
+
+            <tr mat-header-row *matHeaderRowDef="columns"></tr>
+            <tr mat-row *matRowDef="let row; columns: columns"></tr>
+            <tr *matNoDataRow>
+              <td [attr.colspan]="columns.length" class="cdetail__empty">
+                No credit sales yet for this creditor.
+              </td>
+            </tr>
+          </table>
+        </div>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card appearance="outlined">
+      <mat-card-header>
+        <mat-card-title>Payments</mat-card-title>
+        <mat-card-subtitle>
+          Settlements recorded against this creditor's balance, newest first.
+          Voided payments stay in history with a strikethrough.
+        </mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <div class="cdetail__table-wrap">
+          <table mat-table [dataSource]="payments()" class="cdetail__table">
+            <ng-container matColumnDef="ref">
+              <th mat-header-cell *matHeaderCellDef>Ref #</th>
+              <td mat-cell *matCellDef="let p" [class.voided]="p.voidedAt">
+                {{ p.reference }}
+                @if (p.voidedAt) {
+                  <mat-chip class="status-chip status-chip--voided" disableRipple>
+                    voided
+                  </mat-chip>
+                }
+              </td>
+            </ng-container>
+            <ng-container matColumnDef="date">
+              <th mat-header-cell *matHeaderCellDef>Date</th>
+              <td mat-cell *matCellDef="let p" [class.voided]="p.voidedAt">
+                {{ p.date | date: 'MMM d, y, h:mm a' }}
+              </td>
+            </ng-container>
+            <ng-container matColumnDef="amount">
+              <th mat-header-cell *matHeaderCellDef>Amount</th>
+              <td mat-cell *matCellDef="let p" [class.voided]="p.voidedAt">
+                <strong>{{ p.amount | money }}</strong>
+              </td>
+            </ng-container>
+            <ng-container matColumnDef="method">
+              <th mat-header-cell *matHeaderCellDef>Method</th>
+              <td mat-cell *matCellDef="let p" [class.voided]="p.voidedAt">
+                {{ p.paymentMethod | titlecase }}
+              </td>
+            </ng-container>
+            <ng-container matColumnDef="cashier">
+              <th mat-header-cell *matHeaderCellDef>Cashier</th>
+              <td mat-cell *matCellDef="let p" [class.voided]="p.voidedAt">
+                {{ p.cashierName }}
+              </td>
+            </ng-container>
+            <ng-container matColumnDef="actions">
+              <th mat-header-cell *matHeaderCellDef></th>
+              <td mat-cell *matCellDef="let p">
+                @if (isAdmin() && !p.voidedAt) {
+                  <button
+                    mat-icon-button
+                    type="button"
+                    matTooltip="Void this payment"
+                    aria-label="Void payment"
+                    (click)="confirmVoid(p)"
+                  >
+                    <mat-icon>undo</mat-icon>
+                  </button>
+                }
+              </td>
+            </ng-container>
+            <tr mat-header-row *matHeaderRowDef="paymentColumns"></tr>
+            <tr mat-row *matRowDef="let row; columns: paymentColumns"></tr>
+            <tr *matNoDataRow>
+              <td [attr.colspan]="paymentColumns.length" class="cdetail__empty">
+                No payments recorded yet.
+              </td>
+            </tr>
+          </table>
+        </div>
+      </mat-card-content>
+    </mat-card>
+  }
+</section>

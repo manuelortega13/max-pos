@@ -22,6 +22,12 @@ export interface CloseDayDialogData {
   readonly cashRefunds: number;
   readonly cardSales: number;
   readonly transferSales: number;
+  readonly creditSales: number;
+  /** Cash collected as credit payments — adds to expected cash. */
+  readonly cashCreditPayments: number;
+  /** All credit payments (cash + card + transfer) — surfaced in
+   *  the summary row even though only cash hits the drawer. */
+  readonly totalCreditPayments: number;
   readonly totalSales: number;
   readonly totalRefunds: number;
   readonly salesCount: number;
@@ -65,6 +71,12 @@ export interface CloseDayDialogResult {
           <div><dt>Cash</dt><dd>{{ data.cashSales | money }}</dd></div>
           <div><dt>Card</dt><dd>{{ data.cardSales | money }}</dd></div>
           <div><dt>Transfer</dt><dd>{{ data.transferSales | money }}</dd></div>
+          @if (data.creditSales > 0) {
+            <div><dt>Credit</dt><dd>{{ data.creditSales | money }}</dd></div>
+          }
+          @if (data.totalCreditPayments > 0) {
+            <div><dt>Credit payments received</dt><dd>+{{ data.totalCreditPayments | money }}</dd></div>
+          }
           <div class="close-day__total"><dt>Total</dt><dd>{{ data.totalSales | money }}</dd></div>
           @if (data.totalRefunds > 0) {
             <div class="close-day__refund"><dt>Refunds</dt><dd>−{{ data.totalRefunds | money }}</dd></div>
@@ -79,6 +91,9 @@ export interface CloseDayDialogResult {
         <dl>
           <div><dt>Opening float</dt><dd>{{ data.openingFloat | money }}</dd></div>
           <div><dt>+ Cash sales</dt><dd>{{ data.cashSales | money }}</dd></div>
+          @if (data.cashCreditPayments > 0) {
+            <div><dt>+ Cash credit payments</dt><dd>{{ data.cashCreditPayments | money }}</dd></div>
+          }
           @if (data.cashRefunds > 0) {
             <div><dt>− Cash refunds</dt><dd>{{ data.cashRefunds | money }}</dd></div>
           }
@@ -227,7 +242,11 @@ export class CloseDayDialog {
   protected readonly notes = signal<string>('');
 
   protected readonly expected = computed(
-    () => this.data.openingFloat + this.data.cashSales - this.data.cashRefunds,
+    () =>
+      this.data.openingFloat +
+      this.data.cashSales +
+      this.data.cashCreditPayments -
+      this.data.cashRefunds,
   );
   protected readonly hasCountedCash = computed(() => {
     const c = this.counted();

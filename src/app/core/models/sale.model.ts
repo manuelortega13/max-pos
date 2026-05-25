@@ -1,4 +1,4 @@
-export type PaymentMethod = 'CASH' | 'CARD' | 'TRANSFER';
+export type PaymentMethod = 'CASH' | 'CARD' | 'TRANSFER' | 'CREDIT';
 export type SaleStatus = 'COMPLETED' | 'REFUNDED' | 'PENDING';
 
 /** % off (value is 0-100) or a flat money amount off. */
@@ -45,6 +45,9 @@ export interface Sale {
   readonly discountType: DiscountType | null;
   readonly discountValue: number | null;
   readonly discountAmount: number | null;
+  /** Set only when paymentMethod = 'CREDIT', null otherwise. */
+  readonly creditorId: string | null;
+  readonly creditorName: string | null;
   readonly items: readonly SaleItem[];
 }
 
@@ -65,4 +68,6 @@ export interface CreateSaleRequest {
   readonly clientRef?: string;
   /** Order-level discount (applied after line discounts, before tax). */
   readonly discount?: DiscountInput;
+  /** Required when paymentMethod = 'CREDIT', forbidden otherwise. */
+  readonly creditorId?: string;
 }

@@ -7,3 +7,5 @@ export * from './settings.model';
 export * from './auth.model';
 export * from './expense.model';
 export * from './business-day.model';
+export * from './creditor.model';
+export * from './creditor-payment.model';

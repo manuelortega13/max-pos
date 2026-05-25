@@ -43,6 +43,18 @@
             <small>Transfer sales</small>
             <strong>{{ preview().transferSales | money }}</strong>
           </div>
+          @if (preview().creditSales > 0) {
+            <div>
+              <small>Credit sales</small>
+              <strong>{{ preview().creditSales | money }}</strong>
+            </div>
+          }
+          @if (preview().totalCreditPayments > 0) {
+            <div>
+              <small>Credit payments</small>
+              <strong>+{{ preview().totalCreditPayments | money }}</strong>
+            </div>
+          }
           <div>
             <small>Total sales</small>
             <strong>{{ preview().totalSales | money }}</strong>

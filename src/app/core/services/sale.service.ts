@@ -306,6 +306,11 @@ export class SaleService {
       discountType: payload.discount?.type ?? null,
       discountValue: payload.discount?.value ?? null,
       discountAmount: payload.discount ? orderDiscountAmount : null,
+      creditorId: payload.creditorId ?? null,
+      // Optimistic Sale is synthesized client-side; we don't have the
+      // creditor's full name handy here. Leave null — the backend's
+      // canonical response will fill it on replay.
+      creditorName: null,
       items,
     };
   }

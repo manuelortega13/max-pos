@@ -24,7 +24,12 @@ public record CreateSaleRequest(
          */
         @Size(max = 64) String clientRef,
         /** Order-level discount, applied after line discounts and before tax. */
-        @Valid Discount discount
+        @Valid Discount discount,
+        /**
+         * Required when {@code paymentMethod = CREDIT}, forbidden otherwise.
+         * SaleService enforces the symmetry and 400s a mismatched payload.
+         */
+        UUID creditorId
 ) {
     public record Line(
             @NotNull UUID productId,
