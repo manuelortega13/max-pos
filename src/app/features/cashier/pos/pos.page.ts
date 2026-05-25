@@ -11,6 +11,7 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
+import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
@@ -27,6 +28,7 @@ import { BarcodeScannerService } from '../../../core/services/barcode-scanner.se
 import { BusinessDayService } from '../../../core/services/business-day.service';
 import { CartService } from '../../../core/services/cart.service';
 import { CustomerDisplayService } from '../../../core/services/customer-display.service';
+import { OpenDayDialog, OpenDayDialogResult } from '../../admin/end-of-day/open-day-dialog';
 import { ProductService } from '../../../core/services/product.service';
 import { SettingsService } from '../../../core/services/settings.service';
 import { CartLine, Product } from '../../../core/models';
@@ -301,6 +303,31 @@ export class PosPage implements AfterViewInit, OnDestroy {
    *  for the current cart state via BroadcastChannel. */
   protected openCustomerDisplay(): void {
     window.open('/display', 'maxpos-customer-display', 'noopener');
+  }
+
+  /**
+   * Open-Day prompt — banner retry path when the auto-prompt fired
+   * by the cashier shell on layout init was dismissed. Reuses the
+   * same dialog component so the form, validation, and confirm
+   * behaviour are identical to the auto-prompt path.
+   */
+  protected promptOpenDay(): void {
+    const ref = this.dialog.open<OpenDayDialog, void, OpenDayDialogResult>(
+      OpenDayDialog,
+      { width: '420px', panelClass: 'dialog-fullscreen-mobile', autoFocus: false },
+    );
+    ref.afterClosed().subscribe((result) => {
+      if (!result) return;
+      this.businessDayService.open({ openingFloat: result.openingFloat }).subscribe({
+        next: () =>
+          this.snackBar.open('Business day opened.', 'Dismiss', { duration: 2500 }),
+        error: (err: HttpErrorResponse) => {
+          this.snackBar.open(err.error?.message ?? 'Could not open day.', 'Dismiss', {
+            duration: 4000,
+          });
+        },
+      });
+    });
   }
 
   /**

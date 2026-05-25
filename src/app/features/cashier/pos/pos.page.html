@@ -2,10 +2,19 @@
   @if (!dayOpen()) {
     <div class="pos__day-banner" role="status" aria-live="polite">
       <mat-icon>event_busy</mat-icon>
-      <span>
-        The business day is closed. Ask an admin to open the day before ringing
-        up sales.
+      <span class="pos__day-banner-text">
+        The business day is closed. Open the day to start ringing up sales.
       </span>
+      <button
+        type="button"
+        mat-flat-button
+        color="primary"
+        class="pos__day-banner-cta"
+        (click)="promptOpenDay()"
+      >
+        <mat-icon>event_available</mat-icon>
+        Open day
+      </button>
     </div>
   }
   <section class="pos__catalog">

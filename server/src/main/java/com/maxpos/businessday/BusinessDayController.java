@@ -46,8 +46,14 @@ public class BusinessDayController {
         return service.get(id);
     }
 
+    /**
+     * Open the business day. Any authenticated user can do this so a
+     * cashier who finds the day closed at shift start can open it
+     * themselves without needing an admin to walk over. Closing
+     * remains admin-only (it freezes the snapshot + variance and is
+     * the right scope for an explicit manager sign-off).
+     */
     @PostMapping("/open")
-    @PreAuthorize("hasRole('ADMIN')")
     @ResponseStatus(HttpStatus.CREATED)
     public BusinessDayDto open(@Valid @RequestBody OpenDayRequest req,
                                @AuthenticationPrincipal AppUserDetails principal) {

@@ -1,16 +1,20 @@
+import { HttpErrorResponse } from '@angular/common/http';
 import { TitleCasePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, HostListener, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatButtonModule } from '@angular/material/button';
+import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatBadgeModule } from '@angular/material/badge';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatDividerModule } from '@angular/material/divider';
 import { BreakpointObserver, Breakpoints } from '@angular/cdk/layout';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { filter, map, startWith } from 'rxjs';
+import { OpenDayDialog, OpenDayDialogResult } from '../../features/admin/end-of-day/open-day-dialog';
 import { AuthService } from '../../core/services/auth.service';
 import { BusinessDayService } from '../../core/services/business-day.service';
 import { CartService } from '../../core/services/cart.service';
@@ -52,7 +56,12 @@ export class CashierLayout implements OnInit, OnDestroy {
   private readonly refreshService = inject(RefreshService);
   private readonly printerService = inject(PrinterService);
   private readonly businessDayService = inject(BusinessDayService);
+  private readonly dialog = inject(MatDialog);
+  private readonly snackBar = inject(MatSnackBar);
   protected readonly refreshing = signal(false);
+  /** Latch so we don't re-prompt the cashier inside a single layout
+   *  lifecycle if they dismiss the auto-shown open-day dialog. */
+  private openDayPromptShown = false;
 
   protected readonly currentUser = this.authService.user;
   protected readonly offlineSession = this.authService.offlineSession;
@@ -130,7 +139,14 @@ export class CashierLayout implements OnInit, OnDestroy {
     this.sync.start();
     // Cache the current open business day so the POS page can gate
     // checkout and the toolbar can show open/closed state.
-    this.businessDayService.refreshCurrent().subscribe();
+    // After refreshing, if no day is open auto-prompt the cashier to
+    // open it. Cashiers used to need an admin to walk over and do
+    // this; now any logged-in user can open the day with just the
+    // opening float. They can still dismiss the dialog and re-trigger
+    // from the POS "Open day" banner button.
+    this.businessDayService.refreshCurrent().subscribe((day) => {
+      if (!day && !this.openDayPromptShown) this.promptOpenDay();
+    });
   }
 
   ngOnDestroy(): void {
@@ -140,6 +156,38 @@ export class CashierLayout implements OnInit, OnDestroy {
 
   protected retrySync(): void {
     void this.sync.retryNow();
+  }
+
+  /**
+   * Show the open-day dialog and, on confirm, POST to the backend.
+   * Public so the POS page can ping us via the cashier shell (router
+   * outlet child) — but practically used by ngOnInit too.
+   */
+  promptOpenDay(): void {
+    if (this.openDayPromptShown) return;
+    this.openDayPromptShown = true;
+    const ref = this.dialog.open<OpenDayDialog, void, OpenDayDialogResult>(
+      OpenDayDialog,
+      { width: '420px', panelClass: 'dialog-fullscreen-mobile', autoFocus: false },
+    );
+    ref.afterClosed().subscribe((result) => {
+      if (!result) {
+        // Dismissed without confirming — allow re-prompt if the
+        // cashier reloads or hits the banner button.
+        this.openDayPromptShown = false;
+        return;
+      }
+      this.businessDayService.open({ openingFloat: result.openingFloat }).subscribe({
+        next: () =>
+          this.snackBar.open('Business day opened.', 'Dismiss', { duration: 2500 }),
+        error: (err: HttpErrorResponse) => {
+          this.openDayPromptShown = false;
+          this.snackBar.open(err.error?.message ?? 'Could not open day.', 'Dismiss', {
+            duration: 4000,
+          });
+        },
+      });
+    });
   }
 
   protected async onPullRefresh(): Promise<void> {
