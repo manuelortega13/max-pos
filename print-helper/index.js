@@ -390,6 +390,12 @@ function renderZReport(d) {
   if (Number(day.creditSales ?? 0) > 0) {
     out.push(pad('Credit', money(sym, day.creditSales)) + LF);
   }
+  if (Number(day.gcashCashInAmount ?? 0) > 0 || Number(day.gcashCashOutAmount ?? 0) > 0) {
+    out.push(pad('GCash cash-in', money(sym, day.gcashCashInAmount)) + LF);
+    out.push(pad('GCash cash-out', money(sym, day.gcashCashOutAmount)) + LF);
+    const totalFees = Number(day.gcashCashInFees ?? 0) + Number(day.gcashCashOutFees ?? 0);
+    if (totalFees > 0) out.push(pad('GCash fees', money(sym, totalFees)) + LF);
+  }
   out.push(BOLD_ON);
   out.push(pad('TOTAL SALES', money(sym, day.totalSales)) + LF);
   out.push(BOLD_OFF);
@@ -402,6 +408,21 @@ function renderZReport(d) {
   out.push(BOLD_ON, 'CASH DRAWER' + LF, BOLD_OFF);
   out.push(pad('Opening float', money(sym, day.openingFloat)) + LF);
   out.push(pad('+ Cash sales', money(sym, day.cashSales)) + LF);
+  if (Number(day.cashCreditPayments ?? 0) > 0) {
+    out.push(pad('+ Credit pay (cash)', money(sym, day.cashCreditPayments)) + LF);
+  }
+  if (Number(day.gcashCashInAmount ?? 0) > 0) {
+    out.push(pad('+ GCash cash-in', money(sym, day.gcashCashInAmount)) + LF);
+  }
+  if (Number(day.gcashCashInFees ?? 0) > 0) {
+    out.push(pad('+ GCash in fees', money(sym, day.gcashCashInFees)) + LF);
+  }
+  if (Number(day.gcashCashOutFees ?? 0) > 0) {
+    out.push(pad('+ GCash out fees', money(sym, day.gcashCashOutFees)) + LF);
+  }
+  if (Number(day.gcashCashOutAmount ?? 0) > 0) {
+    out.push(pad('- GCash cash-out', money(sym, day.gcashCashOutAmount)) + LF);
+  }
   if (Number(day.cashRefunds ?? 0) > 0) {
     out.push(pad('- Cash refunds', money(sym, day.cashRefunds)) + LF);
   }
@@ -441,6 +462,71 @@ function renderZReport(d) {
   out.push(LF.repeat(4));
   out.push(CUT);
 
+  return Buffer.from(out.join(''), 'binary');
+}
+
+// GCash service receipt. Mirrors the browser fallback in
+// printer.service.ts. Cash-in shows what the customer paid in total
+// (amount + fee); cash-out shows what the customer received (amount
+// − fee). Direction lives on the row, so a single renderer handles
+// both with one branch at the bottom.
+function renderGcashTransaction(d) {
+  const sym = d.currencySymbol ?? '';
+  const t = d.transaction ?? {};
+  const out = [];
+  out.push(INIT, CODEPAGE_CP437);
+
+  // Header.
+  out.push(ALIGN_CENTER, BOLD_ON, DOUBLE_ON);
+  out.push(toCP437(d.storeName ?? 'Store') + LF);
+  out.push(DOUBLE_OFF, BOLD_OFF);
+  if (d.address) out.push(toCP437(d.address) + LF);
+  if (d.phone) out.push(toCP437(d.phone) + LF);
+  out.push(LF);
+
+  out.push(BOLD_ON);
+  out.push((t.type === 'CASH_IN' ? 'GCASH CASH-IN' : 'GCASH CASH-OUT') + LF);
+  out.push(BOLD_OFF);
+  out.push(LF);
+
+  out.push(ALIGN_LEFT);
+  const when = t.date ? new Date(t.date).toLocaleString() : '—';
+  out.push(`Ref     : ${t.reference ?? '—'}` + LF);
+  out.push(`Date    : ${when}` + LF);
+  if (t.cashierName) out.push(`Cashier : ${toCP437(t.cashierName)}` + LF);
+  if (t.customerName) out.push(`Name    : ${toCP437(t.customerName)}` + LF);
+  if (t.customerPhone) out.push(`Phone   : ${toCP437(t.customerPhone)}` + LF);
+  out.push(repeat('-') + LF);
+
+  out.push(pad('Amount', money(sym, t.amount)) + LF);
+  out.push(pad('Service fee', money(sym, t.fee)) + LF);
+  out.push(repeat('-') + LF);
+
+  const amount = Number(t.amount ?? 0);
+  const fee = Number(t.fee ?? 0);
+  const grandLabel = t.type === 'CASH_IN' ? 'Customer paid' : 'Customer received';
+  const grandValue = t.type === 'CASH_IN' ? amount + fee : amount - fee;
+  out.push(BOLD_ON);
+  out.push(pad(grandLabel, money(sym, grandValue)) + LF);
+  out.push(BOLD_OFF);
+
+  if (t.notes) {
+    out.push(LF, 'Notes:' + LF, toCP437(String(t.notes)) + LF);
+  }
+  out.push(LF);
+  out.push('Customer : ____________________' + LF);
+  out.push(LF);
+
+  if (d.footer) {
+    out.push(ALIGN_CENTER);
+    for (const line of String(d.footer).split('\n')) {
+      out.push(toCP437(line) + LF);
+    }
+    out.push(ALIGN_LEFT);
+  }
+
+  out.push(LF.repeat(4));
+  out.push(CUT);
   return Buffer.from(out.join(''), 'binary');
 }
 
@@ -784,6 +870,16 @@ const server = http.createServer(async (req, res) => {
       );
       return send(res, 200, { ok: true, bytes: bytes.length });
     }
+    if (req.method === 'POST' && req.url === '/print-gcash') {
+      const payload = await readJson(req);
+      const bytes = renderGcashTransaction(payload);
+      await writeToPrinter(bytes);
+      console.log(
+        `[gcash] ${new Date().toISOString()} -> ${payload?.transaction?.reference ?? '?'} ` +
+          `(${bytes.length} bytes)`,
+      );
+      return send(res, 200, { ok: true, bytes: bytes.length });
+    }
     if (req.method === 'POST' && req.url === '/kick') {
       // Standalone drawer-open. Sends only the kick command, no
       // receipt feed. Used for "no-sale" drawer access (making change,
@@ -823,5 +919,5 @@ server.listen(PORT, () => {
   console.log(`MaxPOS print helper listening on http://localhost:${PORT}`);
   console.log(`Printer device: ${PRINTER_DEVICE}`);
   console.log(`Paper width:    ${PAPER_WIDTH} chars`);
-  console.log(`Endpoints:      POST /print, POST /print-zreport, POST /kick, POST /test, GET /health`);
+  console.log(`Endpoints:      POST /print, POST /print-zreport, POST /print-gcash, POST /kick, POST /test, GET /health`);
 });

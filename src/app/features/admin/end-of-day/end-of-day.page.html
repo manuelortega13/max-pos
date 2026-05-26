@@ -55,6 +55,24 @@
               <strong>+{{ preview().totalCreditPayments | money }}</strong>
             </div>
           }
+          @if (preview().gcashCashInAmount > 0) {
+            <div>
+              <small>GCash cash-in</small>
+              <strong>{{ preview().gcashCashInAmount | money }}</strong>
+            </div>
+          }
+          @if (preview().gcashCashOutAmount > 0) {
+            <div>
+              <small>GCash cash-out</small>
+              <strong>{{ preview().gcashCashOutAmount | money }}</strong>
+            </div>
+          }
+          @if (preview().gcashCashInFees + preview().gcashCashOutFees > 0) {
+            <div>
+              <small>GCash fees</small>
+              <strong>+{{ (preview().gcashCashInFees + preview().gcashCashOutFees) | money }}</strong>
+            </div>
+          }
           <div>
             <small>Total sales</small>
             <strong>{{ preview().totalSales | money }}</strong>

@@ -28,6 +28,12 @@ export interface CloseDayDialogData {
   /** All credit payments (cash + card + transfer) — surfaced in
    *  the summary row even though only cash hits the drawer. */
   readonly totalCreditPayments: number;
+  /** GCash buckets. All non-voided. Cash-in adds amount+fee to the
+   *  drawer; cash-out removes amount, keeps fee. */
+  readonly gcashCashInAmount: number;
+  readonly gcashCashInFees: number;
+  readonly gcashCashOutAmount: number;
+  readonly gcashCashOutFees: number;
   readonly totalSales: number;
   readonly totalRefunds: number;
   readonly salesCount: number;
@@ -93,6 +99,18 @@ export interface CloseDayDialogResult {
           <div><dt>+ Cash sales</dt><dd>{{ data.cashSales | money }}</dd></div>
           @if (data.cashCreditPayments > 0) {
             <div><dt>+ Cash credit payments</dt><dd>{{ data.cashCreditPayments | money }}</dd></div>
+          }
+          @if (data.gcashCashInAmount > 0) {
+            <div><dt>+ GCash cash-in</dt><dd>{{ data.gcashCashInAmount | money }}</dd></div>
+          }
+          @if (data.gcashCashInFees > 0) {
+            <div><dt>+ GCash cash-in fees</dt><dd>{{ data.gcashCashInFees | money }}</dd></div>
+          }
+          @if (data.gcashCashOutFees > 0) {
+            <div><dt>+ GCash cash-out fees</dt><dd>{{ data.gcashCashOutFees | money }}</dd></div>
+          }
+          @if (data.gcashCashOutAmount > 0) {
+            <div><dt>− GCash cash-out</dt><dd>{{ data.gcashCashOutAmount | money }}</dd></div>
           }
           @if (data.cashRefunds > 0) {
             <div><dt>− Cash refunds</dt><dd>{{ data.cashRefunds | money }}</dd></div>
@@ -245,8 +263,12 @@ export class CloseDayDialog {
     () =>
       this.data.openingFloat +
       this.data.cashSales +
-      this.data.cashCreditPayments -
-      this.data.cashRefunds,
+      this.data.cashCreditPayments +
+      this.data.gcashCashInAmount +
+      this.data.gcashCashInFees +
+      this.data.gcashCashOutFees -
+      this.data.cashRefunds -
+      this.data.gcashCashOutAmount,
   );
   protected readonly hasCountedCash = computed(() => {
     const c = this.counted();

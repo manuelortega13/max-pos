@@ -86,6 +86,12 @@ export const routes: Routes = [
         title: 'End of Day — MaxPOS',
       },
       {
+        path: 'gcash',
+        loadComponent: () =>
+          import('./features/admin/gcash/gcash.page').then((m) => m.GcashPage),
+        title: 'GCash — MaxPOS',
+      },
+      {
         path: 'settings',
         loadComponent: () =>
           import('./features/admin/settings/settings.page').then((m) => m.SettingsPage),
@@ -133,6 +139,12 @@ export const routes: Routes = [
             (m) => m.CreditPaymentPage,
           ),
         title: 'Credit payment — MaxPOS',
+      },
+      {
+        path: 'gcash',
+        loadComponent: () =>
+          import('./features/cashier/gcash/gcash.page').then((m) => m.GcashPage),
+        title: 'GCash — MaxPOS',
       },
     ],
   },

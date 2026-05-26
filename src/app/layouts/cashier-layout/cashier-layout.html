@@ -46,6 +46,15 @@
           <mat-icon>payments</mat-icon>
           Credit Payment
         </a>
+        <a
+          mat-button
+          class="cashier-shell__nav-link"
+          routerLink="gcash"
+          routerLinkActive="cashier-shell__nav-link--active"
+        >
+          <mat-icon>smartphone</mat-icon>
+          GCash
+        </a>
       </nav>
     }
 
@@ -154,6 +163,14 @@
       >
         <mat-icon>payments</mat-icon>
         <span>Payment</span>
+      </a>
+      <a
+        class="cashier-shell__bottom-link"
+        routerLink="gcash"
+        routerLinkActive="cashier-shell__bottom-link--active"
+      >
+        <mat-icon>smartphone</mat-icon>
+        <span>GCash</span>
       </a>
     </nav>
   }

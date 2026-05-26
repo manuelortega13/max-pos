@@ -1,6 +1,6 @@
 import { DOCUMENT } from '@angular/common';
 import { Injectable, effect, inject, signal } from '@angular/core';
-import { BusinessDay, CreditorPayment } from '../models';
+import { BusinessDay, CreditorPayment, GcashTransaction } from '../models';
 
 export type PaperSize = '58mm' | '80mm' | 'a4';
 
@@ -30,6 +30,17 @@ export interface ZReportPayload {
   footer: string;
   currencySymbol: string;
   day: BusinessDay;
+}
+
+/** Structured GCash receipt sent to the local print helper. Browser
+ *  fallback renders the equivalent .print-receipt DOM. */
+export interface GcashReceiptPayload {
+  storeName: string;
+  address: string;
+  phone: string;
+  footer: string;
+  currencySymbol: string;
+  transaction: GcashTransaction;
 }
 
 /** Structured receipt sent to the local print helper. The helper turns
@@ -270,6 +281,74 @@ export class PrinterService {
     this.printZReportBrowser(payload);
   }
 
+  /**
+   * Print a GCash service receipt. Helper-first with a browser
+   * fallback so registers without the helper still get paper.
+   */
+  async printGcashTransaction(payload: GcashReceiptPayload): Promise<void> {
+    if (this._helperEnabled() && this._helperUrl()) {
+      const ok = await this.postToHelper('/print-gcash', payload);
+      if (ok) return;
+      console.warn('[printer] helper unreachable for GCash — falling back to browser');
+    }
+    this.printGcashBrowser(payload);
+  }
+
+  private printGcashBrowser(payload: GcashReceiptPayload): void {
+    const win = this.document.defaultView;
+    if (!win) return;
+    const container = this.document.createElement('section');
+    container.className = 'print-receipt';
+    container.innerHTML = this.renderGcashHtml(payload);
+    this.document.body.appendChild(container);
+    try {
+      win.print();
+    } finally {
+      container.remove();
+    }
+  }
+
+  private renderGcashHtml(p: GcashReceiptPayload): string {
+    const t = p.transaction;
+    const money = (v: number | null | undefined) =>
+      `${p.currencySymbol}${Number(v ?? 0).toFixed(2)}`;
+    const esc = (s: string | null | undefined) =>
+      String(s ?? '').replace(/[&<>]/g, (c) =>
+        c === '&' ? '&amp;' : c === '<' ? '&lt;' : '&gt;',
+      );
+    const date = t.date ? new Date(t.date).toLocaleString() : '—';
+    const label = t.type === 'CASH_IN' ? 'GCASH CASH-IN' : 'GCASH CASH-OUT';
+    const total = Number(t.amount) + Number(t.fee);
+    return `
+      <header class="receipt__header">
+        <strong>${esc(p.storeName)}</strong>
+        ${p.address ? `<small>${esc(p.address)}</small>` : ''}
+        ${p.phone ? `<small>${esc(p.phone)}</small>` : ''}
+        <strong>${label}</strong>
+      </header>
+      <hr/>
+      <div class="receipt__meta">
+        <div>Ref     : ${esc(t.reference)}</div>
+        <div>Date    : ${esc(date)}</div>
+        <div>Cashier : ${esc(t.cashierName)}</div>
+        ${t.customerName ? `<div>Name    : ${esc(t.customerName)}</div>` : ''}
+        ${t.customerPhone ? `<div>Phone   : ${esc(t.customerPhone)}</div>` : ''}
+      </div>
+      <hr/>
+      <div class="receipt__row"><span>Amount</span><span>${money(t.amount)}</span></div>
+      <div class="receipt__row"><span>Service fee</span><span>${money(t.fee)}</span></div>
+      <hr/>
+      <div class="receipt__row receipt__row--grand">
+        <span>${t.type === 'CASH_IN' ? 'Customer paid' : 'Customer received'}</span>
+        <span>${money(t.type === 'CASH_IN' ? total : t.amount - t.fee)}</span>
+      </div>
+      ${t.notes ? `<hr/><div class="receipt__notes"><strong>Notes:</strong> ${esc(t.notes)}</div>` : ''}
+      <hr/>
+      <div>Customer : ____________________</div>
+      ${p.footer ? `<footer class="receipt__footer">${esc(p.footer).replace(/\n/g, '<br/>')}</footer>` : ''}
+    `;
+  }
+
   /** Ping /health to confirm the helper is up. Returned by the Settings
    *  "Test connection" button so the cashier knows wiring is good
    *  before they ring up a real sale. */
@@ -404,6 +483,34 @@ export class PrinterService {
       Number(d.totalRefunds ?? 0) > 0 ? row('Refunds', `-${money(d.totalRefunds)}`) : '';
     const cashRefundsRow =
       Number(d.cashRefunds ?? 0) > 0 ? row('− Cash refunds', money(d.cashRefunds)) : '';
+    const cashCreditRow =
+      Number(d.cashCreditPayments ?? 0) > 0
+        ? row('+ Credit pay (cash)', money(d.cashCreditPayments))
+        : '';
+    const gcashSalesBlock =
+      Number(d.gcashCashInAmount ?? 0) > 0 || Number(d.gcashCashOutAmount ?? 0) > 0
+        ? row('GCash cash-in', money(d.gcashCashInAmount)) +
+          row('GCash cash-out', money(d.gcashCashOutAmount)) +
+          (Number(d.gcashCashInFees ?? 0) + Number(d.gcashCashOutFees ?? 0) > 0
+            ? row(
+                'GCash fees',
+                money(Number(d.gcashCashInFees ?? 0) + Number(d.gcashCashOutFees ?? 0)),
+              )
+            : '')
+        : '';
+    const gcashDrawerBlock =
+      (Number(d.gcashCashInAmount ?? 0) > 0
+        ? row('+ GCash cash-in', money(d.gcashCashInAmount))
+        : '') +
+      (Number(d.gcashCashInFees ?? 0) > 0
+        ? row('+ GCash in fees', money(d.gcashCashInFees))
+        : '') +
+      (Number(d.gcashCashOutFees ?? 0) > 0
+        ? row('+ GCash out fees', money(d.gcashCashOutFees))
+        : '') +
+      (Number(d.gcashCashOutAmount ?? 0) > 0
+        ? row('− GCash cash-out', money(d.gcashCashOutAmount))
+        : '');
     const varianceBanner =
       variance !== 0
         ? `<div class="receipt__center"><strong>${variance > 0 ? '** OVER expected **' : '** SHORT vs expected **'}</strong></div>`
@@ -431,12 +538,15 @@ export class PrinterService {
       ${row('Card', money(d.cardSales))}
       ${row('Transfer', money(d.transferSales))}
       ${Number(d.creditSales ?? 0) > 0 ? row('Credit', money(d.creditSales)) : ''}
+      ${gcashSalesBlock}
       ${row('TOTAL SALES', money(d.totalSales), true)}
       ${refundsRow}
       <hr/>
       <div class="receipt__section"><strong>CASH DRAWER</strong></div>
       ${row('Opening float', money(d.openingFloat))}
       ${row('+ Cash sales', money(d.cashSales))}
+      ${cashCreditRow}
+      ${gcashDrawerBlock}
       ${cashRefundsRow}
       ${row('Expected cash', money(d.expectedCash))}
       ${row('Counted cash', money(d.countedCash))}

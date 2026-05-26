@@ -12,9 +12,10 @@ import { MatInputModule } from '@angular/material/input';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
-import { CreditorPayment, Sale, SaleStatus } from '../../../core/models';
+import { CreditorPayment, GcashTransaction, Sale, SaleStatus } from '../../../core/models';
 import { AuthService } from '../../../core/services/auth.service';
 import { CreditorPaymentService } from '../../../core/services/creditor-payment.service';
+import { GcashService } from '../../../core/services/gcash.service';
 import { SaleService } from '../../../core/services/sale.service';
 import { SettingsService } from '../../../core/services/settings.service';
 import { MoneyPipe } from '../../../shared/pipes/currency-symbol.pipe';
@@ -46,6 +47,7 @@ type StatusFilter = SaleStatus | 'all';
 export class TransactionsPage implements OnInit {
   private readonly saleService = inject(SaleService);
   private readonly paymentService = inject(CreditorPaymentService);
+  private readonly gcashService = inject(GcashService);
   private readonly authService = inject(AuthService);
   private readonly settingsService = inject(SettingsService);
   private readonly dialog = inject(MatDialog);
@@ -56,6 +58,10 @@ export class TransactionsPage implements OnInit {
    *  no pagination needed. */
   protected readonly todayPayments = signal<CreditorPayment[]>([]);
 
+  /** GCash transactions the cashier recorded today. Same shape as
+   *  todayPayments — additive context next to sales. */
+  protected readonly todayGcash = signal<GcashTransaction[]>([]);
+
   protected readonly paymentColumns = [
     'ref',
     'date',
@@ -65,24 +71,35 @@ export class TransactionsPage implements OnInit {
     'status',
   ] as const;
 
+  protected readonly gcashColumns = [
+    'ref',
+    'date',
+    'type',
+    'amount',
+    'fee',
+    'status',
+  ] as const;
+
   ngOnInit(): void {
+    const now = new Date();
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const endOfDay = startOfDay + 86_400_000;
+    const inToday = (iso: string) => {
+      const t = Date.parse(iso);
+      return t >= startOfDay && t < endOfDay;
+    };
+
     this.paymentService.listMine().subscribe({
-      next: (list) => {
-        const now = new Date();
-        const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-        const endOfDay = startOfDay + 86_400_000;
-        this.todayPayments.set(
-          list.filter((p) => {
-            const t = Date.parse(p.date);
-            return t >= startOfDay && t < endOfDay;
-          }),
-        );
-      },
-      error: () => {
-        // Quiet failure — payments are additive context; sales remain
-        // the primary view of "my day". A snackbar would feel like a
-        // hard error for a soft feature.
-      },
+      next: (list) => this.todayPayments.set(list.filter((p) => inToday(p.date))),
+      // Quiet failure — payments are additive context; sales remain
+      // the primary view of "my day". A snackbar would feel like a
+      // hard error for a soft feature.
+      error: () => {},
+    });
+
+    this.gcashService.listMine().subscribe({
+      next: (list) => this.todayGcash.set(list.filter((t) => inToday(t.date))),
+      error: () => {},
     });
   }
 

@@ -1,0 +1,71 @@
+<section class="gtf-page">
+  <header class="gtf-page__header">
+    <div>
+      <h1>GCash fees</h1>
+      <p>Tiers apply to both cash-in and cash-out. Ranges are min ≤ amount &lt; max.</p>
+    </div>
+    <button mat-flat-button color="primary" (click)="openCreate()">
+      <mat-icon>add</mat-icon>
+      Add tier
+    </button>
+  </header>
+
+  @if (loading()) {
+    <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+  }
+
+  @if (error(); as message) {
+    <mat-card appearance="outlined" class="gtf-page__error">
+      <mat-card-content>
+        <mat-icon>error_outline</mat-icon>
+        <span>{{ message }}</span>
+        <button mat-stroked-button (click)="load()">Retry</button>
+      </mat-card-content>
+    </mat-card>
+  }
+
+  <mat-card appearance="outlined" class="gtf-page__table-card">
+    @if (tiers().length === 0 && !loading()) {
+      <div class="gtf-page__empty">
+        <mat-icon>smartphone</mat-icon>
+        <p>No fee tiers yet. Add one to start charging service fees.</p>
+      </div>
+    } @else {
+      <table mat-table [dataSource]="tiers()" class="gtf-page__table">
+        <ng-container matColumnDef="range">
+          <th mat-header-cell *matHeaderCellDef>Range</th>
+          <td mat-cell *matCellDef="let t">
+            {{ t.minAmount | money }} – {{ t.maxAmount | money }}
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="fee">
+          <th mat-header-cell *matHeaderCellDef>Fee</th>
+          <td mat-cell *matCellDef="let t">{{ t.fee | money }}</td>
+        </ng-container>
+        <ng-container matColumnDef="status">
+          <th mat-header-cell *matHeaderCellDef>Status</th>
+          <td mat-cell *matCellDef="let t">
+            @if (t.active) {
+              <mat-chip color="primary" highlighted>Active</mat-chip>
+            } @else {
+              <mat-chip>Inactive</mat-chip>
+            }
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef class="gtf-page__actions-col"></th>
+          <td mat-cell *matCellDef="let t" class="gtf-page__actions-col">
+            <button mat-icon-button (click)="openEdit(t)" aria-label="Edit tier">
+              <mat-icon>edit</mat-icon>
+            </button>
+            <button mat-icon-button (click)="confirmDelete(t)" aria-label="Delete tier">
+              <mat-icon>delete</mat-icon>
+            </button>
+          </td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="columns"></tr>
+        <tr mat-row *matRowDef="let row; columns: columns"></tr>
+      </table>
+    }
+  </mat-card>
+</section>

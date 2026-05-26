@@ -24,6 +24,15 @@ export interface BusinessDay {
   readonly transferSales: number | null;
   /** Charge-on-account total. Doesn't touch the cash drawer. */
   readonly creditSales: number | null;
+  readonly cashCreditPayments: number | null;
+  /** GCash cash-in: customer hands cash, store sends GCash. Drawer
+   *  gains amount + fee. */
+  readonly gcashCashInAmount: number | null;
+  readonly gcashCashInFees: number | null;
+  /** GCash cash-out: customer sends GCash, store hands cash. Drawer
+   *  loses amount, keeps fee. */
+  readonly gcashCashOutAmount: number | null;
+  readonly gcashCashOutFees: number | null;
   readonly salesCount: number | null;
   readonly itemsSold: number | null;
 }

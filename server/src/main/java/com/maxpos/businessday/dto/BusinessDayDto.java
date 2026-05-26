@@ -31,6 +31,10 @@ public record BusinessDayDto(
         BigDecimal transferSales,
         BigDecimal creditSales,
         BigDecimal cashCreditPayments,
+        BigDecimal gcashCashInAmount,
+        BigDecimal gcashCashInFees,
+        BigDecimal gcashCashOutAmount,
+        BigDecimal gcashCashOutFees,
         Integer salesCount,
         Integer itemsSold
 ) {
@@ -56,6 +60,10 @@ public record BusinessDayDto(
                 d.getTransferSales(),
                 d.getCreditSales(),
                 d.getCashCreditPayments(),
+                d.getGcashCashInAmount(),
+                d.getGcashCashInFees(),
+                d.getGcashCashOutAmount(),
+                d.getGcashCashOutFees(),
                 d.getSalesCount(),
                 d.getItemsSold()
         );

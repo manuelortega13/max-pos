@@ -7,6 +7,9 @@ import com.maxpos.common.ConflictException;
 import com.maxpos.common.NotFoundException;
 import com.maxpos.creditor.CreditorPayment;
 import com.maxpos.creditor.CreditorPaymentRepository;
+import com.maxpos.gcash.GcashTransaction;
+import com.maxpos.gcash.GcashTransactionRepository;
+import com.maxpos.gcash.GcashTransactionType;
 import com.maxpos.sale.PaymentMethod;
 import com.maxpos.sale.Sale;
 import com.maxpos.sale.SaleRepository;
@@ -35,15 +38,18 @@ public class BusinessDayService {
     private final BusinessDayRepository days;
     private final SaleRepository sales;
     private final CreditorPaymentRepository creditorPayments;
+    private final GcashTransactionRepository gcashTransactions;
     private final UserRepository users;
 
     public BusinessDayService(BusinessDayRepository days,
                               SaleRepository sales,
                               CreditorPaymentRepository creditorPayments,
+                              GcashTransactionRepository gcashTransactions,
                               UserRepository users) {
         this.days = days;
         this.sales = sales;
         this.creditorPayments = creditorPayments;
+        this.gcashTransactions = gcashTransactions;
         this.users = users;
     }
 
@@ -97,6 +103,10 @@ public class BusinessDayService {
         BigDecimal transferSales = BigDecimal.ZERO;
         BigDecimal creditSales = BigDecimal.ZERO;
         BigDecimal cashCreditPayments = BigDecimal.ZERO;
+        BigDecimal gcashCashInAmount = BigDecimal.ZERO;
+        BigDecimal gcashCashInFees = BigDecimal.ZERO;
+        BigDecimal gcashCashOutAmount = BigDecimal.ZERO;
+        BigDecimal gcashCashOutFees = BigDecimal.ZERO;
         int salesCount = 0;
         int itemsSold = 0;
 
@@ -144,10 +154,29 @@ public class BusinessDayService {
             }
         }
 
+        // GCash service transactions. Cash-in: customer hands cash,
+        // we send GCash → drawer gains amount + fee. Cash-out:
+        // customer sends GCash, we hand cash → drawer loses amount,
+        // keeps fee. Voided rows are excluded — they didn't happen.
+        for (GcashTransaction g : gcashTransactions.findAllByBusinessDayId(d.getId())) {
+            if (g.getVoidedAt() != null) continue;
+            if (g.getType() == GcashTransactionType.CASH_IN) {
+                gcashCashInAmount = gcashCashInAmount.add(g.getAmount());
+                gcashCashInFees   = gcashCashInFees.add(g.getFee());
+            } else {
+                gcashCashOutAmount = gcashCashOutAmount.add(g.getAmount());
+                gcashCashOutFees   = gcashCashOutFees.add(g.getFee());
+            }
+        }
+
         BigDecimal expectedCash = d.getOpeningFloat()
                 .add(cashSales)
                 .add(cashCreditPayments)
-                .subtract(cashRefunds);
+                .add(gcashCashInAmount)
+                .add(gcashCashInFees)
+                .add(gcashCashOutFees)
+                .subtract(cashRefunds)
+                .subtract(gcashCashOutAmount);
         BigDecimal variance = req.countedCash().subtract(expectedCash);
 
         d.setClosedAt(closedAt);
@@ -164,6 +193,10 @@ public class BusinessDayService {
         d.setTransferSales(transferSales);
         d.setCreditSales(creditSales);
         d.setCashCreditPayments(cashCreditPayments);
+        d.setGcashCashInAmount(gcashCashInAmount);
+        d.setGcashCashInFees(gcashCashInFees);
+        d.setGcashCashOutAmount(gcashCashOutAmount);
+        d.setGcashCashOutFees(gcashCashOutFees);
         d.setSalesCount(salesCount);
         d.setItemsSold(itemsSold);
         return BusinessDayDto.from(d);

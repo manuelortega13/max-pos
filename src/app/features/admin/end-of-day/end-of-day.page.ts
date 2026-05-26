@@ -10,9 +10,10 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
-import { BusinessDay, CreditorPayment } from '../../../core/models';
+import { BusinessDay, CreditorPayment, GcashTransaction } from '../../../core/models';
 import { BusinessDayService } from '../../../core/services/business-day.service';
 import { CreditorPaymentService } from '../../../core/services/creditor-payment.service';
+import { GcashService } from '../../../core/services/gcash.service';
 import { PrinterService } from '../../../core/services/printer.service';
 import { SaleService } from '../../../core/services/sale.service';
 import { SettingsService } from '../../../core/services/settings.service';
@@ -41,6 +42,7 @@ export class EndOfDayPage implements OnInit {
   private readonly businessDayService = inject(BusinessDayService);
   private readonly saleService = inject(SaleService);
   private readonly paymentService = inject(CreditorPaymentService);
+  private readonly gcashService = inject(GcashService);
   private readonly settingsService = inject(SettingsService);
   private readonly printer = inject(PrinterService);
   private readonly dialog = inject(MatDialog);
@@ -52,6 +54,9 @@ export class EndOfDayPage implements OnInit {
    * count yesterday's payments when an open day rolls over.
    */
   protected readonly allPayments = signal<CreditorPayment[]>([]);
+  /** GCash transactions loaded for the live preview. Same scoping
+   *  rule as credit payments — filter against the current day's id. */
+  protected readonly allGcash = signal<GcashTransaction[]>([]);
 
   protected readonly currentDay = this.businessDayService.current;
   protected readonly history = this.businessDayService.history;
@@ -83,6 +88,10 @@ export class EndOfDayPage implements OnInit {
       /** Total credit payments (cash + card + transfer) — shown on
        *  the report. Card/transfer payments don't enter the till. */
       totalCreditPayments: 0,
+      gcashCashInAmount: 0,
+      gcashCashInFees: 0,
+      gcashCashOutAmount: 0,
+      gcashCashOutFees: 0,
       totalSales: 0,
       totalRefunds: 0,
       salesCount: 0,
@@ -144,6 +153,25 @@ export class EndOfDayPage implements OnInit {
       if (p.paymentMethod === 'CASH') cashCreditPayments += p.amount;
     }
 
+    // GCash bucket totals. Voided rows excluded so the preview matches
+    // BusinessDayService.close. Cash-in adds (amount + fee) to the
+    // drawer; cash-out removes amount but keeps fee.
+    let gcashCashInAmount = 0,
+      gcashCashInFees = 0,
+      gcashCashOutAmount = 0,
+      gcashCashOutFees = 0;
+    for (const g of this.allGcash()) {
+      if (g.voidedAt !== null) continue;
+      if (g.businessDayId !== day.id) continue;
+      if (g.type === 'CASH_IN') {
+        gcashCashInAmount += g.amount;
+        gcashCashInFees += g.fee;
+      } else {
+        gcashCashOutAmount += g.amount;
+        gcashCashOutFees += g.fee;
+      }
+    }
+
     return {
       cashSales,
       cashRefunds,
@@ -152,6 +180,10 @@ export class EndOfDayPage implements OnInit {
       creditSales,
       cashCreditPayments,
       totalCreditPayments,
+      gcashCashInAmount,
+      gcashCashInFees,
+      gcashCashOutAmount,
+      gcashCashOutFees,
       totalSales,
       totalRefunds,
       salesCount,
@@ -163,9 +195,19 @@ export class EndOfDayPage implements OnInit {
     const day = this.currentDay();
     if (!day) return 0;
     const p = this.preview();
-    // float + cash in (sales + credit payments) − cash out (refunds).
+    // float + cash in (sales + credit payments + GCash cash-ins + all
+    // GCash fees) − cash out (refunds + GCash cash-outs).
     // Card / transfer credit payments don't touch the drawer.
-    return day.openingFloat + p.cashSales + p.cashCreditPayments - p.cashRefunds;
+    return (
+      day.openingFloat +
+      p.cashSales +
+      p.cashCreditPayments +
+      p.gcashCashInAmount +
+      p.gcashCashInFees +
+      p.gcashCashOutFees -
+      p.cashRefunds -
+      p.gcashCashOutAmount
+    );
   });
 
   protected readonly historyColumns = ['opened', 'closed', 'total', 'variance', 'closedBy'] as const;
@@ -186,6 +228,10 @@ export class EndOfDayPage implements OnInit {
         // re-aggregates server-side so the actual snapshot still gets
         // the right numbers.
       },
+    });
+    this.gcashService.listAll().subscribe({
+      next: (list) => this.allGcash.set(list),
+      error: () => {},
     });
   }
 

@@ -87,6 +87,21 @@ public class BusinessDay {
     @Column(name = "items_sold")
     private Integer itemsSold;
 
+    // GCash buckets. Cash-in adds (amount + fee) to the till;
+    // cash-out removes amount but keeps fee. Stored as four separate
+    // columns so the Z-report can show volume and fee revenue cleanly.
+    @Column(name = "gcash_cash_in_amount", precision = 12, scale = 2)
+    private BigDecimal gcashCashInAmount;
+
+    @Column(name = "gcash_cash_in_fees", precision = 12, scale = 2)
+    private BigDecimal gcashCashInFees;
+
+    @Column(name = "gcash_cash_out_amount", precision = 12, scale = 2)
+    private BigDecimal gcashCashOutAmount;
+
+    @Column(name = "gcash_cash_out_fees", precision = 12, scale = 2)
+    private BigDecimal gcashCashOutFees;
+
     public UUID getId() { return id; }
     public Instant getOpenedAt() { return openedAt; }
     public void setOpenedAt(Instant openedAt) { this.openedAt = openedAt; }
@@ -126,4 +141,12 @@ public class BusinessDay {
     public void setSalesCount(Integer salesCount) { this.salesCount = salesCount; }
     public Integer getItemsSold() { return itemsSold; }
     public void setItemsSold(Integer itemsSold) { this.itemsSold = itemsSold; }
+    public BigDecimal getGcashCashInAmount() { return gcashCashInAmount; }
+    public void setGcashCashInAmount(BigDecimal gcashCashInAmount) { this.gcashCashInAmount = gcashCashInAmount; }
+    public BigDecimal getGcashCashInFees() { return gcashCashInFees; }
+    public void setGcashCashInFees(BigDecimal gcashCashInFees) { this.gcashCashInFees = gcashCashInFees; }
+    public BigDecimal getGcashCashOutAmount() { return gcashCashOutAmount; }
+    public void setGcashCashOutAmount(BigDecimal gcashCashOutAmount) { this.gcashCashOutAmount = gcashCashOutAmount; }
+    public BigDecimal getGcashCashOutFees() { return gcashCashOutFees; }
+    public void setGcashCashOutFees(BigDecimal gcashCashOutFees) { this.gcashCashOutFees = gcashCashOutFees; }
 }
