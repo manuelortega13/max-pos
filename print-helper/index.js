@@ -496,6 +496,7 @@ function renderGcashTransaction(d) {
   if (t.cashierName) out.push(`Cashier : ${toCP437(t.cashierName)}` + LF);
   if (t.customerName) out.push(`Name    : ${toCP437(t.customerName)}` + LF);
   if (t.customerPhone) out.push(`Phone   : ${toCP437(t.customerPhone)}` + LF);
+  if (t.inboundRef) out.push(`GCash ref: ${toCP437(t.inboundRef)}` + LF);
   out.push(repeat('-') + LF);
 
   out.push(pad('Amount', money(sym, t.amount)) + LF);

@@ -56,10 +56,17 @@ public class GcashTransaction {
     private String customerName;
 
     /** Phone. Required for {@link GcashTransactionType#CASH_IN}
-     *  (the cashier needs the destination GCash number); optional
+     *  (the cashier needs the destination GCash number); not set
      *  for cash-out. DB-level CHECK constraint enforces this. */
     @Column(name = "customer_phone")
     private String customerPhone;
+
+    /** Inbound GCash transaction reference. Required for
+     *  {@link GcashTransactionType#CASH_OUT} — the cashier copies
+     *  the last 6 chars (or more) of the "Ref no." shown on the
+     *  store's GCash app — and must be NULL for cash-in. */
+    @Column(name = "inbound_ref")
+    private String inboundRef;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "cashier_id", nullable = false)
@@ -101,6 +108,8 @@ public class GcashTransaction {
     public void setCustomerName(String customerName) { this.customerName = customerName; }
     public String getCustomerPhone() { return customerPhone; }
     public void setCustomerPhone(String customerPhone) { this.customerPhone = customerPhone; }
+    public String getInboundRef() { return inboundRef; }
+    public void setInboundRef(String inboundRef) { this.inboundRef = inboundRef; }
     public User getCashier() { return cashier; }
     public void setCashier(User cashier) { this.cashier = cashier; }
     public BusinessDay getBusinessDay() { return businessDay; }

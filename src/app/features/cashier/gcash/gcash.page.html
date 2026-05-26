@@ -26,6 +26,9 @@
           @if (txn.customerPhone) {
             <div><dt>Phone</dt><dd>{{ txn.customerPhone }}</dd></div>
           }
+          @if (txn.inboundRef) {
+            <div><dt>GCash ref</dt><dd>{{ txn.inboundRef }}</dd></div>
+          }
         </dl>
         <div class="gcash__success-actions">
           <button mat-flat-button color="primary" (click)="newTransaction()">
@@ -141,56 +144,90 @@
       </mat-card-content>
     </mat-card>
 
-    <mat-card class="gcash__step" appearance="outlined">
-      <mat-card-header>
-        <mat-card-title>Customer</mat-card-title>
-        @if (phoneRequired()) {
+    @if (type() === 'CASH_IN') {
+      <mat-card class="gcash__step" appearance="outlined">
+        <mat-card-header>
+          <mat-card-title>Customer</mat-card-title>
           <mat-card-subtitle>Phone is required for cash-in.</mat-card-subtitle>
-        }
-      </mat-card-header>
-      <mat-card-content>
-        <div class="gcash__grid">
-          <mat-form-field class="gcash__field" appearance="outline">
-            <mat-label>Name (optional)</mat-label>
-            <input
-              matInput
-              [ngModel]="customerName()"
-              (ngModelChange)="customerName.set($event)"
-              maxlength="255"
-              autocomplete="off"
-            />
-          </mat-form-field>
+        </mat-card-header>
+        <mat-card-content>
+          <div class="gcash__grid">
+            <mat-form-field class="gcash__field" appearance="outline">
+              <mat-label>Name (optional)</mat-label>
+              <input
+                matInput
+                [ngModel]="customerName()"
+                (ngModelChange)="customerName.set($event)"
+                maxlength="255"
+                autocomplete="off"
+              />
+            </mat-form-field>
+
+            <mat-form-field class="gcash__field" appearance="outline">
+              <mat-label>Phone *</mat-label>
+              <input
+                matInput
+                inputmode="tel"
+                [ngModel]="customerPhone()"
+                (ngModelChange)="customerPhone.set($event)"
+                required
+                maxlength="64"
+                autocomplete="off"
+              />
+              @if (phoneMissing()) {
+                <mat-hint>Required for cash-in — the cashier sends to this number.</mat-hint>
+              }
+            </mat-form-field>
+          </div>
 
           <mat-form-field class="gcash__field" appearance="outline">
-            <mat-label>
-              Phone @if (phoneRequired()) { * }
-            </mat-label>
+            <mat-label>Notes (optional)</mat-label>
+            <textarea
+              matInput
+              rows="2"
+              [ngModel]="notes()"
+              (ngModelChange)="notes.set($event)"
+            ></textarea>
+          </mat-form-field>
+        </mat-card-content>
+      </mat-card>
+    } @else {
+      <mat-card class="gcash__step" appearance="outlined">
+        <mat-card-header>
+          <mat-card-title>GCash reference</mat-card-title>
+          <mat-card-subtitle>
+            Last 6 digits/characters of the inbound GCash ref no.
+          </mat-card-subtitle>
+        </mat-card-header>
+        <mat-card-content>
+          <mat-form-field class="gcash__field" appearance="outline">
+            <mat-label>Ref no. (last 6) *</mat-label>
             <input
               matInput
-              inputmode="tel"
-              [ngModel]="customerPhone()"
-              (ngModelChange)="customerPhone.set($event)"
-              [required]="phoneRequired()"
+              [ngModel]="inboundRef()"
+              (ngModelChange)="inboundRef.set($event)"
+              required
               maxlength="64"
               autocomplete="off"
+              placeholder="e.g. 4F2C19"
             />
-            @if (phoneMissing()) {
-              <mat-hint>Required for cash-in — the cashier sends to this number.</mat-hint>
+            @if (inboundRefMissing()) {
+              <mat-hint>Required for cash-out — confirms the inbound GCash arrived.</mat-hint>
             }
           </mat-form-field>
-        </div>
 
-        <mat-form-field class="gcash__field" appearance="outline">
-          <mat-label>Notes (optional)</mat-label>
-          <textarea
-            matInput
-            rows="2"
-            [ngModel]="notes()"
-            (ngModelChange)="notes.set($event)"
-          ></textarea>
-        </mat-form-field>
-      </mat-card-content>
-    </mat-card>
+          <mat-form-field class="gcash__field" appearance="outline">
+            <mat-label>Notes (optional)</mat-label>
+            <textarea
+              matInput
+              rows="2"
+              [ngModel]="notes()"
+              (ngModelChange)="notes.set($event)"
+            ></textarea>
+          </mat-form-field>
+        </mat-card-content>
+      </mat-card>
+    }
 
     <div class="gcash__actions">
       <button

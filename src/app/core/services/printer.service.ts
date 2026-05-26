@@ -333,6 +333,7 @@ export class PrinterService {
         <div>Cashier : ${esc(t.cashierName)}</div>
         ${t.customerName ? `<div>Name    : ${esc(t.customerName)}</div>` : ''}
         ${t.customerPhone ? `<div>Phone   : ${esc(t.customerPhone)}</div>` : ''}
+        ${t.inboundRef ? `<div>GCash ref: ${esc(t.inboundRef)}</div>` : ''}
       </div>
       <hr/>
       <div class="receipt__row"><span>Amount</span><span>${money(t.amount)}</span></div>

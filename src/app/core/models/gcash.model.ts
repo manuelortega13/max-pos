@@ -36,6 +36,10 @@ export interface GcashTransaction {
   readonly fee: number;
   readonly customerName: string | null;
   readonly customerPhone: string | null;
+  /** Inbound GCash transaction reference (cash-out only). The
+   *  cashier copies the last 6 chars (or more) of the "Ref no."
+   *  shown on the store's GCash app. */
+  readonly inboundRef: string | null;
   readonly cashierId: string;
   readonly cashierName: string;
   readonly businessDayId: string | null;
@@ -56,5 +60,6 @@ export interface CreateGcashTransactionRequest {
   readonly fee: number;
   readonly customerName?: string | null;
   readonly customerPhone?: string | null;
+  readonly inboundRef?: string | null;
   readonly notes?: string | null;
 }

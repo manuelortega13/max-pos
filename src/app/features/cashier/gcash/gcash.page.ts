@@ -82,13 +82,24 @@ export class GcashPage implements OnInit {
   protected readonly feeText = signal<string>('');
   protected readonly customerName = signal<string>('');
   protected readonly customerPhone = signal<string>('');
+  /** Inbound GCash ref — cashier types the last 6 chars of the
+   *  "Ref no." their GCash app shows for the customer's incoming
+   *  send. Cash-out only. */
+  protected readonly inboundRef = signal<string>('');
   protected readonly notes = signal<string>('');
 
-  /** Phone is required for cash-in (cashier sends to this number)
-   *  and optional for cash-out (customer already sent to us). */
+  /** Phone is required for cash-in (cashier sends to this number);
+   *  the field doesn't render for cash-out. */
   protected readonly phoneRequired = computed(() => this.type() === 'CASH_IN');
   protected readonly phoneMissing = computed(
     () => this.phoneRequired() && this.customerPhone().trim() === '',
+  );
+
+  /** Inbound ref is required for cash-out (the cashier confirms an
+   *  inbound GCash arrived before handing cash); not used for cash-in. */
+  protected readonly inboundRefRequired = computed(() => this.type() === 'CASH_OUT');
+  protected readonly inboundRefMissing = computed(
+    () => this.inboundRefRequired() && this.inboundRef().trim() === '',
   );
 
   protected readonly amount = computed(() => {
@@ -183,6 +194,7 @@ export class GcashPage implements OnInit {
     if (this.amount() <= 0) return false;
     if (this.fee() < 0) return false;
     if (this.phoneMissing()) return false;
+    if (this.inboundRefMissing()) return false;
     // Manual-fee mode: don't let the cashier submit a zero fee
     // without typing it (forces a deliberate choice for free
     // service vs. forgetting to enter the fee).
@@ -194,15 +206,21 @@ export class GcashPage implements OnInit {
     if (!this.canSubmit() || this.submitting()) return;
     const name = this.customerName().trim();
     const phone = this.customerPhone().trim();
+    const ref = this.inboundRef().trim();
     const note = this.notes().trim();
+    const isCashIn = this.type() === 'CASH_IN';
     this.submitting.set(true);
     this.gcashService
       .create({
         type: this.type(),
         amount: this.amount(),
         fee: this.fee(),
-        customerName: name === '' ? undefined : name,
-        customerPhone: phone === '' ? undefined : phone,
+        // Send only the fields that belong to the current direction.
+        // Backend strips the other side too, but keeping the wire
+        // payload clean makes the request log easier to read.
+        customerName: isCashIn && name !== '' ? name : undefined,
+        customerPhone: isCashIn && phone !== '' ? phone : undefined,
+        inboundRef: !isCashIn && ref !== '' ? ref : undefined,
         notes: note === '' ? undefined : note,
       })
       .subscribe({
@@ -240,6 +258,7 @@ export class GcashPage implements OnInit {
     this.feeText.set('');
     this.customerName.set('');
     this.customerPhone.set('');
+    this.inboundRef.set('');
     this.notes.set('');
     this.matchedTier.set(null);
   }

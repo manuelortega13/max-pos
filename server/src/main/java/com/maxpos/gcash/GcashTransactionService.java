@@ -76,12 +76,25 @@ public class GcashTransactionService {
                 ? null : req.customerName().trim();
         String phone = req.customerPhone() == null || req.customerPhone().isBlank()
                 ? null : req.customerPhone().trim();
-        // Cash-in needs a destination GCash number — the cashier
-        // sends to the customer's phone. The DB CHECK enforces this
-        // too, but throwing a friendly 409 here avoids the bare
-        // constraint error from leaking out.
-        if (req.type() == GcashTransactionType.CASH_IN && phone == null) {
-            throw new ConflictException("Customer phone is required for cash-in.");
+        String inboundRef = req.inboundRef() == null || req.inboundRef().isBlank()
+                ? null : req.inboundRef().trim();
+
+        // Type-specific required fields. DB CHECKs back-stop these,
+        // but throwing friendly 409s here avoids the bare constraint
+        // errors leaking out. Also strip out the field that doesn't
+        // belong on this type so a misbehaving client can't sneak
+        // cash-in fields onto a cash-out row (or vice versa).
+        if (req.type() == GcashTransactionType.CASH_IN) {
+            if (phone == null) {
+                throw new ConflictException("Customer phone is required for cash-in.");
+            }
+            inboundRef = null;
+        } else {
+            if (inboundRef == null) {
+                throw new ConflictException("Inbound GCash reference is required for cash-out.");
+            }
+            name = null;
+            phone = null;
         }
 
         Optional<GcashFeeTier> tier = tiers
@@ -102,6 +115,7 @@ public class GcashTransactionService {
         t.setFee(req.fee());
         t.setCustomerName(name);
         t.setCustomerPhone(phone);
+        t.setInboundRef(inboundRef);
         t.setCashier(cashier);
         t.setBusinessDay(openDay);
         t.setDate(Instant.now());

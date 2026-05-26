@@ -11,5 +11,6 @@ public record CreateGcashTransactionRequest(
         @NotNull @DecimalMin("0.00") BigDecimal fee,
         @Size(max = 255) String customerName,
         @Size(max = 64) String customerPhone,
+        @Size(max = 64) String inboundRef,
         @Size(max = 2048) String notes
 ) {}
