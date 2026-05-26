@@ -106,7 +106,7 @@
         <button
           type="button"
           class="product-tile"
-          [class.product-tile--low]="product.stock > 0 && product.stock <= 10"
+          [class.product-tile--low]="product.stock > 0 && product.stock <= 5"
           [class.product-tile--out]="product.stock <= 0"
           [class.product-tile--active]="i === activeIndex()"
           (click)="addToCart(product)"
@@ -120,7 +120,7 @@
             }
             @if (product.stock <= 0) {
               <span class="product-tile__badge product-tile__badge--out">Out</span>
-            } @else if (product.stock <= 10) {
+            } @else if (product.stock <= 5) {
               <span class="product-tile__badge product-tile__badge--low">Low</span>
             }
           </div>

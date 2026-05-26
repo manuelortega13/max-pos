@@ -43,6 +43,32 @@ export interface GcashReceiptPayload {
   transaction: GcashTransaction;
 }
 
+/** One line on a low-stock report — frozen at print time so the
+ *  paper output stays consistent even if stock moves underneath. */
+export interface LowStockRow {
+  name: string;
+  stock: number;
+  cost: number;
+}
+
+/** Operational restocking report. Two sections: OUT OF STOCK (sorted
+ *  by name) then LOW STOCK (sorted by remaining stock ascending so
+ *  the most urgent shows first). Built client-side from the already-
+ *  loaded product + category signals — no new backend endpoint. */
+export interface LowStockReportPayload {
+  storeName: string;
+  address: string;
+  phone: string;
+  footer: string;
+  currencySymbol: string;
+  /** ISO timestamp at which the snapshot was taken. */
+  generatedAt: string;
+  /** Admin who pressed print — surfaces on the paper for audit. */
+  generatedByName: string;
+  outOfStock: ReadonlyArray<LowStockRow>;
+  lowStock: ReadonlyArray<LowStockRow>;
+}
+
 /** Structured receipt sent to the local print helper. The helper turns
  *  this into ESC/POS bytes; the browser fallback ignores it (uses the
  *  rendered .print-receipt DOM instead). */
@@ -346,6 +372,88 @@ export class PrinterService {
       ${t.notes ? `<hr/><div class="receipt__notes"><strong>Notes:</strong> ${esc(t.notes)}</div>` : ''}
       <hr/>
       <div>Customer : ____________________</div>
+      ${p.footer ? `<footer class="receipt__footer">${esc(p.footer).replace(/\n/g, '<br/>')}</footer>` : ''}
+    `;
+  }
+
+  /**
+   * Print a low-stock restocking report. Helper-first with a browser
+   * fallback so registers without the helper still get paper. The
+   * payload is a frozen snapshot — caller pre-sorts each section and
+   * the helper renders exactly what it was given.
+   */
+  async printLowStockReport(payload: LowStockReportPayload): Promise<void> {
+    if (this._helperEnabled() && this._helperUrl()) {
+      const ok = await this.postToHelper('/print-low-stock', payload);
+      if (ok) return;
+      console.warn('[printer] helper unreachable for low-stock — falling back to browser');
+    }
+    this.printLowStockBrowser(payload);
+  }
+
+  private printLowStockBrowser(payload: LowStockReportPayload): void {
+    const win = this.document.defaultView;
+    if (!win) return;
+    const container = this.document.createElement('section');
+    container.className = 'print-receipt';
+    container.innerHTML = this.renderLowStockHtml(payload);
+    this.document.body.appendChild(container);
+    try {
+      win.print();
+    } finally {
+      container.remove();
+    }
+  }
+
+  private renderLowStockHtml(p: LowStockReportPayload): string {
+    const money = (v: number | null | undefined) =>
+      `${p.currencySymbol}${Number(v ?? 0).toFixed(2)}`;
+    const esc = (s: string | null | undefined) =>
+      String(s ?? '').replace(/[&<>]/g, (c) =>
+        c === '&' ? '&amp;' : c === '<' ? '&lt;' : '&gt;',
+      );
+    const date = new Date(p.generatedAt).toLocaleString();
+    const renderSection = (title: string, rows: ReadonlyArray<LowStockRow>) => {
+      if (rows.length === 0) return '';
+      // Per row: name + stock, then cost right-aligned, then an
+      // <hr/> separator between rows. Matches the ESC/POS layout.
+      const lines = rows
+        .map(
+          (r) =>
+            `<div class="receipt__row">
+               <span>${esc(r.name)}</span>
+               <span>${r.stock}</span>
+             </div>
+             <div class="receipt__row receipt__row--sub">
+               <span></span>
+               <span>${money(r.cost)}</span>
+             </div>
+             <hr/>`,
+        )
+        .join('');
+      return `<div class="receipt__section"><strong>${title} (${rows.length})</strong></div>${lines}`;
+    };
+    return `
+      <header class="receipt__header">
+        <strong>${esc(p.storeName)}</strong>
+        ${p.address ? `<small>${esc(p.address)}</small>` : ''}
+        ${p.phone ? `<small>${esc(p.phone)}</small>` : ''}
+        <strong>LOW STOCK REPORT</strong>
+      </header>
+      <hr/>
+      <div class="receipt__meta">
+        <div>Date    : ${esc(date)}</div>
+        <div>By      : ${esc(p.generatedByName)}</div>
+      </div>
+      <hr/>
+      ${renderSection('OUT OF STOCK', p.outOfStock)}
+      ${renderSection('LOW STOCK', p.lowStock)}
+      <div class="receipt__row receipt__row--grand">
+        <span>Total items</span>
+        <span>${p.outOfStock.length + p.lowStock.length}</span>
+      </div>
+      <hr/>
+      <div>Restocked by: ____________________</div>
       ${p.footer ? `<footer class="receipt__footer">${esc(p.footer).replace(/\n/g, '<br/>')}</footer>` : ''}
     `;
   }

@@ -14,9 +14,13 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { Product } from '../../../core/models';
+import { AuthService } from '../../../core/services/auth.service';
 import { BarcodeScannerService } from '../../../core/services/barcode-scanner.service';
 import { CategoryService } from '../../../core/services/category.service';
+import { PrinterService, LowStockRow } from '../../../core/services/printer.service';
 import { ProductService } from '../../../core/services/product.service';
+import { SettingsService } from '../../../core/services/settings.service';
+import { MarkupDialog, MarkupDialogData } from '../../../shared/dialogs/markup-dialog';
 import { MoneyPipe } from '../../../shared/pipes/currency-symbol.pipe';
 import { RestockPayload } from '../../../core/services/product.service';
 import { BatchesDialog } from './batches-dialog';
@@ -50,6 +54,9 @@ export class InventoryPage {
   private readonly dialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
   private readonly scanner = inject(BarcodeScannerService);
+  private readonly printer = inject(PrinterService);
+  private readonly settings = inject(SettingsService);
+  private readonly authService = inject(AuthService);
 
   protected readonly cameraSupported = this.scanner.isSupported;
 
@@ -72,7 +79,7 @@ export class InventoryPage {
       totalProducts: products.length,
       totalUnits,
       totalValue,
-      lowStock: products.filter((p) => p.stock > 0 && p.stock <= 10).length,
+      lowStock: products.filter((p) => p.stock > 0 && p.stock <= 5).length,
       // "Out of stock" tile includes negatives so oversold products aren't
       // silently dropped from the count.
       outOfStock: products.filter((p) => p.stock <= 0).length,
@@ -95,9 +102,9 @@ export class InventoryPage {
         if (!hit) return false;
       }
       switch (stock) {
-        case 'low': return p.stock > 0 && p.stock <= 10;
+        case 'low': return p.stock > 0 && p.stock <= 5;
         case 'out': return p.stock <= 0; // includes oversold / negative
-        case 'ok':  return p.stock > 10;
+        case 'ok':  return p.stock > 5;
         case 'all':
         default:    return true;
       }
@@ -111,7 +118,39 @@ export class InventoryPage {
       this.filter() !== 'all',
   );
 
-  protected readonly columns = ['image', 'name', 'category', 'stock', 'cost', 'value', 'actions'] as const;
+  protected readonly columns = ['image', 'name', 'category', 'stock', 'cost', 'price', 'markup', 'value', 'actions'] as const;
+
+  /** Current markup % for a product. Returns 0 when cost is missing. */
+  protected markupPercent(product: Product): number {
+    if (product.cost <= 0) return 0;
+    return Math.round(((product.price - product.cost) / product.cost) * 100);
+  }
+
+  /** Same chip-class bucketing as the Products page so the visual
+   *  language is consistent between the two views. */
+  protected markupChipClass(product: Product): string {
+    if (product.cost <= 0) return 'status-chip--refunded';
+    const m = this.markupPercent(product);
+    if (m < 30) return 'status-chip--warn';
+    if (m < 60) return 'status-chip--pending';
+    if (m <= 120) return 'status-chip--completed';
+    return 'status-chip--high';
+  }
+
+  protected markupLabel(product: Product): string {
+    if (product.cost <= 0) return 'No cost';
+    return `${this.markupPercent(product)}%`;
+  }
+
+  protected openMarkup(product: Product): void {
+    this.dialog.open<MarkupDialog, MarkupDialogData>(MarkupDialog, {
+      width: '560px',
+      maxWidth: '95vw',
+      autoFocus: 'first-tabbable',
+      panelClass: 'dialog-fullscreen-mobile',
+      data: { product },
+    });
+  }
 
   protected categoryName(id: string): string {
     return this.categoryService.getById(id)?.name ?? '—';
@@ -120,14 +159,14 @@ export class InventoryPage {
   protected chipClass(stock: number): string {
     if (stock < 0) return 'status-chip--oversold';
     if (stock === 0) return 'status-chip--refunded';
-    if (stock <= 10) return 'status-chip--warn';
+    if (stock <= 5) return 'status-chip--warn';
     return 'status-chip--completed';
   }
 
   protected chipLabel(stock: number): string {
     if (stock < 0) return 'Oversold';
     if (stock === 0) return 'Out of stock';
-    if (stock <= 10) return 'Low';
+    if (stock <= 5) return 'Low';
     return 'In stock';
   }
 
@@ -181,5 +220,51 @@ export class InventoryPage {
     this.search.set('');
     this.categoryFilter.set('all');
     this.filter.set('all');
+  }
+
+  /**
+   * Print the restocking sheet: out-of-stock first (alphabetical),
+   * then low-stock (urgent first — sorted by remaining stock ascending).
+   * Only active products are eligible — inactive SKUs shouldn't show
+   * up on a restocking run.
+   *
+   * Disabled in the UI when both buckets are empty, but we re-check
+   * here to keep the method safe if it's ever called from elsewhere.
+   */
+  protected printLowStock(): void {
+    const active = this.productService.products().filter((p) => p.active);
+    const toRow = (p: Product): LowStockRow => ({
+      name: p.name,
+      stock: p.stock,
+      cost: p.cost,
+    });
+    const outOfStock = active
+      .filter((p) => p.stock <= 0)
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map(toRow);
+    const lowStock = active
+      .filter((p) => p.stock > 0 && p.stock <= 5)
+      .sort((a, b) => a.stock - b.stock || a.name.localeCompare(b.name))
+      .map(toRow);
+
+    if (outOfStock.length === 0 && lowStock.length === 0) {
+      this.snackBar.open('Nothing to restock — stock looks healthy.', 'Dismiss', {
+        duration: 2500,
+      });
+      return;
+    }
+
+    const s = this.settings.settings();
+    void this.printer.printLowStockReport({
+      storeName: s.storeName,
+      address: s.address,
+      phone: s.phone,
+      footer: s.receiptFooter,
+      currencySymbol: s.currencySymbol,
+      generatedAt: new Date().toISOString(),
+      generatedByName: this.authService.user()?.name ?? '—',
+      outOfStock,
+      lowStock,
+    });
   }
 }

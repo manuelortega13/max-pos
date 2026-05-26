@@ -292,3 +292,89 @@
   from { transform: rotate(0deg); }
   to   { transform: rotate(360deg); }
 }
+
+// Floating "Owner's playbook" trigger. Sits at bottom-right on
+// desktop; lifted above the mobile bottom-nav on handsets so it
+// doesn't fight the primary nav. Above standard content but below
+// MatDialog/CDK overlays (z-index <= 1000).
+.admin-shell__playbook-fab {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  width: 3.25rem;
+  height: 3.25rem;
+  border: none;
+  border-radius: 50%;
+  background: var(--mat-sys-primary);
+  color: var(--mat-sys-on-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.22);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+  z-index: 900;
+
+  mat-icon {
+    font-size: 1.5rem;
+    width: 1.5rem;
+    height: 1.5rem;
+  }
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.28);
+  }
+
+  &:active { transform: translateY(0); }
+  &:focus-visible {
+    outline: 2px solid var(--mat-sys-primary);
+    outline-offset: 3px;
+  }
+
+  // When the panel is open, the FAB tucks against the panel's left
+  // edge (panel width below). On mobile the panel covers the
+  // viewport, so we hide the FAB entirely — the panel has its own
+  // close button.
+  &--open {
+    right: calc(36rem + 1rem);
+  }
+
+  // Lift above the mobile bottom-nav (~64px tall) so it doesn't
+  // overlap. Bottom-nav itself is z-index ~50.
+  &--handset {
+    bottom: 5rem;
+  }
+
+  &--open#{&}--handset {
+    display: none;
+  }
+}
+
+// Slide-in panel. Fixed-position aside (not a MatDialog) on purpose —
+// the page beneath stays fully interactive so the owner can read the
+// markup table while editing a product form. Below MatDialog overlays
+// but above page content.
+.admin-shell__playbook-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 36rem;
+  // 92vw caps the panel on smaller laptops (e.g. 13" / 14") so it
+  // doesn't eat the whole screen. On phones it falls back to full
+  // viewport width via the 100vw safety, which 92vw never exceeds.
+  max-width: min(36rem, 92vw);
+  background: var(--mat-sys-surface);
+  border-left: 1px solid var(--mat-sys-outline-variant);
+  box-shadow: -8px 0 28px rgba(0, 0, 0, 0.18);
+  z-index: 901;
+  display: flex;
+  flex-direction: column;
+  animation: playbook-slide-in 0.22s ease-out;
+}
+
+@keyframes playbook-slide-in {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}

@@ -19,6 +19,7 @@ import { BarcodeScannerService } from '../../../core/services/barcode-scanner.se
 import { CategoryService } from '../../../core/services/category.service';
 import { ProductService } from '../../../core/services/product.service';
 import { ConfirmDialog } from '../../../shared/dialogs/confirm-dialog';
+import { MarkupDialog, MarkupDialogData } from '../../../shared/dialogs/markup-dialog';
 import { MoneyPipe } from '../../../shared/pipes/currency-symbol.pipe';
 import { ProductFormDialog } from './product-form-dialog';
 
@@ -83,10 +84,37 @@ export class ProductsPage {
     'sku',
     'category',
     'price',
+    'markup',
     'stock',
     'status',
     'actions',
   ] as const;
+
+  /** Current markup % for a product. Returns 0 (and the chip class
+   *  flags it) when cost is missing — markup math is undefined there. */
+  protected markupPercent(product: Product): number {
+    if (product.cost <= 0) return 0;
+    return Math.round(((product.price - product.cost) / product.cost) * 100);
+  }
+
+  /** Bucket the markup % into one of the playbook's health bands so
+   *  the table at-a-glance flags which products need attention. The
+   *  thresholds reflect the playbook's category mix recommendations:
+   *  <30% is thin even for soft drinks, 60%+ is healthy, 120%+ is
+   *  cooked-food territory (or a setup oddity worth verifying). */
+  protected markupChipClass(product: Product): string {
+    if (product.cost <= 0) return 'status-chip--refunded';
+    const m = this.markupPercent(product);
+    if (m < 30) return 'status-chip--warn';
+    if (m < 60) return 'status-chip--pending';
+    if (m <= 120) return 'status-chip--completed';
+    return 'status-chip--high';
+  }
+
+  protected markupLabel(product: Product): string {
+    if (product.cost <= 0) return 'No cost';
+    return `${this.markupPercent(product)}%`;
+  }
 
   protected categoryName(categoryId: string): string {
     return this.categoryService.getById(categoryId)?.name ?? '—';
@@ -94,7 +122,7 @@ export class ProductsPage {
 
   protected stockChipClass(stock: number): string {
     if (stock === 0) return 'status-chip--refunded';
-    if (stock <= 10) return 'status-chip--warn';
+    if (stock <= 5) return 'status-chip--warn';
     return 'status-chip--completed';
   }
 
@@ -132,6 +160,16 @@ export class ProductsPage {
       autoFocus: 'first-tabbable',
       panelClass: 'dialog-fullscreen-mobile',
       data: { mode: 'duplicate', product },
+    });
+  }
+
+  protected openMarkup(product: Product): void {
+    this.dialog.open<MarkupDialog, MarkupDialogData>(MarkupDialog, {
+      width: '560px',
+      maxWidth: '95vw',
+      autoFocus: 'first-tabbable',
+      panelClass: 'dialog-fullscreen-mobile',
+      data: { product },
     });
   }
 

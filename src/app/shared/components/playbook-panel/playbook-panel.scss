@@ -1,0 +1,148 @@
+// The playbook panel is rendered inside a fixed-position container
+// owned by admin-layout. These styles handle internal layout only
+// (header sticky, body scroll, accordion typography). Outer
+// positioning + slide-in animation live in admin-layout.scss.
+
+:host {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  background: var(--mat-sys-surface);
+}
+
+.playbook-panel {
+  &__header {
+    flex-shrink: 0;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 1rem 1rem 0.75rem;
+    border-bottom: 1px solid var(--mat-sys-outline-variant);
+    background: var(--mat-sys-surface);
+    position: sticky;
+    top: 0;
+    z-index: 1;
+  }
+
+  &__title-block {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    min-width: 0;
+  }
+
+  &__title {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin: 0;
+    font-size: 1.15rem;
+    font-weight: 600;
+
+    mat-icon {
+      color: var(--mat-sys-primary);
+    }
+  }
+
+  &__subtitle {
+    margin: 0;
+    color: var(--mat-sys-on-surface-variant);
+    font-size: 0.8rem;
+    line-height: 1.3;
+  }
+
+  &__body {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    padding: 0.5rem 0.5rem 1rem;
+  }
+
+  // Each expansion-panel-header title wraps its icon + text in a
+  // dedicated flex row. mat-panel-title by itself doesn't enforce a
+  // flex layout, so an inline mat-icon next to inline text ends up
+  // overlapping at certain widths. The wrapper guarantees a stable
+  // icon-then-text layout with a real gap regardless of header width.
+  &__title-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+
+    > span {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  }
+
+  &__icon {
+    color: var(--mat-sys-primary);
+    flex-shrink: 0;
+  }
+
+  &__lead {
+    margin: 0 0 0.85rem;
+    color: var(--mat-sys-on-surface-variant);
+    line-height: 1.5;
+    font-size: 0.9rem;
+  }
+
+  &__note {
+    margin: 0.85rem 0 0;
+    padding: 0.7rem 0.9rem;
+    border-radius: 0.5rem;
+    background: var(--mat-sys-surface-container);
+    font-size: 0.85rem;
+    line-height: 1.5;
+  }
+
+  &__list {
+    margin: 0;
+    padding-left: 1.25rem;
+    line-height: 1.55;
+    font-size: 0.9rem;
+
+    li + li { margin-top: 0.4rem; }
+
+    &--numbered {
+      list-style: decimal;
+      li { padding-left: 0.25rem; }
+    }
+  }
+
+  &__table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+    margin: 0.3rem 0;
+
+    thead th {
+      text-align: left;
+      font-size: 0.7rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--mat-sys-on-surface-variant);
+      font-weight: 500;
+      padding: 0.5rem 0.6rem;
+      border-bottom: 1px solid var(--mat-sys-outline-variant);
+    }
+
+    tbody td {
+      padding: 0.55rem 0.6rem;
+      vertical-align: top;
+      border-bottom: 1px solid var(--mat-sys-outline-variant);
+
+      small {
+        display: block;
+        color: var(--mat-sys-on-surface-variant);
+        font-size: 0.72rem;
+        margin-top: 0.15rem;
+      }
+    }
+
+    tbody tr:last-child td { border-bottom: none; }
+  }
+}

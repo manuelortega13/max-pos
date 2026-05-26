@@ -13,6 +13,12 @@
 
   &__title { margin: 0; font-size: 1.75rem; font-weight: 600; }
   &__subtitle { margin: 0; color: var(--mat-sys-on-surface-variant); }
+
+  &__actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
 }
 
 .summary {
@@ -116,4 +122,40 @@
   // Deeper crimson to visually distinguish "oversold" (stock below 0) from
   // a plain out-of-stock at exactly 0.
   &--oversold { background: rgba(190, 18, 60, 0.18) !important; color: #9f1239 !important; }
+  // Markup buckets: pending = neutral/acceptable (30–60%), high =
+  // primary blue for premium markups (>120%, typically cooked food).
+  &--pending { background: rgba(99, 102, 241, 0.15) !important; color: #4338ca !important; }
+  &--high { background: rgba(14, 165, 233, 0.15) !important; color: #0369a1 !important; }
+}
+
+.markup-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.4rem;
+  margin: -0.2rem -0.4rem;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 0.4rem;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  transition: background 0.12s ease, border-color 0.12s ease;
+
+  &:hover {
+    background: var(--mat-sys-surface-container-high);
+    border-color: var(--mat-sys-outline-variant);
+  }
+  &:focus-visible {
+    outline: 2px solid var(--mat-sys-primary);
+    outline-offset: 1px;
+  }
+
+  &__edit {
+    font-size: 0.95rem;
+    width: 0.95rem;
+    height: 0.95rem;
+    color: var(--mat-sys-on-surface-variant);
+    opacity: 0.7;
+  }
 }

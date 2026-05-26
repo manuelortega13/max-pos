@@ -317,3 +317,129 @@ table.mat-mdc-table {
     flex-shrink: 0;
   }
 }
+
+.profit {
+  &__empty {
+    text-align: center;
+    padding: 2rem 1rem;
+    color: var(--mat-sys-on-surface-variant);
+
+    mat-icon {
+      font-size: 2.4rem;
+      width: 2.4rem;
+      height: 2.4rem;
+      opacity: 0.6;
+    }
+    p { margin: 0.6rem 0 0; }
+  }
+}
+
+.profit-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.85rem;
+  margin-bottom: 1.25rem;
+}
+
+.profit-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.85rem 1rem;
+  border-radius: 0.6rem;
+  background: var(--mat-sys-surface-container-low);
+
+  &__label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--mat-sys-on-surface-variant);
+  }
+  &__value {
+    font-size: 1.35rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  &__sub {
+    font-size: 0.75rem;
+    color: var(--mat-sys-on-surface-variant);
+  }
+
+  // Negative-contribution cards (COGS, expenses) — value reads as a debit.
+  &--out &__value { color: var(--mat-sys-error); }
+
+  // Net profit headline card — primary container background. The bad
+  // modifier overrides this when the period ran at a loss.
+  &--net {
+    background: var(--mat-sys-primary-container);
+    color: var(--mat-sys-on-primary-container);
+
+    .profit-stat__label,
+    .profit-stat__sub { color: var(--mat-sys-on-primary-container); }
+  }
+  &--bad {
+    background: var(--mat-sys-error-container);
+    color: var(--mat-sys-on-error-container);
+
+    .profit-stat__label,
+    .profit-stat__sub,
+    .profit-stat__value { color: var(--mat-sys-on-error-container); }
+  }
+}
+
+.profit-detail {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.75rem;
+  padding-top: 1rem;
+  margin-bottom: 1rem;
+  border-top: 1px solid var(--mat-sys-outline-variant);
+}
+
+.profit-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+
+  &__label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--mat-sys-on-surface-variant);
+  }
+  &__value {
+    font-size: 1.15rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  &__sub {
+    font-size: 0.7rem;
+    color: var(--mat-sys-on-surface-variant);
+  }
+
+  // Status colors for the avg-revenue/day card relative to break-even.
+  &--good &__value { color: var(--color-success, #10b981); }
+  &--bad  &__value { color: var(--mat-sys-error); }
+}
+
+.profit-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.85rem 1rem;
+  border-radius: 0.55rem;
+  background: var(--mat-sys-surface-container);
+  font-size: 0.9rem;
+  line-height: 1.4;
+
+  mat-icon {
+    flex-shrink: 0;
+    color: var(--mat-sys-primary);
+  }
+
+  &--bad {
+    background: var(--mat-sys-error-container);
+    color: var(--mat-sys-on-error-container);
+    mat-icon { color: var(--mat-sys-on-error-container); }
+  }
+}

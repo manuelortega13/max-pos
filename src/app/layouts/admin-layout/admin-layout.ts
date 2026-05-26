@@ -20,6 +20,7 @@ import { NotificationService } from '../../core/services/notification.service';
 import { PushService } from '../../core/services/push.service';
 import { RealtimeService } from '../../core/services/realtime.service';
 import { RefreshService } from '../../core/services/refresh.service';
+import { PlaybookPanel } from '../../shared/components/playbook-panel/playbook-panel';
 import { PullToRefreshDirective } from '../../shared/directives/pull-to-refresh.directive';
 
 interface NavItem {
@@ -57,6 +58,7 @@ const NAV_ITEMS: readonly NavItem[] = [
     MatDividerModule,
     MatMenuModule,
     MatTooltipModule,
+    PlaybookPanel,
     PullToRefreshDirective,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -74,6 +76,20 @@ export class AdminLayout implements OnInit, OnDestroy {
   private readonly refreshService = inject(RefreshService);
   private readonly businessDayService = inject(BusinessDayService);
   protected readonly refreshing = signal(false);
+
+  /** Floating playbook panel state. Persists for the session via the
+   *  signal; user can flip it open/closed without re-mounting the
+   *  component. Stays open across navigations so admins can keep it
+   *  visible while pricing products on different pages. */
+  protected readonly playbookOpen = signal(false);
+
+  protected togglePlaybook(): void {
+    this.playbookOpen.update((v) => !v);
+  }
+
+  protected closePlaybook(): void {
+    this.playbookOpen.set(false);
+  }
 
   protected readonly navItems = NAV_ITEMS;
   protected readonly sidenavOpen = signal(true);

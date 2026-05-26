@@ -4,10 +4,20 @@
       <h1 class="page__title">Inventory</h1>
       <p class="page__subtitle">Stock levels across the catalog</p>
     </div>
-    <button mat-stroked-button>
-      <mat-icon>download</mat-icon>
-      Export CSV
-    </button>
+    <div class="page__actions">
+      <button
+        mat-stroked-button
+        [disabled]="totals().lowStock === 0 && totals().outOfStock === 0"
+        (click)="printLowStock()"
+      >
+        <mat-icon>print</mat-icon>
+        Print low stock
+      </button>
+      <button mat-stroked-button>
+        <mat-icon>download</mat-icon>
+        Export CSV
+      </button>
+    </div>
   </header>
 
   <div class="summary">
@@ -139,6 +149,29 @@
           <ng-container matColumnDef="cost">
             <th mat-header-cell *matHeaderCellDef>Unit cost</th>
             <td mat-cell *matCellDef="let p">{{ p.cost | money }}</td>
+          </ng-container>
+          <ng-container matColumnDef="price">
+            <th mat-header-cell *matHeaderCellDef>Selling price</th>
+            <td mat-cell *matCellDef="let p"><strong>{{ p.price | money }}</strong></td>
+          </ng-container>
+          <ng-container matColumnDef="markup">
+            <th mat-header-cell *matHeaderCellDef>Markup</th>
+            <td mat-cell *matCellDef="let p">
+              <button
+                type="button"
+                class="markup-cell"
+                (click)="openMarkup(p)"
+                [matTooltip]="p.cost <= 0 ? 'Set cost first to enable markup math' : 'Adjust markup'"
+              >
+                <mat-chip
+                  [class]="'status-chip ' + markupChipClass(p)"
+                  disableRipple
+                >
+                  {{ markupLabel(p) }}
+                </mat-chip>
+                <mat-icon class="markup-cell__edit">edit</mat-icon>
+              </button>
+            </td>
           </ng-container>
           <ng-container matColumnDef="value">
             <th mat-header-cell *matHeaderCellDef>Line value</th>

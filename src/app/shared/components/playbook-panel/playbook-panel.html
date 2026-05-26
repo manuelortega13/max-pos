@@ -1,0 +1,209 @@
+<header class="playbook-panel__header">
+  <div class="playbook-panel__title-block">
+    <h2 class="playbook-panel__title">
+      <mat-icon>auto_stories</mat-icon>
+      Owner's playbook
+    </h2>
+    <p class="playbook-panel__subtitle">
+      Pricing &amp; operations for a student-focused store
+    </p>
+  </div>
+  <button
+    mat-icon-button
+    type="button"
+    (click)="close.emit()"
+    aria-label="Close playbook"
+  >
+    <mat-icon>close</mat-icon>
+  </button>
+</header>
+
+<div class="playbook-panel__body">
+  <mat-accordion multi>
+
+    <mat-expansion-panel expanded>
+      <mat-expansion-panel-header>
+        <mat-panel-title>
+          <span class="playbook-panel__title-row">
+            <mat-icon class="playbook-panel__icon">price_change</mat-icon>
+            <span>Markup by category</span>
+          </span>
+        </mat-panel-title>
+        <mat-panel-description>Blended target: 90–120%</mat-panel-description>
+      </mat-expansion-panel-header>
+
+      <p class="playbook-panel__lead">
+        Don't apply one fixed % to everything. Each category has a natural ceiling.
+        The blended average emerges from the mix.
+      </p>
+
+      <table class="playbook-panel__table">
+        <thead>
+          <tr><th>Category</th><th>Markup</th><th>Why</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Cooked food</strong><br/><small>rice meals, fried chicken, siopao, siomai</small></td>
+            <td><strong>150–200%</strong></td>
+            <td>Your moneymaker. No competition within steps of the gate.</td>
+          </tr>
+          <tr>
+            <td><strong>Hotdog bun</strong></td>
+            <td><strong>100–150%</strong></td>
+            <td>Fast mover, easy to prep, high margin.</td>
+          </tr>
+          <tr>
+            <td><strong>Counter impulse</strong><br/><small>candies, gum, mints, ₱5–10 treats</small></td>
+            <td><strong>80–120%</strong></td>
+            <td>Students aren't price-shopping at the till.</td>
+          </tr>
+          <tr>
+            <td><strong>Snacks</strong><br/><small>chichirya, biscuits, viral TikTok items</small></td>
+            <td><strong>60–100%</strong></td>
+            <td>Trend-driven; price flexibility on most items.</td>
+          </tr>
+          <tr>
+            <td><strong>Soft drinks</strong></td>
+            <td><strong>25–40%</strong></td>
+            <td>Competitive pressure caps this. Don't fight it — they're your traffic builder.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p class="playbook-panel__note">
+        <strong>How blended works:</strong> if cooked food is 40%+ of your revenue,
+        you'll naturally land at 90–120% blended without setting any single price differently.
+        Lift the cooked-food share of revenue = lift the blended markup, no price tweaks needed.
+      </p>
+    </mat-expansion-panel>
+
+    <mat-expansion-panel expanded>
+      <mat-expansion-panel-header>
+        <mat-panel-title>
+          <span class="playbook-panel__title-row">
+            <mat-icon class="playbook-panel__icon">rule</mat-icon>
+            <span>Pricing rules</span>
+          </span>
+        </mat-panel-title>
+      </mat-expansion-panel-header>
+
+      <ul class="playbook-panel__list">
+        <li><strong>Use round denominations</strong> — ₱5, ₱10, ₱15, ₱20, ₱25, ₱30, ₱40, ₱50. Never ₱13, ₱17, ₱27, ₱33. Students count change.</li>
+        <li><strong>Bundle meal + drink at a small discount</strong> — e.g. rice + chicken + Coke = ₱80 (vs ₱85 separately). Turns a ₱45 sale into an ₱80 sale.</li>
+        <li><strong>Hold soft-drink prices steady.</strong> Don't price-fight your competitor on Coke. The proximity-to-gate advantage is worth more than ₱2.</li>
+        <li><strong>Counter impulse shelf at eye level</strong> — mentos, frutella, ₱5–10 candies. Lifts daily revenue 10–20% with near-zero cost.</li>
+        <li><strong>Combo signs above the chiller</strong> — make bundles visible without having to ask.</li>
+      </ul>
+    </mat-expansion-panel>
+
+    <mat-expansion-panel>
+      <mat-expansion-panel-header>
+        <mat-panel-title>
+          <span class="playbook-panel__title-row">
+            <mat-icon class="playbook-panel__icon">schedule</mat-icon>
+            <span>Daily playbook</span>
+          </span>
+        </mat-panel-title>
+        <mat-panel-description>Peak windows + prep timing</mat-panel-description>
+      </mat-expansion-panel-header>
+
+      <p class="playbook-panel__lead">
+        Recess is your Christmas — every single day. Pre-prep saves you from losing sales
+        when students arrive and the kitchen is cold.
+      </p>
+
+      <table class="playbook-panel__table">
+        <thead><tr><th>Time</th><th>What to do</th></tr></thead>
+        <tbody>
+          <tr><td><strong>9:30am</strong></td><td>Cook the 10am recess batch (HS)</td></tr>
+          <tr><td><strong>11:30am</strong></td><td>Cook the 12pm lunch batch (biggest of the day)</td></tr>
+          <tr><td><strong>2:30pm</strong></td><td>Cook the 3pm break batch</td></tr>
+          <tr><td><strong>4:30pm</strong></td><td>Light prep for after-school dismissal</td></tr>
+        </tbody>
+      </table>
+
+      <p class="playbook-panel__note">
+        <strong>Cardinal sin:</strong> students arriving at recess and you're still frying chicken.
+        They'll go to the competitor. Don't give them the chance.
+      </p>
+    </mat-expansion-panel>
+
+    <mat-expansion-panel>
+      <mat-expansion-panel-header>
+        <mat-panel-title>
+          <span class="playbook-panel__title-row">
+            <mat-icon class="playbook-panel__icon">savings</mat-icon>
+            <span>Cash flow &amp; summer survival</span>
+          </span>
+        </mat-panel-title>
+        <mat-panel-description>April–May is your biggest risk</mat-panel-description>
+      </mat-expansion-panel-header>
+
+      <ul class="playbook-panel__list">
+        <li><strong>Save ₱500/day in a separate "summer fund" envelope.</strong> By April you'll have ~₱45–60k buffer.</li>
+        <li><strong>Target: 6–8 weeks of operating expenses in cash</strong> before April–May hits.</li>
+        <li><strong>Track spoilage daily.</strong> Notebook on the counter — what got thrown out at close? Sum it monthly. Hidden cost recovery: ~₱30–50k/year.</li>
+        <li><strong>Real fixed cost is probably ₱40–45k/month</strong> once LPG, packaging, spoilage, and shrinkage are included. The ₱33k figure under-counts.</li>
+        <li><strong>April–May pivot</strong>: switch the menu to neighborhood items (halo-halo, ice candy, sago't gulaman). 100–200% margin, doesn't depend on students.</li>
+        <li><strong>Cut hours in summer</strong> — open 9am–4pm instead of 6am–7pm. Save labor + utilities.</li>
+      </ul>
+    </mat-expansion-panel>
+
+    <mat-expansion-panel>
+      <mat-expansion-panel-header>
+        <mat-panel-title>
+          <span class="playbook-panel__title-row">
+            <mat-icon class="playbook-panel__icon">trending_up</mat-icon>
+            <span>Growth tactics</span>
+          </span>
+        </mat-panel-title>
+      </mat-expansion-panel-header>
+
+      <ul class="playbook-panel__list">
+        <li><strong>Chase TikTok-viral snacks weekly.</strong> Be the first near the school to stock the new viral item. 2–3 weeks of premium pricing before the supermarket catches up.</li>
+        <li><strong>Loyalty card for college students.</strong> 5 meals = 1 free softdrink. Trivial cost, strong retention.</li>
+        <li><strong>Group/dorm orders for college students.</strong> "3 chicken meals: ₱220" (vs ₱270 separately). Group buys are pure gold.</li>
+        <li><strong>Know their names.</strong> Students love being recognized. Costs ₱0, raises retention dramatically.</li>
+        <li><strong>Better wholesale prices &gt; higher retail prices.</strong> A 5% better cost is invisible to customers but equivalent to a 7–10% markup increase.</li>
+      </ul>
+    </mat-expansion-panel>
+
+    <mat-expansion-panel>
+      <mat-expansion-panel-header>
+        <mat-panel-title>
+          <span class="playbook-panel__title-row">
+            <mat-icon class="playbook-panel__icon">block</mat-icon>
+            <span>Skip these</span>
+          </span>
+        </mat-panel-title>
+      </mat-expansion-panel-header>
+
+      <ul class="playbook-panel__list">
+        <li><strong>Cigarettes</strong> — legally risky with minors, PR-toxic, low margin. Drop them.</li>
+        <li><strong>Big-bag snacks (₱80+)</strong> — students don't have the budget. Stock ₱15–25 sizes 2–3× deep instead.</li>
+        <li><strong>Adult-oriented slow movers</strong> — canned goods, condiments. They take shelf space from items that actually turn.</li>
+        <li><strong>Don't expand SKUs to match competitor.</strong> Stay focused on what students actually buy.</li>
+      </ul>
+    </mat-expansion-panel>
+
+    <mat-expansion-panel>
+      <mat-expansion-panel-header>
+        <mat-panel-title>
+          <span class="playbook-panel__title-row">
+            <mat-icon class="playbook-panel__icon">checklist</mat-icon>
+            <span>This week's checklist</span>
+          </span>
+        </mat-panel-title>
+        <mat-panel-description>4 actions that move the needle</mat-panel-description>
+      </mat-expansion-panel-header>
+
+      <ol class="playbook-panel__list playbook-panel__list--numbered">
+        <li><strong>Measure true cost-per-meal</strong> for your top 5 cooked items. Spreadsheet, 30 minutes. Include LPG share, packaging, and spoilage buffer.</li>
+        <li><strong>Start a spoilage log.</strong> Notebook on the counter. Write down what's thrown out at close. Sum it at month-end.</li>
+        <li><strong>Print a menu board</strong> with bundle prices. Visible to anyone in line. No more "ano meron?" 30 times a day.</li>
+        <li><strong>Open the summer fund envelope.</strong> Put ₱500/day in starting now. By April you'll have ₱45–60k buffer.</li>
+      </ol>
+    </mat-expansion-panel>
+
+  </mat-accordion>
+</div>

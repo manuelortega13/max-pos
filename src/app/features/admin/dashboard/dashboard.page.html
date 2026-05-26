@@ -40,6 +40,110 @@
     </mat-card>
   </div>
 
+  <!--
+    Profit insights — rolling 30-day window.
+    Foundation metrics only (revenue, COGS, margin, break-even).
+    SKU-by-SKU margin contribution + spoilage + cash buffer are v2.
+  -->
+  <mat-card appearance="outlined" class="profit">
+    <mat-card-header>
+      <mat-card-title>Profit insights</mat-card-title>
+      <mat-card-subtitle>Last 30 days · break-even &amp; markup health</mat-card-subtitle>
+    </mat-card-header>
+    <mat-card-content>
+      @if (!hasProfitData()) {
+        <div class="profit__empty">
+          <mat-icon>insights</mat-icon>
+          <p>{{ profitRecommendation() }}</p>
+        </div>
+      } @else {
+        <div class="profit-grid">
+          <div class="profit-stat">
+            <span class="profit-stat__label">Revenue</span>
+            <span class="profit-stat__value">{{ windowRevenue() | money }}</span>
+          </div>
+          <div class="profit-stat profit-stat--out">
+            <span class="profit-stat__label">Cost of goods</span>
+            <span class="profit-stat__value">−{{ windowCogs() | money }}</span>
+          </div>
+          <div class="profit-stat profit-stat--out">
+            <span class="profit-stat__label">Expenses</span>
+            <span class="profit-stat__value">−{{ windowExpenseTotal() | money }}</span>
+          </div>
+          <div
+            class="profit-stat profit-stat--net"
+            [class.profit-stat--bad]="windowNetProfit() < 0"
+            [matTooltip]="windowNetProfit() < 0 ? 'You are losing money on the last 30 days.' : 'Net profit after cost of goods and expenses.'"
+          >
+            <span class="profit-stat__label">Net profit</span>
+            <span class="profit-stat__value">{{ windowNetProfit() | money }}</span>
+            <span class="profit-stat__sub">{{ netPerDay() | money }}/day avg</span>
+          </div>
+        </div>
+
+        <div class="profit-detail">
+          <div class="profit-metric">
+            <span class="profit-metric__label">Effective markup</span>
+            <span class="profit-metric__value">
+              {{ (effectiveMarkup() * 100) | number: '1.0-0' }}%
+            </span>
+            <span class="profit-metric__sub">
+              Margin: {{ (effectiveMargin() * 100) | number: '1.0-0' }}%
+            </span>
+          </div>
+          <div class="profit-metric">
+            <span class="profit-metric__label">Daily fixed cost</span>
+            <span class="profit-metric__value">{{ dailyFixedCost() | money }}</span>
+            <span class="profit-metric__sub">Expenses ÷ 30 days</span>
+          </div>
+          <div class="profit-metric">
+            <span class="profit-metric__label">Break-even revenue/day</span>
+            <span
+              class="profit-metric__value"
+              [matTooltip]="
+                breakEvenDailyRevenue() === null
+                  ? 'Margin is zero or negative — fix that before computing break-even.'
+                  : 'Daily revenue needed to cover fixed costs at your current margin.'
+              "
+            >
+              @if (breakEvenDailyRevenue() === null) {
+                —
+              } @else {
+                {{ breakEvenDailyRevenue() | money }}
+              }
+            </span>
+            <span class="profit-metric__sub">At current margin</span>
+          </div>
+          <div
+            class="profit-metric"
+            [class.profit-metric--good]="aboveBreakEven()"
+            [class.profit-metric--bad]="!aboveBreakEven() && breakEvenDailyRevenue() !== null"
+          >
+            <span class="profit-metric__label">Avg revenue/day</span>
+            <span class="profit-metric__value">{{ avgDailyRevenue() | money }}</span>
+            <span class="profit-metric__sub">
+              @if (breakEvenDailyRevenue() === null) {
+                —
+              } @else if (aboveBreakEven()) {
+                Above break-even
+              } @else {
+                Below break-even
+              }
+            </span>
+          </div>
+        </div>
+
+        <div
+          class="profit-hint"
+          [class.profit-hint--bad]="windowNetProfit() < 0 || (breakEvenDailyRevenue() !== null && !aboveBreakEven())"
+        >
+          <mat-icon>tips_and_updates</mat-icon>
+          <span>{{ profitRecommendation() }}</span>
+        </div>
+      }
+    </mat-card-content>
+  </mat-card>
+
   <div class="split">
     <mat-card appearance="outlined" class="split__main">
       <mat-card-header>

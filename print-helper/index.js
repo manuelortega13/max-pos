@@ -531,6 +531,78 @@ function renderGcashTransaction(d) {
   return Buffer.from(out.join(''), 'binary');
 }
 
+// Operational restocking report. Caller pre-sorts each section
+// (OUT OF STOCK by name, LOW STOCK by stock ascending) — the helper
+// just renders. Per-row layout uses two lines:
+//   line 1: name ............................... stock
+//   line 2:   category ...................... cost
+// Mirrors the browser fallback in printer.service.ts so paper looks
+// identical whichever path the admin takes.
+function renderLowStockReport(d) {
+  const sym = d.currencySymbol ?? '';
+  const out = [];
+  out.push(INIT, CODEPAGE_CP437);
+
+  // Header.
+  out.push(ALIGN_CENTER, BOLD_ON, DOUBLE_ON);
+  out.push(toCP437(d.storeName ?? 'Store') + LF);
+  out.push(DOUBLE_OFF, BOLD_OFF);
+  if (d.address) out.push(toCP437(d.address) + LF);
+  if (d.phone) out.push(toCP437(d.phone) + LF);
+  out.push(LF);
+
+  // Report title.
+  out.push(BOLD_ON, 'LOW STOCK REPORT' + LF, BOLD_OFF);
+  out.push(LF);
+
+  // Meta.
+  out.push(ALIGN_LEFT);
+  const date = d.generatedAt ? new Date(d.generatedAt).toLocaleString() : '—';
+  out.push(`Date : ${date}` + LF);
+  if (d.generatedByName) out.push(`By   : ${toCP437(d.generatedByName)}` + LF);
+  out.push(repeat('-') + LF);
+
+  const section = (title, rows) => {
+    if (!rows || rows.length === 0) return;
+    out.push(BOLD_ON, `${title} (${rows.length})` + LF, BOLD_OFF);
+    // Per row: line 1 is name + stock, line 2 is cost right-aligned,
+    // then a dashed separator between rows so the eye finds the next
+    // item easily when walking the shelves.
+    for (const r of rows) {
+      const name = truncate(toCP437(String(r.name ?? '')), PAPER_WIDTH - 5);
+      const stockText = String(r.stock ?? 0);
+      out.push(pad(name, stockText) + LF);
+      out.push(pad('', money(sym, r.cost)) + LF);
+      out.push(repeat('-') + LF);
+    }
+  };
+
+  section('OUT OF STOCK', d.outOfStock);
+  section('LOW STOCK', d.lowStock);
+
+  // Total + signature.
+  const total = (d.outOfStock?.length ?? 0) + (d.lowStock?.length ?? 0);
+  out.push(BOLD_ON);
+  out.push(pad('TOTAL ITEMS', String(total)) + LF);
+  out.push(BOLD_OFF);
+  out.push(LF);
+  out.push('Restocked by: ____________________' + LF);
+  out.push(LF);
+
+  // Footer.
+  if (d.footer) {
+    out.push(ALIGN_CENTER);
+    for (const line of String(d.footer).split('\n')) {
+      out.push(toCP437(line) + LF);
+    }
+    out.push(ALIGN_LEFT);
+  }
+
+  out.push(LF.repeat(4));
+  out.push(CUT);
+  return Buffer.from(out.join(''), 'binary');
+}
+
 // ─────────────────────────── render ────────────────────────────────
 function renderReceipt(d) {
   const out = [];
@@ -881,6 +953,18 @@ const server = http.createServer(async (req, res) => {
       );
       return send(res, 200, { ok: true, bytes: bytes.length });
     }
+    if (req.method === 'POST' && req.url === '/print-low-stock') {
+      const payload = await readJson(req);
+      const bytes = renderLowStockReport(payload);
+      await writeToPrinter(bytes);
+      const total =
+        (payload?.outOfStock?.length ?? 0) + (payload?.lowStock?.length ?? 0);
+      console.log(
+        `[lowstock] ${new Date().toISOString()} -> ${total} item(s) ` +
+          `(${bytes.length} bytes)`,
+      );
+      return send(res, 200, { ok: true, bytes: bytes.length });
+    }
     if (req.method === 'POST' && req.url === '/kick') {
       // Standalone drawer-open. Sends only the kick command, no
       // receipt feed. Used for "no-sale" drawer access (making change,
@@ -920,5 +1004,5 @@ server.listen(PORT, () => {
   console.log(`MaxPOS print helper listening on http://localhost:${PORT}`);
   console.log(`Printer device: ${PRINTER_DEVICE}`);
   console.log(`Paper width:    ${PAPER_WIDTH} chars`);
-  console.log(`Endpoints:      POST /print, POST /print-zreport, POST /print-gcash, POST /kick, POST /test, GET /health`);
+  console.log(`Endpoints:      POST /print, POST /print-zreport, POST /print-gcash, POST /print-low-stock, POST /kick, POST /test, GET /health`);
 });

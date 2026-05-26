@@ -201,3 +201,33 @@
     }
   </mat-sidenav-content>
 </mat-sidenav-container>
+
+<!--
+  Floating playbook FAB + slide-in panel. Available from every admin
+  page so the owner can keep pricing notes visible while editing
+  products, setting up inventory, or running EoD. The panel itself
+  doesn't render a backdrop — the rest of the page stays interactive
+  so the owner can copy numbers between the playbook and a form.
+-->
+<button
+  type="button"
+  class="admin-shell__playbook-fab"
+  [class.admin-shell__playbook-fab--open]="playbookOpen()"
+  [class.admin-shell__playbook-fab--handset]="isHandset()"
+  matTooltip="Owner's playbook"
+  matTooltipPosition="left"
+  aria-label="Open owner's playbook"
+  (click)="togglePlaybook()"
+>
+  <mat-icon>{{ playbookOpen() ? 'close' : 'auto_stories' }}</mat-icon>
+</button>
+
+@if (playbookOpen()) {
+  <aside
+    class="admin-shell__playbook-panel"
+    role="complementary"
+    aria-label="Owner's playbook"
+  >
+    <app-playbook-panel (close)="closePlaybook()" />
+  </aside>
+}
