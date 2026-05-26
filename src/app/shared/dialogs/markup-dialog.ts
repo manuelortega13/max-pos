@@ -76,30 +76,33 @@ export interface MarkupDialogData {
         </div>
       </header>
 
-      <section class="md__current">
-        <div>
-          <small>Cost</small>
-          <strong>{{ data.product.cost | money }}</strong>
-        </div>
-        <div>
-          <small>Current price</small>
-          <strong>{{ data.product.price | money }}</strong>
-        </div>
-        <div [class.md__current-warn]="currentMarkup() < 30">
-          <small>Current markup</small>
-          <strong>{{ currentMarkup() | number: '1.0-0' }}%</strong>
-        </div>
-      </section>
+      <p class="md__currently">
+        Currently
+        <strong>{{ data.product.price | money }}</strong>
+        at
+        <strong [class.md__current-warn]="hasCost() && currentMarkup() < 30">
+          @if (hasCost()) { {{ currentMarkup() | number: '1.0-0' }}% } @else { no cost set }
+        </strong>
+      </p>
 
-      @if (data.product.cost <= 0) {
-        <div class="md__warn">
-          <mat-icon>warning</mat-icon>
-          <span>
-            This product has no cost set. Markup math requires a cost greater than zero —
-            edit the product first to set its cost, then come back to adjust markup.
-          </span>
-        </div>
-      } @else {
+      <div class="md__grid">
+        <mat-form-field appearance="outline" class="md__field">
+          <mat-label>Cost</mat-label>
+          <span matTextPrefix>{{ currencySymbol() }}&nbsp;</span>
+          <input
+            matInput
+            type="number"
+            inputmode="decimal"
+            min="0"
+            step="0.01"
+            [ngModel]="costText()"
+            (ngModelChange)="costText.set($event)"
+          />
+          @if (!hasCost()) {
+            <mat-hint>Set the unit cost to enable markup math.</mat-hint>
+          }
+        </mat-form-field>
+
         <mat-form-field appearance="outline" class="md__field">
           <mat-label>Target markup</mat-label>
           <input
@@ -113,26 +116,29 @@ export interface MarkupDialogData {
             autofocus
           />
           <span matTextSuffix>&nbsp;%</span>
-          <mat-hint>
-            Try 25–40 for soft drinks, 60–100 for snacks, 100–200 for cooked food.
-          </mat-hint>
         </mat-form-field>
+      </div>
 
-        <div class="md__round">
-          <label>Round new price to</label>
-          <mat-button-toggle-group
-            [value]="roundStep()"
-            (change)="roundStep.set($event.value)"
-            hideSingleSelectionIndicator
-          >
-            <mat-button-toggle value="none">Exact</mat-button-toggle>
-            <mat-button-toggle value="1">{{ currencySymbol() }}1</mat-button-toggle>
-            <mat-button-toggle value="5">{{ currencySymbol() }}5</mat-button-toggle>
-            <mat-button-toggle value="10">{{ currencySymbol() }}10</mat-button-toggle>
-          </mat-button-toggle-group>
-        </div>
+      <p class="md__tip">
+        Try 25–40 for soft drinks, 60–100 for snacks, 100–200 for cooked food.
+      </p>
 
-        <section class="md__preview" [class.md__preview--bad]="effectiveMarkup() < 0">
+      <div class="md__round">
+        <label>Round new price to</label>
+        <mat-button-toggle-group
+          [value]="roundStep()"
+          (change)="roundStep.set($event.value)"
+          hideSingleSelectionIndicator
+        >
+          <mat-button-toggle value="none">Exact</mat-button-toggle>
+          <mat-button-toggle value="1">{{ currencySymbol() }}1</mat-button-toggle>
+          <mat-button-toggle value="5">{{ currencySymbol() }}5</mat-button-toggle>
+          <mat-button-toggle value="10">{{ currencySymbol() }}10</mat-button-toggle>
+        </mat-button-toggle-group>
+      </div>
+
+      @if (hasCost() && markup() !== null) {
+        <section class="md__preview">
           <div>
             <small>New price</small>
             <strong>{{ newPrice() | money }}</strong>
@@ -148,13 +154,17 @@ export interface MarkupDialogData {
             </strong>
           </div>
         </section>
+      }
 
-        @if (error(); as message) {
-          <div class="md__warn" role="alert">
-            <mat-icon>error_outline</mat-icon>
-            <span>{{ message }}</span>
-          </div>
-        }
+      @if (disabledReason(); as reason) {
+        <p class="md__hint">{{ reason }}</p>
+      }
+
+      @if (error(); as message) {
+        <div class="md__warn" role="alert">
+          <mat-icon>error_outline</mat-icon>
+          <span>{{ message }}</span>
+        </div>
       }
     </mat-dialog-content>
 
@@ -220,13 +230,31 @@ export interface MarkupDialogData {
           font-size: 0.75rem;
         }
       }
-      .md__current, .md__preview {
+      .md__currently {
+        margin: 0;
+        color: var(--mat-sys-on-surface-variant);
+        font-size: 0.9rem;
+
+        strong { color: var(--mat-sys-on-surface); }
+      }
+      .md__grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+        gap: 0.6rem;
+      }
+      .md__tip {
+        margin: -0.25rem 0 0;
+        font-size: 0.78rem;
+        color: var(--mat-sys-on-surface-variant);
+      }
+      .md__preview {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
         gap: 0.5rem;
         padding: 0.75rem 0.85rem;
         border-radius: 0.5rem;
-        background: var(--mat-sys-surface-container-low);
+        background: var(--mat-sys-primary-container);
+        color: var(--mat-sys-on-primary-container);
 
         > div {
           display: flex;
@@ -238,25 +266,22 @@ export interface MarkupDialogData {
           font-size: 0.7rem;
           letter-spacing: 0.05em;
           text-transform: uppercase;
-          color: var(--mat-sys-on-surface-variant);
+          color: var(--mat-sys-on-primary-container);
         }
         strong {
           font-size: 1.05rem;
           font-variant-numeric: tabular-nums;
         }
       }
-      .md__preview {
-        background: var(--mat-sys-primary-container);
-        color: var(--mat-sys-on-primary-container);
-
-        small { color: var(--mat-sys-on-primary-container); }
+      .md__hint {
+        margin: 0;
+        padding: 0.55rem 0.75rem;
+        border-radius: 0.45rem;
+        background: var(--mat-sys-surface-container);
+        color: var(--mat-sys-on-surface-variant);
+        font-size: 0.85rem;
       }
-      .md__preview--bad {
-        background: var(--mat-sys-error-container);
-        color: var(--mat-sys-on-error-container);
-        small { color: var(--mat-sys-on-error-container); }
-      }
-      .md__current-warn strong { color: var(--mat-sys-error); }
+      .md__current-warn { color: var(--mat-sys-error); }
       .md__field { width: 100%; }
       .md__round {
         display: flex;
@@ -296,17 +321,14 @@ export class MarkupDialog {
     () => this.settingsService.settings().currencySymbol,
   );
 
-  /** Current markup % derived from cost + price. Display-only. */
-  protected readonly currentMarkup = computed(() => {
-    const c = this.data.product.cost;
-    if (c <= 0) return 0;
-    return ((this.data.product.price - c) / c) * 100;
-  });
-
-  /** Pre-fill with the current markup rounded to whole percent so
-   *  small tweaks (74 → 80) are one keystroke away rather than
-   *  starting from zero. */
-  protected readonly markupText = signal<string>(
+  // Editable signals. Both inputs use Angular's NumberValueAccessor
+  // which writes back numeric values — coerce to string defensively
+  // in the parsing computeds so `.trim()` never blows up on a stray
+  // number/null (this used to silently freeze the form).
+  protected readonly costText = signal<string | number | null>(
+    this.data.product.cost > 0 ? this.data.product.cost.toFixed(2) : '',
+  );
+  protected readonly markupText = signal<string | number | null>(
     Math.max(0, Math.round(this.computeInitialMarkup())).toString(),
   );
   protected readonly roundStep = signal<RoundStep>('none');
@@ -314,28 +336,52 @@ export class MarkupDialog {
   protected readonly submitting = signal(false);
   protected readonly error = signal<string | null>(null);
 
+  /** Defensive numeric parse — accepts string, number, or null from
+   *  ngModel and returns a finite number or null. Used by both
+   *  costText and markupText since type="number" + ngModel can send
+   *  back any of the three depending on validity/empty state. */
+  private parseNum(v: string | number | null): number | null {
+    if (v === null || v === undefined) return null;
+    if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+    const trimmed = String(v).trim();
+    if (trimmed === '') return null;
+    const parsed = Number(trimmed);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  /** Current cost as the user has it now (live). */
+  protected readonly cost = computed<number>(() => this.parseNum(this.costText()) ?? 0);
+
+  protected readonly hasCost = computed<boolean>(() => this.cost() > 0);
+
+  /** Display-only — markup at open time. Doesn't react to edits. */
+  protected readonly currentMarkup = computed<number>(() => {
+    const c = this.data.product.cost;
+    if (c <= 0) return 0;
+    return ((this.data.product.price - c) / c) * 100;
+  });
+
   /** Parsed markup as a decimal multiplier. Returns null when the
-   *  field is empty or non-numeric so the form blocks save without
-   *  showing a misleading preview. */
-  private readonly markup = computed<number | null>(() => {
-    const raw = this.markupText().trim();
-    if (raw === '') return null;
-    const parsed = parseFloat(raw);
-    if (!Number.isFinite(parsed)) return null;
+   *  field is empty or non-numeric so the preview / save block
+   *  cleanly. */
+  protected readonly markup = computed<number | null>(() => {
+    const parsed = this.parseNum(this.markupText());
+    if (parsed === null) return null;
     return parsed / 100;
   });
 
-  /** New price before rounding. */
+  /** New price before rounding. Falls back to the current price if
+   *  inputs are incomplete so the preview never reads `NaN`. */
   private readonly rawNewPrice = computed<number | null>(() => {
     const m = this.markup();
-    if (m === null) return null;
-    return this.data.product.cost * (1 + m);
+    const c = this.cost();
+    if (m === null || c <= 0) return null;
+    return c * (1 + m);
   });
 
   /** New price after applying the rounding step. Always rounds UP
    *  to the nearest step — a ₱27 price rounds to ₱30 at step=5, not
-   *  ₱25. Rounding down would silently lower the margin the cashier
-   *  thinks they're getting. */
+   *  ₱25. Rounding down would silently shrink the margin. */
   protected readonly newPrice = computed<number>(() => {
     const raw = this.rawNewPrice();
     if (raw === null) return this.data.product.price;
@@ -345,32 +391,52 @@ export class MarkupDialog {
     return Math.ceil(raw / s) * s;
   });
 
-  /** Markup after rounding takes effect — the cashier sees this on
-   *  the receipt, so display it (not the typed value). */
+  /** Markup after rounding takes effect — what the math actually
+   *  yields once the price is rounded. */
   protected readonly effectiveMarkup = computed<number>(() => {
-    const cost = this.data.product.cost;
-    if (cost <= 0) return 0;
-    return ((this.newPrice() - cost) / cost) * 100;
+    const c = this.cost();
+    if (c <= 0) return 0;
+    return ((this.newPrice() - c) / c) * 100;
   });
 
   protected readonly priceChange = computed<number>(
     () => this.newPrice() - this.data.product.price,
   );
 
+  /** Save guard. Intentionally lenient — only blocks on conditions
+   *  that would produce a bad request. "No price change" used to
+   *  block here, which trapped users whose pre-filled markup
+   *  happened to match the existing price; backend update is
+   *  idempotent, so we let the no-op through instead. */
   protected readonly canSubmit = computed<boolean>(() => {
     if (this.submitting()) return false;
-    if (this.data.product.cost <= 0) return false;
+    if (!this.hasCost()) return false;
     if (this.markup() === null) return false;
     if (this.newPrice() <= 0) return false;
-    // Treat "no change" as not worth submitting — closes faster.
-    if (Math.abs(this.priceChange()) < 0.005) return false;
     return true;
+  });
+
+  /** Surfaced as inline hint text whenever save is disabled, so the
+   *  user understands *why* without having to guess. */
+  protected readonly disabledReason = computed<string | null>(() => {
+    if (this.submitting()) return null;
+    if (!this.hasCost()) {
+      return 'Enter a cost greater than zero to enable save.';
+    }
+    if (this.markup() === null) {
+      return 'Enter a target markup percentage.';
+    }
+    if (this.newPrice() <= 0) {
+      return 'The resulting price must be greater than zero.';
+    }
+    return null;
   });
 
   protected submit(): void {
     if (!this.canSubmit()) return;
     const p = this.data.product;
     const newPrice = Math.round(this.newPrice() * 100) / 100;
+    const newCost = Math.round(this.cost() * 100) / 100;
     this.submitting.set(true);
     this.error.set(null);
     this.productService
@@ -379,7 +445,7 @@ export class MarkupDialog {
         sku: p.sku,
         barcodes: [...p.barcodes],
         price: newPrice,
-        cost: p.cost,
+        cost: newCost,
         stock: p.stock,
         categoryId: p.categoryId,
         image: p.image,
