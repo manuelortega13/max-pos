@@ -33,6 +33,10 @@ export interface BusinessDay {
    *  loses amount, keeps fee. */
   readonly gcashCashOutAmount: number | null;
   readonly gcashCashOutFees: number | null;
+  /** Load transactions — always cash-in for the till (customer hands
+   *  cash, store sends mobile load). Drawer gains amount + fee. */
+  readonly loadAmount: number | null;
+  readonly loadFees: number | null;
   readonly salesCount: number | null;
   readonly itemsSold: number | null;
 }

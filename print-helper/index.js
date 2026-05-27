@@ -396,6 +396,12 @@ function renderZReport(d) {
     const totalFees = Number(day.gcashCashInFees ?? 0) + Number(day.gcashCashOutFees ?? 0);
     if (totalFees > 0) out.push(pad('GCash fees', money(sym, totalFees)) + LF);
   }
+  if (Number(day.loadAmount ?? 0) > 0) {
+    out.push(pad('Load', money(sym, day.loadAmount)) + LF);
+    if (Number(day.loadFees ?? 0) > 0) {
+      out.push(pad('Load fees', money(sym, day.loadFees)) + LF);
+    }
+  }
   out.push(BOLD_ON);
   out.push(pad('TOTAL SALES', money(sym, day.totalSales)) + LF);
   out.push(BOLD_OFF);
@@ -422,6 +428,12 @@ function renderZReport(d) {
   }
   if (Number(day.gcashCashOutAmount ?? 0) > 0) {
     out.push(pad('- GCash cash-out', money(sym, day.gcashCashOutAmount)) + LF);
+  }
+  if (Number(day.loadAmount ?? 0) > 0) {
+    out.push(pad('+ Load amount', money(sym, day.loadAmount)) + LF);
+  }
+  if (Number(day.loadFees ?? 0) > 0) {
+    out.push(pad('+ Load fees', money(sym, day.loadFees)) + LF);
   }
   if (Number(day.cashRefunds ?? 0) > 0) {
     out.push(pad('- Cash refunds', money(sym, day.cashRefunds)) + LF);
@@ -509,6 +521,64 @@ function renderGcashTransaction(d) {
   const grandValue = t.type === 'CASH_IN' ? amount + fee : amount - fee;
   out.push(BOLD_ON);
   out.push(pad(grandLabel, money(sym, grandValue)) + LF);
+  out.push(BOLD_OFF);
+
+  if (t.notes) {
+    out.push(LF, 'Notes:' + LF, toCP437(String(t.notes)) + LF);
+  }
+  out.push(LF);
+  out.push('Customer : ____________________' + LF);
+  out.push(LF);
+
+  if (d.footer) {
+    out.push(ALIGN_CENTER);
+    for (const line of String(d.footer).split('\n')) {
+      out.push(toCP437(line) + LF);
+    }
+    out.push(ALIGN_LEFT);
+  }
+
+  out.push(LF.repeat(4));
+  out.push(CUT);
+  return Buffer.from(out.join(''), 'binary');
+}
+
+// Cellphone load receipt. Same structural shape as the GCash
+// cash-in receipt, just with the promo line instead of name/phone
+// (phone is mandatory here so it always prints).
+function renderLoadTransaction(d) {
+  const sym = d.currencySymbol ?? '';
+  const t = d.transaction ?? {};
+  const out = [];
+  out.push(INIT, CODEPAGE_CP437);
+
+  // Header.
+  out.push(ALIGN_CENTER, BOLD_ON, DOUBLE_ON);
+  out.push(toCP437(d.storeName ?? 'Store') + LF);
+  out.push(DOUBLE_OFF, BOLD_OFF);
+  if (d.address) out.push(toCP437(d.address) + LF);
+  if (d.phone) out.push(toCP437(d.phone) + LF);
+  out.push(LF);
+
+  out.push(BOLD_ON, 'CELLPHONE LOAD' + LF, BOLD_OFF);
+  out.push(LF);
+
+  out.push(ALIGN_LEFT);
+  const when = t.date ? new Date(t.date).toLocaleString() : '—';
+  out.push(`Ref     : ${t.reference ?? '—'}` + LF);
+  out.push(`Date    : ${when}` + LF);
+  if (t.cashierName) out.push(`Cashier : ${toCP437(t.cashierName)}` + LF);
+  if (t.customerPhone) out.push(`Phone   : ${toCP437(t.customerPhone)}` + LF);
+  if (t.promo) out.push(`Promo   : ${toCP437(t.promo)}` + LF);
+  out.push(repeat('-') + LF);
+
+  out.push(pad('Amount', money(sym, t.amount)) + LF);
+  out.push(pad('Service fee', money(sym, t.fee)) + LF);
+  out.push(repeat('-') + LF);
+
+  const total = Number(t.amount ?? 0) + Number(t.fee ?? 0);
+  out.push(BOLD_ON);
+  out.push(pad('Customer paid', money(sym, total)) + LF);
   out.push(BOLD_OFF);
 
   if (t.notes) {
@@ -953,6 +1023,16 @@ const server = http.createServer(async (req, res) => {
       );
       return send(res, 200, { ok: true, bytes: bytes.length });
     }
+    if (req.method === 'POST' && req.url === '/print-load') {
+      const payload = await readJson(req);
+      const bytes = renderLoadTransaction(payload);
+      await writeToPrinter(bytes);
+      console.log(
+        `[load]  ${new Date().toISOString()} -> ${payload?.transaction?.reference ?? '?'} ` +
+          `(${bytes.length} bytes)`,
+      );
+      return send(res, 200, { ok: true, bytes: bytes.length });
+    }
     if (req.method === 'POST' && req.url === '/print-low-stock') {
       const payload = await readJson(req);
       const bytes = renderLowStockReport(payload);
@@ -1004,5 +1084,5 @@ server.listen(PORT, () => {
   console.log(`MaxPOS print helper listening on http://localhost:${PORT}`);
   console.log(`Printer device: ${PRINTER_DEVICE}`);
   console.log(`Paper width:    ${PAPER_WIDTH} chars`);
-  console.log(`Endpoints:      POST /print, POST /print-zreport, POST /print-gcash, POST /print-low-stock, POST /kick, POST /test, GET /health`);
+  console.log(`Endpoints:      POST /print, POST /print-zreport, POST /print-gcash, POST /print-load, POST /print-low-stock, POST /kick, POST /test, GET /health`);
 });

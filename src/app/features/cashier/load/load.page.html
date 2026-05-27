@@ -1,0 +1,168 @@
+@if (receipt(); as txn) {
+  <section class="load">
+    <mat-card class="load__success" appearance="outlined">
+      <mat-card-content class="load__success-content">
+        <div class="load__success-icon load__success-icon--pending">
+          <mat-icon>hourglass_top</mat-icon>
+        </div>
+        <h2 class="load__success-title">Load recorded</h2>
+        <p class="load__success-summary">
+          {{ currencySymbol() }}{{ txn.amount.toFixed(2) }}
+          @if (txn.promo) { · {{ txn.promo }} }
+          · to {{ txn.customerPhone }}
+        </p>
+        <p class="load__pending-note">
+          Cash is at the till. Admin will send the load and mark this complete.
+        </p>
+        <dl class="load__success-detail">
+          <div><dt>Reference</dt><dd>{{ txn.reference }}</dd></div>
+          <div><dt>Fee</dt><dd>{{ currencySymbol() }}{{ txn.fee.toFixed(2) }}</dd></div>
+        </dl>
+        <div class="load__success-actions">
+          <button mat-flat-button color="primary" (click)="newTransaction()">
+            <mat-icon>add</mat-icon>
+            New transaction
+          </button>
+        </div>
+      </mat-card-content>
+    </mat-card>
+  </section>
+} @else {
+  <section class="load">
+    <header class="load__page-header">
+      <h1>Cellphone load</h1>
+      <p>Customer hands cash; store sends mobile load. Admin completes the load from their phone.</p>
+    </header>
+
+    @if (!dayOpen()) {
+      <mat-card class="load__warning" appearance="outlined">
+        <mat-card-content>
+          <mat-icon>warning</mat-icon>
+          <span>No business day is open. Ask an admin to open the day before recording loads.</span>
+        </mat-card-content>
+      </mat-card>
+    }
+
+    <mat-card class="load__step" appearance="outlined">
+      <mat-card-header>
+        <mat-card-title>Amount &amp; fee</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        <div class="load__grid">
+          <mat-form-field class="load__field" appearance="outline">
+            <mat-label>Amount</mat-label>
+            <span matTextPrefix>{{ currencySymbol() }}&nbsp;</span>
+            <input
+              matInput
+              inputmode="decimal"
+              type="number"
+              min="0"
+              step="0.01"
+              [ngModel]="amountText()"
+              (ngModelChange)="amountText.set($event)"
+              (blur)="normalizeAmount()"
+            />
+            @if (lookingUp()) {
+              <mat-hint>Looking up fee…</mat-hint>
+            } @else if (matchedTier(); as t) {
+              <mat-hint>
+                Tier {{ currencySymbol() }}{{ t.minAmount.toFixed(2) }}–{{ currencySymbol() }}{{ t.maxAmount.toFixed(2) }}
+                · fee {{ currencySymbol() }}{{ t.fee.toFixed(2) }}
+              </mat-hint>
+            } @else if (amount() > 0) {
+              <mat-hint>No tier matches — enter fee manually</mat-hint>
+            }
+          </mat-form-field>
+
+          <mat-form-field class="load__field" appearance="outline">
+            <mat-label>Service fee</mat-label>
+            <span matTextPrefix>{{ currencySymbol() }}&nbsp;</span>
+            <input
+              matInput
+              inputmode="decimal"
+              type="number"
+              min="0"
+              step="0.01"
+              [ngModel]="feeText()"
+              (ngModelChange)="feeText.set($event)"
+              (blur)="normalizeFee()"
+              [readonly]="feeLocked()"
+            />
+            @if (feeLocked()) {
+              <mat-icon matSuffix>lock</mat-icon>
+            }
+          </mat-form-field>
+        </div>
+
+        @if (amount() > 0) {
+          <div class="load__grand-total">
+            <span class="load__grand-total-label">Customer pays</span>
+            <span class="load__grand-total-value">
+              {{ currencySymbol() }}{{ grandTotal().toFixed(2) }}
+            </span>
+          </div>
+        }
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card class="load__step" appearance="outlined">
+      <mat-card-header>
+        <mat-card-title>Customer</mat-card-title>
+        <mat-card-subtitle>Phone is required. Promo is optional.</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <div class="load__grid">
+          <mat-form-field class="load__field" appearance="outline">
+            <mat-label>Promo (optional)</mat-label>
+            <input
+              matInput
+              [ngModel]="promo()"
+              (ngModelChange)="promo.set($event)"
+              maxlength="255"
+              placeholder="e.g. Unli Calls 50"
+              autocomplete="off"
+            />
+          </mat-form-field>
+
+          <mat-form-field class="load__field" appearance="outline">
+            <mat-label>Phone *</mat-label>
+            <input
+              matInput
+              inputmode="tel"
+              [ngModel]="customerPhone()"
+              (ngModelChange)="customerPhone.set($event)"
+              required
+              maxlength="64"
+              autocomplete="off"
+            />
+            @if (phoneMissing()) {
+              <mat-hint>Required — the cashier sends to this number.</mat-hint>
+            }
+          </mat-form-field>
+        </div>
+
+        <mat-form-field class="load__field" appearance="outline">
+          <mat-label>Notes (optional)</mat-label>
+          <textarea
+            matInput
+            rows="2"
+            [ngModel]="notes()"
+            (ngModelChange)="notes.set($event)"
+          ></textarea>
+        </mat-form-field>
+      </mat-card-content>
+    </mat-card>
+
+    <div class="load__actions">
+      <button
+        mat-flat-button
+        color="primary"
+        [disabled]="!canSubmit() || submitting()"
+        (click)="submit()"
+      >
+        <mat-icon>check</mat-icon>
+        Confirm load
+      </button>
+    </div>
+  </section>
+}

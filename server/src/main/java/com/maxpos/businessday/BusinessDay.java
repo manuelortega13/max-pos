@@ -102,6 +102,15 @@ public class BusinessDay {
     @Column(name = "gcash_cash_out_fees", precision = 12, scale = 2)
     private BigDecimal gcashCashOutFees;
 
+    // Load buckets. Always cash-in (customer hands cash, store sends
+    // load), so a single pair of amount + fees columns mirrors the
+    // GCash cash-in side.
+    @Column(name = "load_amount", precision = 12, scale = 2)
+    private BigDecimal loadAmount;
+
+    @Column(name = "load_fees", precision = 12, scale = 2)
+    private BigDecimal loadFees;
+
     public UUID getId() { return id; }
     public Instant getOpenedAt() { return openedAt; }
     public void setOpenedAt(Instant openedAt) { this.openedAt = openedAt; }
@@ -149,4 +158,8 @@ public class BusinessDay {
     public void setGcashCashOutAmount(BigDecimal gcashCashOutAmount) { this.gcashCashOutAmount = gcashCashOutAmount; }
     public BigDecimal getGcashCashOutFees() { return gcashCashOutFees; }
     public void setGcashCashOutFees(BigDecimal gcashCashOutFees) { this.gcashCashOutFees = gcashCashOutFees; }
+    public BigDecimal getLoadAmount() { return loadAmount; }
+    public void setLoadAmount(BigDecimal loadAmount) { this.loadAmount = loadAmount; }
+    public BigDecimal getLoadFees() { return loadFees; }
+    public void setLoadFees(BigDecimal loadFees) { this.loadFees = loadFees; }
 }

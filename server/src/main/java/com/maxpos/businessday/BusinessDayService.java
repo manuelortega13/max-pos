@@ -10,6 +10,8 @@ import com.maxpos.creditor.CreditorPaymentRepository;
 import com.maxpos.gcash.GcashTransaction;
 import com.maxpos.gcash.GcashTransactionRepository;
 import com.maxpos.gcash.GcashTransactionType;
+import com.maxpos.load.LoadTransaction;
+import com.maxpos.load.LoadTransactionRepository;
 import com.maxpos.sale.PaymentMethod;
 import com.maxpos.sale.Sale;
 import com.maxpos.sale.SaleRepository;
@@ -39,17 +41,20 @@ public class BusinessDayService {
     private final SaleRepository sales;
     private final CreditorPaymentRepository creditorPayments;
     private final GcashTransactionRepository gcashTransactions;
+    private final LoadTransactionRepository loadTransactions;
     private final UserRepository users;
 
     public BusinessDayService(BusinessDayRepository days,
                               SaleRepository sales,
                               CreditorPaymentRepository creditorPayments,
                               GcashTransactionRepository gcashTransactions,
+                              LoadTransactionRepository loadTransactions,
                               UserRepository users) {
         this.days = days;
         this.sales = sales;
         this.creditorPayments = creditorPayments;
         this.gcashTransactions = gcashTransactions;
+        this.loadTransactions = loadTransactions;
         this.users = users;
     }
 
@@ -107,6 +112,8 @@ public class BusinessDayService {
         BigDecimal gcashCashInFees = BigDecimal.ZERO;
         BigDecimal gcashCashOutAmount = BigDecimal.ZERO;
         BigDecimal gcashCashOutFees = BigDecimal.ZERO;
+        BigDecimal loadAmount = BigDecimal.ZERO;
+        BigDecimal loadFees = BigDecimal.ZERO;
         int salesCount = 0;
         int itemsSold = 0;
 
@@ -169,12 +176,23 @@ public class BusinessDayService {
             }
         }
 
+        // Load transactions are always cash-in for the till: customer
+        // hands cash, store sends mobile load. Drawer gains amount +
+        // fee. Voided rows excluded (same rule as GCash).
+        for (LoadTransaction l : loadTransactions.findAllByBusinessDayId(d.getId())) {
+            if (l.getVoidedAt() != null) continue;
+            loadAmount = loadAmount.add(l.getAmount());
+            loadFees   = loadFees.add(l.getFee());
+        }
+
         BigDecimal expectedCash = d.getOpeningFloat()
                 .add(cashSales)
                 .add(cashCreditPayments)
                 .add(gcashCashInAmount)
                 .add(gcashCashInFees)
                 .add(gcashCashOutFees)
+                .add(loadAmount)
+                .add(loadFees)
                 .subtract(cashRefunds)
                 .subtract(gcashCashOutAmount);
         BigDecimal variance = req.countedCash().subtract(expectedCash);
@@ -197,6 +215,8 @@ public class BusinessDayService {
         d.setGcashCashInFees(gcashCashInFees);
         d.setGcashCashOutAmount(gcashCashOutAmount);
         d.setGcashCashOutFees(gcashCashOutFees);
+        d.setLoadAmount(loadAmount);
+        d.setLoadFees(loadFees);
         d.setSalesCount(salesCount);
         d.setItemsSold(itemsSold);
         return BusinessDayDto.from(d);

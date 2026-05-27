@@ -1,6 +1,6 @@
 import { DOCUMENT } from '@angular/common';
 import { Injectable, effect, inject, signal } from '@angular/core';
-import { BusinessDay, CreditorPayment, GcashTransaction } from '../models';
+import { BusinessDay, CreditorPayment, GcashTransaction, LoadTransaction } from '../models';
 
 export type PaperSize = '58mm' | '80mm' | 'a4';
 
@@ -41,6 +41,17 @@ export interface GcashReceiptPayload {
   footer: string;
   currencySymbol: string;
   transaction: GcashTransaction;
+}
+
+/** Structured load receipt sent to the local print helper. Same
+ *  shape as the GCash receipt — the helper has its own renderer. */
+export interface LoadReceiptPayload {
+  storeName: string;
+  address: string;
+  phone: string;
+  footer: string;
+  currencySymbol: string;
+  transaction: LoadTransaction;
 }
 
 /** One line on a low-stock report — frozen at print time so the
@@ -334,6 +345,72 @@ export class PrinterService {
     }
   }
 
+  /**
+   * Print a load receipt. Helper-first with browser fallback —
+   * same pattern as the other receipts.
+   */
+  async printLoadTransaction(payload: LoadReceiptPayload): Promise<void> {
+    if (this._helperEnabled() && this._helperUrl()) {
+      const ok = await this.postToHelper('/print-load', payload);
+      if (ok) return;
+      console.warn('[printer] helper unreachable for load — falling back to browser');
+    }
+    this.printLoadBrowser(payload);
+  }
+
+  private printLoadBrowser(payload: LoadReceiptPayload): void {
+    const win = this.document.defaultView;
+    if (!win) return;
+    const container = this.document.createElement('section');
+    container.className = 'print-receipt';
+    container.innerHTML = this.renderLoadHtml(payload);
+    this.document.body.appendChild(container);
+    try {
+      win.print();
+    } finally {
+      container.remove();
+    }
+  }
+
+  private renderLoadHtml(p: LoadReceiptPayload): string {
+    const t = p.transaction;
+    const money = (v: number | null | undefined) =>
+      `${p.currencySymbol}${Number(v ?? 0).toFixed(2)}`;
+    const esc = (s: string | null | undefined) =>
+      String(s ?? '').replace(/[&<>]/g, (c) =>
+        c === '&' ? '&amp;' : c === '<' ? '&lt;' : '&gt;',
+      );
+    const date = t.date ? new Date(t.date).toLocaleString() : '—';
+    const total = Number(t.amount) + Number(t.fee);
+    return `
+      <header class="receipt__header">
+        <strong>${esc(p.storeName)}</strong>
+        ${p.address ? `<small>${esc(p.address)}</small>` : ''}
+        ${p.phone ? `<small>${esc(p.phone)}</small>` : ''}
+        <strong>CELLPHONE LOAD</strong>
+      </header>
+      <hr/>
+      <div class="receipt__meta">
+        <div>Ref     : ${esc(t.reference)}</div>
+        <div>Date    : ${esc(date)}</div>
+        <div>Cashier : ${esc(t.cashierName)}</div>
+        <div>Phone   : ${esc(t.customerPhone)}</div>
+        ${t.promo ? `<div>Promo   : ${esc(t.promo)}</div>` : ''}
+      </div>
+      <hr/>
+      <div class="receipt__row"><span>Amount</span><span>${money(t.amount)}</span></div>
+      <div class="receipt__row"><span>Service fee</span><span>${money(t.fee)}</span></div>
+      <hr/>
+      <div class="receipt__row receipt__row--grand">
+        <span>Customer paid</span><span>${money(total)}</span>
+      </div>
+      ${t.notes ? `<hr/><div class="receipt__notes"><strong>Notes:</strong> ${esc(t.notes)}</div>` : ''}
+      <hr/>
+      <div>Customer : ____________________</div>
+      ${p.footer ? `<footer class="receipt__footer">${esc(p.footer).replace(/\n/g, '<br/>')}</footer>` : ''}
+    `;
+  }
+
   private renderGcashHtml(p: GcashReceiptPayload): string {
     const t = p.transaction;
     const money = (v: number | null | undefined) =>
@@ -607,6 +684,11 @@ export class PrinterService {
               )
             : '')
         : '';
+    const loadSalesBlock =
+      Number(d.loadAmount ?? 0) > 0
+        ? row('Load', money(d.loadAmount)) +
+          (Number(d.loadFees ?? 0) > 0 ? row('Load fees', money(d.loadFees)) : '')
+        : '';
     const gcashDrawerBlock =
       (Number(d.gcashCashInAmount ?? 0) > 0
         ? row('+ GCash cash-in', money(d.gcashCashInAmount))
@@ -619,6 +701,13 @@ export class PrinterService {
         : '') +
       (Number(d.gcashCashOutAmount ?? 0) > 0
         ? row('− GCash cash-out', money(d.gcashCashOutAmount))
+        : '');
+    const loadDrawerBlock =
+      (Number(d.loadAmount ?? 0) > 0
+        ? row('+ Load amount', money(d.loadAmount))
+        : '') +
+      (Number(d.loadFees ?? 0) > 0
+        ? row('+ Load fees', money(d.loadFees))
         : '');
     const varianceBanner =
       variance !== 0
@@ -648,6 +737,7 @@ export class PrinterService {
       ${row('Transfer', money(d.transferSales))}
       ${Number(d.creditSales ?? 0) > 0 ? row('Credit', money(d.creditSales)) : ''}
       ${gcashSalesBlock}
+      ${loadSalesBlock}
       ${row('TOTAL SALES', money(d.totalSales), true)}
       ${refundsRow}
       <hr/>
@@ -656,6 +746,7 @@ export class PrinterService {
       ${row('+ Cash sales', money(d.cashSales))}
       ${cashCreditRow}
       ${gcashDrawerBlock}
+      ${loadDrawerBlock}
       ${cashRefundsRow}
       ${row('Expected cash', money(d.expectedCash))}
       ${row('Counted cash', money(d.countedCash))}

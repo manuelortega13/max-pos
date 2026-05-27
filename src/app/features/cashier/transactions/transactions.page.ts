@@ -12,10 +12,11 @@ import { MatInputModule } from '@angular/material/input';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
-import { CreditorPayment, GcashTransaction, Sale, SaleStatus } from '../../../core/models';
+import { CreditorPayment, GcashTransaction, LoadTransaction, Sale, SaleStatus } from '../../../core/models';
 import { AuthService } from '../../../core/services/auth.service';
 import { CreditorPaymentService } from '../../../core/services/creditor-payment.service';
 import { GcashService } from '../../../core/services/gcash.service';
+import { LoadService } from '../../../core/services/load.service';
 import { SaleService } from '../../../core/services/sale.service';
 import { SettingsService } from '../../../core/services/settings.service';
 import { MoneyPipe } from '../../../shared/pipes/currency-symbol.pipe';
@@ -48,6 +49,7 @@ export class TransactionsPage implements OnInit {
   private readonly saleService = inject(SaleService);
   private readonly paymentService = inject(CreditorPaymentService);
   private readonly gcashService = inject(GcashService);
+  private readonly loadService = inject(LoadService);
   private readonly authService = inject(AuthService);
   private readonly settingsService = inject(SettingsService);
   private readonly dialog = inject(MatDialog);
@@ -62,6 +64,9 @@ export class TransactionsPage implements OnInit {
    *  todayPayments — additive context next to sales. */
   protected readonly todayGcash = signal<GcashTransaction[]>([]);
 
+  /** Load transactions the cashier recorded today. */
+  protected readonly todayLoad = signal<LoadTransaction[]>([]);
+
   protected readonly paymentColumns = [
     'ref',
     'date',
@@ -75,6 +80,16 @@ export class TransactionsPage implements OnInit {
     'ref',
     'date',
     'type',
+    'amount',
+    'fee',
+    'status',
+  ] as const;
+
+  protected readonly loadColumns = [
+    'ref',
+    'date',
+    'phone',
+    'promo',
     'amount',
     'fee',
     'status',
@@ -99,6 +114,11 @@ export class TransactionsPage implements OnInit {
 
     this.gcashService.listMine().subscribe({
       next: (list) => this.todayGcash.set(list.filter((t) => inToday(t.date))),
+      error: () => {},
+    });
+
+    this.loadService.listMine().subscribe({
+      next: (list) => this.todayLoad.set(list.filter((t) => inToday(t.date))),
       error: () => {},
     });
   }

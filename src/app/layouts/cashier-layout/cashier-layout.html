@@ -55,6 +55,15 @@
           <mat-icon>smartphone</mat-icon>
           GCash
         </a>
+        <a
+          mat-button
+          class="cashier-shell__nav-link"
+          routerLink="load"
+          routerLinkActive="cashier-shell__nav-link--active"
+        >
+          <mat-icon>sim_card</mat-icon>
+          Load
+        </a>
       </nav>
     }
 
@@ -171,6 +180,14 @@
       >
         <mat-icon>smartphone</mat-icon>
         <span>GCash</span>
+      </a>
+      <a
+        class="cashier-shell__bottom-link"
+        routerLink="load"
+        routerLinkActive="cashier-shell__bottom-link--active"
+      >
+        <mat-icon>sim_card</mat-icon>
+        <span>Load</span>
       </a>
     </nav>
   }

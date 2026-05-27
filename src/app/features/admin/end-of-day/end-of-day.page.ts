@@ -10,10 +10,11 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
-import { BusinessDay, CreditorPayment, GcashTransaction } from '../../../core/models';
+import { BusinessDay, CreditorPayment, GcashTransaction, LoadTransaction } from '../../../core/models';
 import { BusinessDayService } from '../../../core/services/business-day.service';
 import { CreditorPaymentService } from '../../../core/services/creditor-payment.service';
 import { GcashService } from '../../../core/services/gcash.service';
+import { LoadService } from '../../../core/services/load.service';
 import { PrinterService } from '../../../core/services/printer.service';
 import { SaleService } from '../../../core/services/sale.service';
 import { SettingsService } from '../../../core/services/settings.service';
@@ -43,6 +44,7 @@ export class EndOfDayPage implements OnInit {
   private readonly saleService = inject(SaleService);
   private readonly paymentService = inject(CreditorPaymentService);
   private readonly gcashService = inject(GcashService);
+  private readonly loadService = inject(LoadService);
   private readonly settingsService = inject(SettingsService);
   private readonly printer = inject(PrinterService);
   private readonly dialog = inject(MatDialog);
@@ -57,6 +59,9 @@ export class EndOfDayPage implements OnInit {
   /** GCash transactions loaded for the live preview. Same scoping
    *  rule as credit payments — filter against the current day's id. */
   protected readonly allGcash = signal<GcashTransaction[]>([]);
+
+  /** Load transactions loaded for the live preview. */
+  protected readonly allLoad = signal<LoadTransaction[]>([]);
 
   protected readonly currentDay = this.businessDayService.current;
   protected readonly history = this.businessDayService.history;
@@ -92,6 +97,8 @@ export class EndOfDayPage implements OnInit {
       gcashCashInFees: 0,
       gcashCashOutAmount: 0,
       gcashCashOutFees: 0,
+      loadAmount: 0,
+      loadFees: 0,
       totalSales: 0,
       totalRefunds: 0,
       salesCount: 0,
@@ -172,6 +179,17 @@ export class EndOfDayPage implements OnInit {
       }
     }
 
+    // Load transactions are always cash-in for the till. Same
+    // exclusion rules as GCash: voided rows + wrong-day rows skipped.
+    let loadAmount = 0,
+      loadFees = 0;
+    for (const l of this.allLoad()) {
+      if (l.voidedAt !== null) continue;
+      if (l.businessDayId !== day.id) continue;
+      loadAmount += l.amount;
+      loadFees += l.fee;
+    }
+
     return {
       cashSales,
       cashRefunds,
@@ -184,6 +202,8 @@ export class EndOfDayPage implements OnInit {
       gcashCashInFees,
       gcashCashOutAmount,
       gcashCashOutFees,
+      loadAmount,
+      loadFees,
       totalSales,
       totalRefunds,
       salesCount,
@@ -196,15 +216,18 @@ export class EndOfDayPage implements OnInit {
     if (!day) return 0;
     const p = this.preview();
     // float + cash in (sales + credit payments + GCash cash-ins + all
-    // GCash fees) − cash out (refunds + GCash cash-outs).
-    // Card / transfer credit payments don't touch the drawer.
+    // GCash fees + load amount + load fees) − cash out (refunds +
+    // GCash cash-outs). Card / transfer credit payments don't touch
+    // the drawer.
     return (
       day.openingFloat +
       p.cashSales +
       p.cashCreditPayments +
       p.gcashCashInAmount +
       p.gcashCashInFees +
-      p.gcashCashOutFees -
+      p.gcashCashOutFees +
+      p.loadAmount +
+      p.loadFees -
       p.cashRefunds -
       p.gcashCashOutAmount
     );
@@ -231,6 +254,10 @@ export class EndOfDayPage implements OnInit {
     });
     this.gcashService.listAll().subscribe({
       next: (list) => this.allGcash.set(list),
+      error: () => {},
+    });
+    this.loadService.listAll().subscribe({
+      next: (list) => this.allLoad.set(list),
       error: () => {},
     });
   }

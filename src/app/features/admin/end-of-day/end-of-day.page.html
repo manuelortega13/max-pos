@@ -73,6 +73,18 @@
               <strong>+{{ (preview().gcashCashInFees + preview().gcashCashOutFees) | money }}</strong>
             </div>
           }
+          @if (preview().loadAmount > 0) {
+            <div>
+              <small>Load</small>
+              <strong>{{ preview().loadAmount | money }}</strong>
+            </div>
+          }
+          @if (preview().loadFees > 0) {
+            <div>
+              <small>Load fees</small>
+              <strong>+{{ preview().loadFees | money }}</strong>
+            </div>
+          }
           <div>
             <small>Total sales</small>
             <strong>{{ preview().totalSales | money }}</strong>

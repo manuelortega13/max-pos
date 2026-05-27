@@ -1,0 +1,157 @@
+<section class="ltx">
+  <header class="ltx__header">
+    <div class="ltx__title-block">
+      <h2>Load transactions</h2>
+      <p>Cash is at the till. Send the load from your phone, then mark each row completed.</p>
+    </div>
+
+    <mat-button-toggle-group
+      class="ltx__filter"
+      [value]="statusFilter()"
+      (change)="setFilter($event.value)"
+      hideSingleSelectionIndicator
+    >
+      <mat-button-toggle value="PENDING">
+        Pending @if (pendingCount() > 0) { ({{ pendingCount() }}) }
+      </mat-button-toggle>
+      <mat-button-toggle value="COMPLETED">
+        Completed @if (completedCount() > 0) { ({{ completedCount() }}) }
+      </mat-button-toggle>
+      <mat-button-toggle value="all">All</mat-button-toggle>
+    </mat-button-toggle-group>
+  </header>
+
+  @if (loading()) {
+    <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+  }
+
+  @if (error(); as message) {
+    <mat-card appearance="outlined" class="ltx__error">
+      <mat-card-content>
+        <mat-icon>error_outline</mat-icon>
+        <span>{{ message }}</span>
+        <button mat-stroked-button (click)="load()">Retry</button>
+      </mat-card-content>
+    </mat-card>
+  }
+
+  <mat-card appearance="outlined" class="ltx__table-card">
+    @if (rows().length === 0 && !loading()) {
+      <div class="ltx__empty">
+        <mat-icon>inbox</mat-icon>
+        @if (statusFilter() === 'PENDING') {
+          <p>No pending loads. You're caught up.</p>
+        } @else if (statusFilter() === 'COMPLETED') {
+          <p>No completed loads yet.</p>
+        } @else {
+          <p>No load transactions recorded yet.</p>
+        }
+      </div>
+    } @else {
+      <div class="ltx__table-wrap">
+        <table mat-table [dataSource]="rows()" class="ltx__table">
+          <ng-container matColumnDef="ref">
+            <th mat-header-cell *matHeaderCellDef>Ref #</th>
+            <td mat-cell *matCellDef="let t" [class.ltx__voided]="t.voidedAt">
+              <strong>{{ t.reference }}</strong>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="date">
+            <th mat-header-cell *matHeaderCellDef>Date</th>
+            <td mat-cell *matCellDef="let t" [class.ltx__voided]="t.voidedAt">
+              {{ t.date | date: 'MMM d, y, h:mm a' }}
+              <small class="ltx__cashier">by {{ t.cashierName }}</small>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="customer">
+            <th mat-header-cell *matHeaderCellDef>Phone &amp; promo</th>
+            <td mat-cell *matCellDef="let t" [class.ltx__voided]="t.voidedAt">
+              <div class="ltx__customer">
+                <button
+                  type="button"
+                  class="ltx__phone-copy"
+                  [cdkCopyToClipboard]="t.customerPhone"
+                  (cdkCopyToClipboardCopied)="onPhoneCopied($event, t.customerPhone)"
+                  matTooltip="Copy phone"
+                  aria-label="Copy phone number to clipboard"
+                >
+                  <strong class="ltx__phone">{{ t.customerPhone }}</strong>
+                  <mat-icon class="ltx__phone-copy-icon">content_copy</mat-icon>
+                </button>
+                @if (t.promo) {
+                  <span class="ltx__promo">{{ t.promo }}</span>
+                }
+              </div>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="amount">
+            <th mat-header-cell *matHeaderCellDef>Amount</th>
+            <td mat-cell *matCellDef="let t" [class.ltx__voided]="t.voidedAt">
+              <strong>{{ t.amount | money }}</strong>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="fee">
+            <th mat-header-cell *matHeaderCellDef>Fee</th>
+            <td mat-cell *matCellDef="let t" [class.ltx__voided]="t.voidedAt">
+              {{ t.fee | money }}
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="status">
+            <th mat-header-cell *matHeaderCellDef>Status</th>
+            <td mat-cell *matCellDef="let t">
+              @if (t.voidedAt) {
+                <mat-chip class="ltx__chip ltx__chip--voided" disableRipple>Voided</mat-chip>
+              } @else if (t.status === 'PENDING') {
+                <mat-chip class="ltx__chip ltx__chip--pending" disableRipple>Pending</mat-chip>
+              } @else {
+                <mat-chip
+                  class="ltx__chip ltx__chip--completed"
+                  disableRipple
+                  [matTooltip]="
+                    'Completed ' +
+                    (t.completedAt | date: 'MMM d, y, h:mm a') +
+                    (t.completedByName ? ' by ' + t.completedByName : '')
+                  "
+                >
+                  Completed
+                </mat-chip>
+              }
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="actions">
+            <th mat-header-cell *matHeaderCellDef class="ltx__actions-col"></th>
+            <td mat-cell *matCellDef="let t" class="ltx__actions-col">
+              @if (!t.voidedAt && t.status === 'PENDING') {
+                <button
+                  mat-flat-button
+                  color="primary"
+                  (click)="confirmComplete(t)"
+                >
+                  <mat-icon>check</mat-icon>
+                  Mark completed
+                </button>
+                <button
+                  mat-icon-button
+                  matTooltip="Void"
+                  (click)="confirmVoid(t)"
+                  aria-label="Void load"
+                >
+                  <mat-icon>block</mat-icon>
+                </button>
+              }
+            </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="columns"></tr>
+          <tr mat-row *matRowDef="let row; columns: columns"></tr>
+        </table>
+      </div>
+    }
+  </mat-card>
+</section>

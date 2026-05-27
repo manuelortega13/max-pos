@@ -34,6 +34,10 @@ export interface CloseDayDialogData {
   readonly gcashCashInFees: number;
   readonly gcashCashOutAmount: number;
   readonly gcashCashOutFees: number;
+  /** Load buckets. Always cash-in for the till — amount + fee both
+   *  add to the drawer. */
+  readonly loadAmount: number;
+  readonly loadFees: number;
   readonly totalSales: number;
   readonly totalRefunds: number;
   readonly salesCount: number;
@@ -111,6 +115,12 @@ export interface CloseDayDialogResult {
           }
           @if (data.gcashCashOutAmount > 0) {
             <div><dt>− GCash cash-out</dt><dd>{{ data.gcashCashOutAmount | money }}</dd></div>
+          }
+          @if (data.loadAmount > 0) {
+            <div><dt>+ Load amount</dt><dd>{{ data.loadAmount | money }}</dd></div>
+          }
+          @if (data.loadFees > 0) {
+            <div><dt>+ Load fees</dt><dd>{{ data.loadFees | money }}</dd></div>
           }
           @if (data.cashRefunds > 0) {
             <div><dt>− Cash refunds</dt><dd>{{ data.cashRefunds | money }}</dd></div>
@@ -266,7 +276,9 @@ export class CloseDayDialog {
       this.data.cashCreditPayments +
       this.data.gcashCashInAmount +
       this.data.gcashCashInFees +
-      this.data.gcashCashOutFees -
+      this.data.gcashCashOutFees +
+      this.data.loadAmount +
+      this.data.loadFees -
       this.data.cashRefunds -
       this.data.gcashCashOutAmount,
   );

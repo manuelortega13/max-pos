@@ -424,3 +424,28 @@ mat-icon {
   color: var(--mat-sys-on-surface-variant);
   flex-shrink: 0;
 }
+
+/* ──────────────────────────────────────────────────────────────────
+   Stuck-backdrop escape hatch.
+
+   Material's cdk-overlay-backdrop is supposed to be removed after a
+   dialog/menu closes (a `cdk-overlay-backdrop-fading` class triggers
+   a transition; the element is removed on transitionend). When that
+   transition is interrupted — route change mid-close, throttled
+   background tab, fast double-confirm — the backdrop can be left in
+   the DOM with pointer-events:auto, swallowing every click on the
+   page until reload.
+
+   This rule hides any backdrop whose overlay-container has no
+   accompanying open .cdk-overlay-pane left. The :has() check makes
+   it conditional: while a real dialog is open, the backdrop renders
+   normally; once the pane is gone, any leftover backdrops collapse.
+
+   Belt for the closeAll() braces in app.ts — covers cases the route
+   handler can't reach (browser-tab focus thrash, in-place programmatic
+   .close() without navigation).
+   ────────────────────────────────────────────────────────────────── */
+.cdk-overlay-container:not(:has(.cdk-overlay-pane)) .cdk-overlay-backdrop {
+  display: none !important;
+  pointer-events: none !important;
+}

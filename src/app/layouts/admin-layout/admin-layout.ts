@@ -40,6 +40,7 @@ const NAV_ITEMS: readonly NavItem[] = [
   { path: 'creditors', label: 'Creditors', icon: 'account_balance_wallet' },
   { path: 'end-of-day', label: 'End of Day', icon: 'event_busy' },
   { path: 'gcash', label: 'GCash', icon: 'smartphone' },
+  { path: 'load', label: 'Load', icon: 'sim_card' },
   { path: 'settings', label: 'Settings', icon: 'settings' },
 ];
 

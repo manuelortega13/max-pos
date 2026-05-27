@@ -10,3 +10,4 @@ export * from './business-day.model';
 export * from './creditor.model';
 export * from './creditor-payment.model';
 export * from './gcash.model';
+export * from './load.model';
