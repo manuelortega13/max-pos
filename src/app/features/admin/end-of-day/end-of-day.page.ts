@@ -121,7 +121,6 @@ export class EndOfDayPage implements OnInit {
       itemsSold: 0,
     };
     if (!day) return empty;
-    const openedAt = Date.parse(day.openedAt);
     let cashSales = 0,
       cashRefunds = 0,
       cardSales = 0,
@@ -137,8 +136,17 @@ export class EndOfDayPage implements OnInit {
     // cashSales would produce a negative expectedCash whenever
     // same-day refunds exceeded same-day completed cash sales (e.g.
     // 3 cash sales, 2 of which got refunded later in the day).
+    //
+    // Filter by businessDayId (not by `date >= openedAt`) — same key
+    // the backend uses in findAllByBusinessDayId at close time. The
+    // timestamp heuristic was wrong for offline sales: they get
+    // tagged to the currently-open day when synced, but their date
+    // stamp is their original (earlier) creation time, which would
+    // fail a `date >= openedAt` check and get silently dropped from
+    // the live preview — making the preview total disagree with what
+    // the backend would actually compute on close.
     for (const s of this.saleService.sales()) {
-      if (Date.parse(s.date) < openedAt) continue;
+      if (s.businessDayId !== day.id) continue;
       const refunded = s.status === 'REFUNDED';
       totalSales += s.total;
       salesCount++;

@@ -48,6 +48,12 @@ export interface Sale {
   /** Set only when paymentMethod = 'CREDIT', null otherwise. */
   readonly creditorId: string | null;
   readonly creditorName: string | null;
+  /** FK to the business day this sale belongs to. Null for pre-V16
+   *  historical rows (before the business-day feature shipped). The
+   *  EoD live preview filters by this so it mirrors what the backend
+   *  actually aggregates on close, not the looser date-since-openedAt
+   *  heuristic. */
+  readonly businessDayId: string | null;
   readonly items: readonly SaleItem[];
 }
 

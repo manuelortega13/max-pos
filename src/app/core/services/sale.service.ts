@@ -5,6 +5,7 @@ import { catchError } from 'rxjs/operators';
 import { CreateSaleRequest, Sale, SaleItem } from '../models';
 import { computeDiscount } from './cart.service';
 import { AuthService } from './auth.service';
+import { BusinessDayService } from './business-day.service';
 import { OfflineQueueService, QueuedRefund, QueuedSale } from './offline-queue.service';
 import { ProductService } from './product.service';
 import { SettingsService } from './settings.service';
@@ -13,6 +14,7 @@ import { SettingsService } from './settings.service';
 export class SaleService {
   private readonly http = inject(HttpClient);
   private readonly authService = inject(AuthService);
+  private readonly businessDayService = inject(BusinessDayService);
   private readonly offlineQueue = inject(OfflineQueueService);
   private readonly productService = inject(ProductService);
   private readonly settingsService = inject(SettingsService);
@@ -111,6 +113,28 @@ export class SaleService {
    * runner replays queued sales once the network is back.
    */
   create(request: CreateSaleRequest): Observable<Sale> {
+    // Belt-and-braces against orphan sales (sales with NULL business_day_id
+    // landing in the DB and floating outside any EoD close report). The
+    // POS checkout dialog already gates on businessDayService.isOpen, but
+    // gating here too means future callers — fast checkout, alternate UIs,
+    // dev shortcuts — can't silently bypass it. Without this, an offline
+    // sale queued while no day was open would replay with the
+    // X-Maxpos-Offline-Replay header and the backend would accept it with
+    // business_day_id = null.
+    if (this.businessDayService.current() === null) {
+      return throwError(
+        () =>
+          new HttpErrorResponse({
+            status: 412,
+            statusText: 'Precondition Failed',
+            error: {
+              message:
+                'No business day is open. An admin must open the day before sales can be rung up.',
+            },
+          }),
+      );
+    }
+
     const clientRef = request.clientRef ?? this.generateClientRef();
     const payload: CreateSaleRequest = { ...request, clientRef };
     const offlineEnabled = this.settingsService.settings().offlineModeEnabled;
@@ -311,6 +335,11 @@ export class SaleService {
       // creditor's full name handy here. Leave null — the backend's
       // canonical response will fill it on replay.
       creditorName: null,
+      // Use the currently-open day so the optimistic sale appears in
+      // the EoD live preview (which now filters by businessDayId).
+      // Null is acceptable too — on replay the backend assigns the
+      // actual id from whatever day is open at that moment.
+      businessDayId: this.businessDayService.current()?.id ?? null,
       items,
     };
   }
