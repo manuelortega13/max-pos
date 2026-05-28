@@ -1,7 +1,13 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { Observable, tap } from 'rxjs';
-import { BusinessDay, CloseDayRequest, OpenDayRequest } from '../models';
+import {
+  BusinessDay,
+  CloseDayRequest,
+  CreateFloatAdditionRequest,
+  FloatAddition,
+  OpenDayRequest,
+} from '../models';
 
 /**
  * The currently-open business day (if any) and the open/close lifecycle.
@@ -85,6 +91,32 @@ export class BusinessDayService {
           return next;
         });
       }),
+    );
+  }
+
+  // ─── Float additions (mid-day cash top-ups) ─────────────────────
+  //
+  // Audit-log endpoints scoped to the currently-open business day.
+  // Admin-only — backend enforces with @PreAuthorize. Frontend just
+  // wires the HTTP layer; the EoD page owns the UX.
+
+  listFloatAdditions(): Observable<FloatAddition[]> {
+    return this.http.get<FloatAddition[]>(
+      '/api/business-days/current/float-additions',
+    );
+  }
+
+  addFloatAddition(req: CreateFloatAdditionRequest): Observable<FloatAddition> {
+    return this.http.post<FloatAddition>(
+      '/api/business-days/current/float-additions',
+      req,
+    );
+  }
+
+  voidFloatAddition(id: string, reason?: string | null): Observable<FloatAddition> {
+    return this.http.post<FloatAddition>(
+      `/api/business-days/current/float-additions/${id}/void`,
+      { reason: reason ?? null },
     );
   }
 

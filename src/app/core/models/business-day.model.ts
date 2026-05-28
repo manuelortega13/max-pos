@@ -37,8 +37,30 @@ export interface BusinessDay {
    *  cash, store sends mobile load). Drawer gains amount + fee. */
   readonly loadAmount: number | null;
   readonly loadFees: number | null;
+  /** Sum of mid-day cash top-ups to the opening float (excluding
+   *  voided additions). Frozen at close time. */
+  readonly floatAdditions: number | null;
   readonly salesCount: number | null;
   readonly itemsSold: number | null;
+}
+
+/** One audit-log entry for a mid-day cash float top-up. */
+export interface FloatAddition {
+  readonly id: string;
+  readonly businessDayId: string;
+  readonly amount: number;
+  readonly note: string | null;
+  readonly addedAt: string;
+  readonly addedById: string;
+  readonly addedByName: string;
+  readonly voidedAt: string | null;
+  readonly voidedById: string | null;
+  readonly voidedByName: string | null;
+}
+
+export interface CreateFloatAdditionRequest {
+  readonly amount: number;
+  readonly note?: string | null;
 }
 
 export interface OpenDayRequest {

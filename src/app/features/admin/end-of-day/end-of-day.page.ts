@@ -10,7 +10,9 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
-import { BusinessDay, CreditorPayment, GcashTransaction, LoadTransaction } from '../../../core/models';
+import { MatTooltipModule } from '@angular/material/tooltip';
+import { BusinessDay, CreditorPayment, FloatAddition, GcashTransaction, LoadTransaction } from '../../../core/models';
+import { AddToFloatDialog, AddToFloatDialogData } from './add-to-float-dialog';
 import { BusinessDayService } from '../../../core/services/business-day.service';
 import { CreditorPaymentService } from '../../../core/services/creditor-payment.service';
 import { GcashService } from '../../../core/services/gcash.service';
@@ -33,6 +35,7 @@ import { OpenDayDialog, OpenDayDialogResult } from './open-day-dialog';
     MatIconModule,
     MatProgressSpinnerModule,
     MatTableModule,
+    MatTooltipModule,
     MoneyPipe,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -62,6 +65,18 @@ export class EndOfDayPage implements OnInit {
 
   /** Load transactions loaded for the live preview. */
   protected readonly allLoad = signal<LoadTransaction[]>([]);
+
+  /** Mid-day float top-ups for the currently-open day. Newest first
+   *  so the EoD log reads chronologically downward. */
+  protected readonly floatAdditions = signal<FloatAddition[]>([]);
+
+  /** Total of active (non-voided) float additions. Feeds the live
+   *  preview + the AddToFloat dialog's "Float so far" pill. */
+  protected readonly activeFloatAdditionsTotal = computed(() =>
+    this.floatAdditions()
+      .filter((a) => a.voidedAt === null)
+      .reduce((sum, a) => sum + a.amount, 0),
+  );
 
   protected readonly currentDay = this.businessDayService.current;
   protected readonly history = this.businessDayService.history;
@@ -99,6 +114,7 @@ export class EndOfDayPage implements OnInit {
       gcashCashOutFees: 0,
       loadAmount: 0,
       loadFees: 0,
+      floatAdditions: 0,
       totalSales: 0,
       totalRefunds: 0,
       salesCount: 0,
@@ -190,6 +206,14 @@ export class EndOfDayPage implements OnInit {
       loadFees += l.fee;
     }
 
+    // Mid-day float top-ups. Same exclusion rule — voided rows skipped.
+    let floatAdditions = 0;
+    for (const a of this.floatAdditions()) {
+      if (a.voidedAt !== null) continue;
+      if (a.businessDayId !== day.id) continue;
+      floatAdditions += a.amount;
+    }
+
     return {
       cashSales,
       cashRefunds,
@@ -204,6 +228,7 @@ export class EndOfDayPage implements OnInit {
       gcashCashOutFees,
       loadAmount,
       loadFees,
+      floatAdditions,
       totalSales,
       totalRefunds,
       salesCount,
@@ -215,12 +240,13 @@ export class EndOfDayPage implements OnInit {
     const day = this.currentDay();
     if (!day) return 0;
     const p = this.preview();
-    // float + cash in (sales + credit payments + GCash cash-ins + all
-    // GCash fees + load amount + load fees) − cash out (refunds +
-    // GCash cash-outs). Card / transfer credit payments don't touch
-    // the drawer.
+    // float + mid-day top-ups + cash in (sales + credit payments +
+    // GCash cash-ins + all GCash fees + load amount + load fees) −
+    // cash out (refunds + GCash cash-outs). Card / transfer credit
+    // payments don't touch the drawer.
     return (
       day.openingFloat +
+      p.floatAdditions +
       p.cashSales +
       p.cashCreditPayments +
       p.gcashCashInAmount +
@@ -259,6 +285,54 @@ export class EndOfDayPage implements OnInit {
     this.loadService.listAll().subscribe({
       next: (list) => this.allLoad.set(list),
       error: () => {},
+    });
+    this.loadFloatAdditions();
+  }
+
+  private loadFloatAdditions(): void {
+    this.businessDayService.listFloatAdditions().subscribe({
+      next: (list) => this.floatAdditions.set(list),
+      // Soft failure — preview falls back to 0 additions and the
+      // backend snapshot will still be correct at close time.
+      error: () => {},
+    });
+  }
+
+  protected openAddToFloat(): void {
+    const day = this.currentDay();
+    if (!day) return;
+    const ref = this.dialog.open<AddToFloatDialog, AddToFloatDialogData, boolean>(
+      AddToFloatDialog,
+      {
+        width: '440px',
+        panelClass: 'dialog-fullscreen-mobile',
+        autoFocus: 'first-tabbable',
+        data: {
+          openingFloat: day.openingFloat,
+          priorAdditions: this.activeFloatAdditionsTotal(),
+        },
+      },
+    );
+    ref.afterClosed().subscribe((added) => {
+      if (added) this.loadFloatAdditions();
+    });
+  }
+
+  protected confirmVoidFloatAddition(addition: FloatAddition): void {
+    if (!confirm(
+      `Void this addition of ${this.currencySymbol()}${addition.amount.toFixed(2)}?\n\n` +
+      `The cash physically added to the till stays put — voiding only removes ` +
+      `the row from the end-of-day reconciliation. Use this for mistakes ` +
+      `(wrong amount, duplicate entry).`,
+    )) return;
+    this.businessDayService.voidFloatAddition(addition.id).subscribe({
+      next: () => {
+        this.snackBar.open('Float addition voided', 'Dismiss', { duration: 2500 });
+        this.loadFloatAdditions();
+      },
+      error: (err: HttpErrorResponse) => {
+        this.snackBar.open(err.error?.message ?? 'Void failed.', 'Dismiss', { duration: 4000 });
+      },
     });
   }
 

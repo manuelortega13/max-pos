@@ -37,6 +37,7 @@ public record BusinessDayDto(
         BigDecimal gcashCashOutFees,
         BigDecimal loadAmount,
         BigDecimal loadFees,
+        BigDecimal floatAdditions,
         Integer salesCount,
         Integer itemsSold
 ) {
@@ -68,6 +69,7 @@ public record BusinessDayDto(
                 d.getGcashCashOutFees(),
                 d.getLoadAmount(),
                 d.getLoadFees(),
+                d.getFloatAdditions(),
                 d.getSalesCount(),
                 d.getItemsSold()
         );

@@ -823,6 +823,7 @@ export class PrinterService {
       <hr/>
       <div class="receipt__section"><strong>CASH DRAWER</strong></div>
       ${row('Opening float', money(d.openingFloat))}
+      ${Number(d.floatAdditions ?? 0) > 0 ? row('+ Float top-ups', money(d.floatAdditions)) : ''}
       ${row('+ Cash sales', money(d.cashSales))}
       ${cashCreditRow}
       ${gcashDrawerBlock}

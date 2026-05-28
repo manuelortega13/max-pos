@@ -16,7 +16,12 @@
           </mat-chip>
           <div class="eod__status-meta">
             <small>Opened {{ day.openedAt | date: 'mediumDate' }} · {{ day.openedAt | date: 'shortTime' }} by {{ day.openedByName }}</small>
-            <small>Float: <strong>{{ day.openingFloat | money }}</strong></small>
+            <small>
+              Float: <strong>{{ day.openingFloat | money }}</strong>
+              @if (preview().floatAdditions > 0) {
+                + <strong>{{ preview().floatAdditions | money }}</strong> added
+              }
+            </small>
           </div>
         </div>
 
@@ -85,6 +90,12 @@
               <strong>+{{ preview().loadFees | money }}</strong>
             </div>
           }
+          @if (preview().floatAdditions > 0) {
+            <div>
+              <small>Float top-ups</small>
+              <strong>+{{ preview().floatAdditions | money }}</strong>
+            </div>
+          }
           <div>
             <small>Total sales</small>
             <strong>{{ preview().totalSales | money }}</strong>
@@ -102,6 +113,10 @@
         </div>
 
         <div class="eod__actions">
+          <button mat-stroked-button (click)="openAddToFloat()">
+            <mat-icon>add</mat-icon>
+            Add to float
+          </button>
           <button mat-flat-button color="warn" (click)="closeDay()">
             <mat-icon>event_busy</mat-icon>
             Close day
@@ -128,6 +143,48 @@
       </mat-card-content>
     }
   </mat-card>
+
+  @if (currentDay() && floatAdditions().length > 0) {
+    <mat-card class="eod__history-card" appearance="outlined">
+      <mat-card-header>
+        <mat-card-title>Float top-ups today</mat-card-title>
+        <mat-card-subtitle>
+          Cash added to the till during the day. Newest first.
+        </mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <ul class="eod__float-log">
+          @for (a of floatAdditions(); track a.id) {
+            <li class="eod__float-row" [class.eod__float-row--voided]="a.voidedAt">
+              <div class="eod__float-amount">
+                <strong>+{{ a.amount | money }}</strong>
+                @if (a.voidedAt) {
+                  <mat-chip class="eod__float-chip" disableRipple>Voided</mat-chip>
+                }
+              </div>
+              <div class="eod__float-meta">
+                <small>{{ a.addedAt | date: 'MMM d, h:mm a' }} · by {{ a.addedByName }}</small>
+                @if (a.note) {
+                  <small class="eod__float-note">{{ a.note }}</small>
+                }
+              </div>
+              @if (!a.voidedAt) {
+                <button
+                  mat-icon-button
+                  type="button"
+                  matTooltip="Void this addition"
+                  (click)="confirmVoidFloatAddition(a)"
+                  aria-label="Void float addition"
+                >
+                  <mat-icon>block</mat-icon>
+                </button>
+              }
+            </li>
+          }
+        </ul>
+      </mat-card-content>
+    </mat-card>
+  }
 
   <mat-card class="eod__history-card" appearance="outlined">
     <mat-card-header>

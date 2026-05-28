@@ -111,6 +111,12 @@ public class BusinessDay {
     @Column(name = "load_fees", precision = 12, scale = 2)
     private BigDecimal loadFees;
 
+    /** Sum of mid-day cash top-ups to the opening float (excluding
+     *  voided additions). Frozen at close time; live preview comes
+     *  from FloatAdditionRepository directly. */
+    @Column(name = "float_additions", precision = 12, scale = 2)
+    private BigDecimal floatAdditions;
+
     public UUID getId() { return id; }
     public Instant getOpenedAt() { return openedAt; }
     public void setOpenedAt(Instant openedAt) { this.openedAt = openedAt; }
@@ -162,4 +168,6 @@ public class BusinessDay {
     public void setLoadAmount(BigDecimal loadAmount) { this.loadAmount = loadAmount; }
     public BigDecimal getLoadFees() { return loadFees; }
     public void setLoadFees(BigDecimal loadFees) { this.loadFees = loadFees; }
+    public BigDecimal getFloatAdditions() { return floatAdditions; }
+    public void setFloatAdditions(BigDecimal floatAdditions) { this.floatAdditions = floatAdditions; }
 }

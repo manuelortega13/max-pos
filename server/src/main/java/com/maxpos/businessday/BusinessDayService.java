@@ -42,6 +42,7 @@ public class BusinessDayService {
     private final CreditorPaymentRepository creditorPayments;
     private final GcashTransactionRepository gcashTransactions;
     private final LoadTransactionRepository loadTransactions;
+    private final FloatAdditionRepository floatAdditions;
     private final UserRepository users;
 
     public BusinessDayService(BusinessDayRepository days,
@@ -49,12 +50,14 @@ public class BusinessDayService {
                               CreditorPaymentRepository creditorPayments,
                               GcashTransactionRepository gcashTransactions,
                               LoadTransactionRepository loadTransactions,
+                              FloatAdditionRepository floatAdditions,
                               UserRepository users) {
         this.days = days;
         this.sales = sales;
         this.creditorPayments = creditorPayments;
         this.gcashTransactions = gcashTransactions;
         this.loadTransactions = loadTransactions;
+        this.floatAdditions = floatAdditions;
         this.users = users;
     }
 
@@ -114,6 +117,7 @@ public class BusinessDayService {
         BigDecimal gcashCashOutFees = BigDecimal.ZERO;
         BigDecimal loadAmount = BigDecimal.ZERO;
         BigDecimal loadFees = BigDecimal.ZERO;
+        BigDecimal floatAdditionsTotal = BigDecimal.ZERO;
         int salesCount = 0;
         int itemsSold = 0;
 
@@ -185,7 +189,15 @@ public class BusinessDayService {
             loadFees   = loadFees.add(l.getFee());
         }
 
+        // Mid-day float top-ups. Voided additions excluded — they're
+        // accounting reversals, not actual cash movement.
+        for (FloatAddition a : floatAdditions.findAllByBusinessDayId(d.getId())) {
+            if (a.getVoidedAt() != null) continue;
+            floatAdditionsTotal = floatAdditionsTotal.add(a.getAmount());
+        }
+
         BigDecimal expectedCash = d.getOpeningFloat()
+                .add(floatAdditionsTotal)
                 .add(cashSales)
                 .add(cashCreditPayments)
                 .add(gcashCashInAmount)
@@ -217,6 +229,7 @@ public class BusinessDayService {
         d.setGcashCashOutFees(gcashCashOutFees);
         d.setLoadAmount(loadAmount);
         d.setLoadFees(loadFees);
+        d.setFloatAdditions(floatAdditionsTotal);
         d.setSalesCount(salesCount);
         d.setItemsSold(itemsSold);
         return BusinessDayDto.from(d);

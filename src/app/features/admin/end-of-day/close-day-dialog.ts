@@ -38,6 +38,8 @@ export interface CloseDayDialogData {
    *  add to the drawer. */
   readonly loadAmount: number;
   readonly loadFees: number;
+  /** Sum of mid-day cash top-ups for this day (excluding voided). */
+  readonly floatAdditions: number;
   readonly totalSales: number;
   readonly totalRefunds: number;
   readonly salesCount: number;
@@ -100,6 +102,9 @@ export interface CloseDayDialogResult {
         <header>Cash drawer</header>
         <dl>
           <div><dt>Opening float</dt><dd>{{ data.openingFloat | money }}</dd></div>
+          @if (data.floatAdditions > 0) {
+            <div><dt>+ Float top-ups</dt><dd>{{ data.floatAdditions | money }}</dd></div>
+          }
           <div><dt>+ Cash sales</dt><dd>{{ data.cashSales | money }}</dd></div>
           @if (data.cashCreditPayments > 0) {
             <div><dt>+ Cash credit payments</dt><dd>{{ data.cashCreditPayments | money }}</dd></div>
@@ -272,6 +277,7 @@ export class CloseDayDialog {
   protected readonly expected = computed(
     () =>
       this.data.openingFloat +
+      this.data.floatAdditions +
       this.data.cashSales +
       this.data.cashCreditPayments +
       this.data.gcashCashInAmount +

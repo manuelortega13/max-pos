@@ -413,6 +413,9 @@ function renderZReport(d) {
   // Cash drawer reconciliation.
   out.push(BOLD_ON, 'CASH DRAWER' + LF, BOLD_OFF);
   out.push(pad('Opening float', money(sym, day.openingFloat)) + LF);
+  if (Number(day.floatAdditions ?? 0) > 0) {
+    out.push(pad('+ Float top-ups', money(sym, day.floatAdditions)) + LF);
+  }
   out.push(pad('+ Cash sales', money(sym, day.cashSales)) + LF);
   if (Number(day.cashCreditPayments ?? 0) > 0) {
     out.push(pad('+ Credit pay (cash)', money(sym, day.cashCreditPayments)) + LF);
