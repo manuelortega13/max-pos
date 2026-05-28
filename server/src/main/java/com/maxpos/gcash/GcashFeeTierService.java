@@ -36,15 +36,17 @@ public class GcashFeeTierService {
 
     /**
      * Active tier matching an amount. The boundary rule is
-     * {@code min ≤ amount < max} so contiguous tiers ([100,500),
-     * [500,1000)) don't both match 500. Returns empty when no
+     * {@code min ≤ amount ≤ max} — closed range on both ends so
+     * "501–1000" includes both 501 and 1000. Overlap validation on
+     * insert/update prevents endpoint conflicts (e.g. [1,500] +
+     * [500,1000] both containing 500). Returns empty when no
      * active tier covers the amount — the UI surfaces that to the
      * cashier and falls back to manual fee entry.
      */
     public Optional<GcashFeeTierDto> lookup(BigDecimal amount) {
         if (amount == null || amount.signum() < 0) return Optional.empty();
         return tiers
-                .findFirstByActiveTrueAndMinAmountLessThanEqualAndMaxAmountGreaterThanOrderByMinAmount(amount, amount)
+                .findFirstByActiveTrueAndMinAmountLessThanEqualAndMaxAmountGreaterThanEqualOrderByMinAmount(amount, amount)
                 .map(GcashFeeTierDto::from);
     }
 
@@ -91,14 +93,17 @@ public class GcashFeeTierService {
 
     /**
      * Reject when the proposed range overlaps an existing active
-     * tier (excluding the row being updated, if any). Two ranges
-     * [a,b) and [c,d) overlap iff a < d && c < b.
+     * tier (excluding the row being updated, if any). Two closed
+     * ranges [a,b] and [c,d] overlap iff a ≤ d AND c ≤ b. This
+     * rejects endpoint contiguity ([1,500] + [500,1000] both
+     * contain 500), forcing the admin to use [1,499] + [500,1000]
+     * or [1,500] + [501,1000] instead.
      */
     private void rejectOverlap(GcashFeeTierUpsertRequest req, UUID excludeId) {
         for (GcashFeeTier other : tiers.findAllByActiveTrueOrderByMinAmount()) {
             if (excludeId != null && other.getId().equals(excludeId)) continue;
-            boolean overlap = req.minAmount().compareTo(other.getMaxAmount()) < 0
-                           && other.getMinAmount().compareTo(req.maxAmount()) < 0;
+            boolean overlap = req.minAmount().compareTo(other.getMaxAmount()) <= 0
+                           && other.getMinAmount().compareTo(req.maxAmount()) <= 0;
             if (overlap) {
                 throw new ConflictException(
                         "Range overlaps an existing active tier (" +

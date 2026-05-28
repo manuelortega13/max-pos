@@ -1,0 +1,146 @@
+<section class="gco">
+  <header class="gco__header">
+    <div class="gco__title-block">
+      <h2>Cash-outs</h2>
+      <p>Customer sent GCash, cashier handed cash at the till. Void here for mistakes or disputes.</p>
+    </div>
+
+    <mat-button-toggle-group
+      class="gco__filter"
+      [value]="filter()"
+      (change)="setFilter($event.value)"
+      hideSingleSelectionIndicator
+    >
+      <mat-button-toggle value="active">
+        Active @if (activeCount() > 0) { ({{ activeCount() }}) }
+      </mat-button-toggle>
+      <mat-button-toggle value="voided">
+        Voided @if (voidedCount() > 0) { ({{ voidedCount() }}) }
+      </mat-button-toggle>
+      <mat-button-toggle value="all">All</mat-button-toggle>
+    </mat-button-toggle-group>
+  </header>
+
+  @if (loading()) {
+    <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+  }
+
+  @if (error(); as message) {
+    <mat-card appearance="outlined" class="gco__error">
+      <mat-card-content>
+        <mat-icon>error_outline</mat-icon>
+        <span>{{ message }}</span>
+        <button mat-stroked-button (click)="load()">Retry</button>
+      </mat-card-content>
+    </mat-card>
+  }
+
+  <mat-card appearance="outlined" class="gco__table-card">
+    @if (rows().length === 0 && !loading()) {
+      <div class="gco__empty">
+        <mat-icon>north</mat-icon>
+        @if (filter() === 'active') {
+          <p>No active cash-outs recorded yet.</p>
+        } @else if (filter() === 'voided') {
+          <p>No voided cash-outs.</p>
+        } @else {
+          <p>No cash-out transactions recorded yet.</p>
+        }
+      </div>
+    } @else {
+      <div class="gco__table-wrap">
+        <table mat-table [dataSource]="rows()" class="gco__table">
+          <ng-container matColumnDef="ref">
+            <th mat-header-cell *matHeaderCellDef>Ref #</th>
+            <td mat-cell *matCellDef="let t" [class.gco__voided]="t.voidedAt">
+              <strong>{{ t.reference }}</strong>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="date">
+            <th mat-header-cell *matHeaderCellDef>Date</th>
+            <td mat-cell *matCellDef="let t" [class.gco__voided]="t.voidedAt">
+              {{ t.date | date: 'MMM d, y, h:mm a' }}
+              <small class="gco__cashier">by {{ t.cashierName }}</small>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="inboundRef">
+            <th mat-header-cell *matHeaderCellDef>GCash ref</th>
+            <td mat-cell *matCellDef="let t" [class.gco__voided]="t.voidedAt">
+              @if (t.inboundRef) {
+                <button
+                  type="button"
+                  class="gco__ref-copy"
+                  [cdkCopyToClipboard]="t.inboundRef"
+                  (cdkCopyToClipboardCopied)="onRefCopied($event, t.inboundRef)"
+                  matTooltip="Copy ref"
+                  aria-label="Copy GCash reference to clipboard"
+                >
+                  <strong>{{ t.inboundRef }}</strong>
+                  <mat-icon class="gco__ref-copy-icon">content_copy</mat-icon>
+                </button>
+              } @else {
+                <span class="gco__missing">—</span>
+              }
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="amount">
+            <th mat-header-cell *matHeaderCellDef>Amount</th>
+            <td mat-cell *matCellDef="let t" [class.gco__voided]="t.voidedAt">
+              <strong>{{ t.amount | money }}</strong>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="fee">
+            <th mat-header-cell *matHeaderCellDef>Fee</th>
+            <td mat-cell *matCellDef="let t" [class.gco__voided]="t.voidedAt">
+              {{ t.fee | money }}
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="status">
+            <th mat-header-cell *matHeaderCellDef>Status</th>
+            <td mat-cell *matCellDef="let t">
+              @if (t.voidedAt) {
+                <mat-chip
+                  class="gco__chip gco__chip--voided"
+                  disableRipple
+                  [matTooltip]="
+                    'Voided ' +
+                    (t.voidedAt | date: 'MMM d, y, h:mm a') +
+                    (t.voidedByName ? ' by ' + t.voidedByName : '')
+                  "
+                >
+                  Voided
+                </mat-chip>
+              } @else {
+                <mat-chip class="gco__chip gco__chip--active" disableRipple>Active</mat-chip>
+              }
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="actions">
+            <th mat-header-cell *matHeaderCellDef class="gco__actions-col"></th>
+            <td mat-cell *matCellDef="let t" class="gco__actions-col">
+              @if (!t.voidedAt) {
+                <button
+                  mat-stroked-button
+                  color="warn"
+                  (click)="confirmVoid(t)"
+                >
+                  <mat-icon>block</mat-icon>
+                  Void
+                </button>
+              }
+            </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="columns"></tr>
+          <tr mat-row *matRowDef="let row; columns: columns"></tr>
+        </table>
+      </div>
+    }
+  </mat-card>
+</section>

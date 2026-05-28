@@ -98,7 +98,7 @@ public class GcashTransactionService {
         }
 
         Optional<GcashFeeTier> tier = tiers
-                .findFirstByActiveTrueAndMinAmountLessThanEqualAndMaxAmountGreaterThanOrderByMinAmount(
+                .findFirstByActiveTrueAndMinAmountLessThanEqualAndMaxAmountGreaterThanEqualOrderByMinAmount(
                         req.amount(), req.amount());
         if (tier.isPresent() && req.fee().compareTo(tier.get().getFee()) != 0) {
             // The cashier UI auto-fills + locks the fee when a tier

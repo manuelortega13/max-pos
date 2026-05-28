@@ -15,10 +15,12 @@ public interface GcashFeeTierRepository extends JpaRepository<GcashFeeTier, UUID
     /** All active tiers, ordered. Drives the overlap check. */
     List<GcashFeeTier> findAllByActiveTrueOrderByMinAmount();
 
-    /** Active tier matching an amount (min ≤ amount < max).
+    /** Active tier matching an amount (min ≤ amount ≤ max — closed
+     *  range on both ends, matching how humans read "501–1000").
      *  Multiple matches shouldn't happen — overlap validation on
-     *  insert/update keeps the active set non-overlapping — but
-     *  we still pick deterministically by ordering on minAmount. */
-    Optional<GcashFeeTier> findFirstByActiveTrueAndMinAmountLessThanEqualAndMaxAmountGreaterThanOrderByMinAmount(
+     *  insert/update keeps the active set non-overlapping, including
+     *  endpoint contiguity — but we still pick deterministically by
+     *  ordering on minAmount. */
+    Optional<GcashFeeTier> findFirstByActiveTrueAndMinAmountLessThanEqualAndMaxAmountGreaterThanEqualOrderByMinAmount(
             BigDecimal minBound, BigDecimal maxBound);
 }

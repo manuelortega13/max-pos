@@ -34,10 +34,13 @@ public class LoadFeeTierService {
                 .orElseThrow(() -> new NotFoundException("Fee tier not found"));
     }
 
+    /** Active tier matching an amount. Closed range on both ends —
+     *  {@code min ≤ amount ≤ max} — so "501–1000" matches 501 and
+     *  1000. Overlap validation prevents endpoint conflicts. */
     public Optional<LoadFeeTierDto> lookup(BigDecimal amount) {
         if (amount == null || amount.signum() < 0) return Optional.empty();
         return tiers
-                .findFirstByActiveTrueAndMinAmountLessThanEqualAndMaxAmountGreaterThanOrderByMinAmount(amount, amount)
+                .findFirstByActiveTrueAndMinAmountLessThanEqualAndMaxAmountGreaterThanEqualOrderByMinAmount(amount, amount)
                 .map(LoadFeeTierDto::from);
     }
 
@@ -84,14 +87,17 @@ public class LoadFeeTierService {
 
     /**
      * Reject when the proposed range overlaps an existing active
-     * tier (excluding the row being updated, if any). Two ranges
-     * [a,b) and [c,d) overlap iff a < d && c < b.
+     * tier (excluding the row being updated, if any). Two closed
+     * ranges [a,b] and [c,d] overlap iff a ≤ d AND c ≤ b — this
+     * rejects endpoint contiguity ([1,500] + [500,1000] both
+     * contain 500), forcing the admin to use [1,499] + [500,1000]
+     * or [1,500] + [501,1000] instead.
      */
     private void rejectOverlap(LoadFeeTierUpsertRequest req, UUID excludeId) {
         for (LoadFeeTier other : tiers.findAllByActiveTrueOrderByMinAmount()) {
             if (excludeId != null && other.getId().equals(excludeId)) continue;
-            boolean overlap = req.minAmount().compareTo(other.getMaxAmount()) < 0
-                           && other.getMinAmount().compareTo(req.maxAmount()) < 0;
+            boolean overlap = req.minAmount().compareTo(other.getMaxAmount()) <= 0
+                           && other.getMinAmount().compareTo(req.maxAmount()) <= 0;
             if (overlap) {
                 throw new ConflictException(
                         "Range overlaps an existing active tier (" +

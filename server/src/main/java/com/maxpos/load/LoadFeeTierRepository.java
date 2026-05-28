@@ -11,6 +11,9 @@ import java.util.UUID;
 public interface LoadFeeTierRepository extends JpaRepository<LoadFeeTier, UUID> {
     List<LoadFeeTier> findAll(Sort sort);
     List<LoadFeeTier> findAllByActiveTrueOrderByMinAmount();
-    Optional<LoadFeeTier> findFirstByActiveTrueAndMinAmountLessThanEqualAndMaxAmountGreaterThanOrderByMinAmount(
+    /** Active tier matching an amount (min ≤ amount ≤ max — closed
+     *  range on both ends). Overlap validation prevents endpoint
+     *  conflicts on insert/update. */
+    Optional<LoadFeeTier> findFirstByActiveTrueAndMinAmountLessThanEqualAndMaxAmountGreaterThanEqualOrderByMinAmount(
             BigDecimal minBound, BigDecimal maxBound);
 }

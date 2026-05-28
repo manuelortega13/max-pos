@@ -158,8 +158,10 @@ export class LoadFeeFormDialog {
       return;
     }
     if (raw.active) {
+      // Closed-range overlap: [a,b] and [c,d] overlap iff a ≤ d AND
+      // c ≤ b. Matches backend rejectOverlap semantics.
       const overlap = this.data.otherActive.find(
-        (o) => raw.minAmount < o.maxAmount && o.minAmount < raw.maxAmount,
+        (o) => raw.minAmount <= o.maxAmount && o.minAmount <= raw.maxAmount,
       );
       if (overlap) {
         this.error.set(

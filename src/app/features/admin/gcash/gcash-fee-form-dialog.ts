@@ -163,8 +163,11 @@ export class GcashFeeFormDialog {
       return;
     }
     if (raw.active) {
+      // Closed-range overlap: [a,b] and [c,d] overlap iff a ≤ d AND
+      // c ≤ b. Rejects endpoint contiguity (e.g. [1,500] + [500,1000]
+      // both contain 500) — matches backend rejectOverlap.
       const overlap = this.data.otherActive.find(
-        (o) => raw.minAmount < o.maxAmount && o.minAmount < raw.maxAmount,
+        (o) => raw.minAmount <= o.maxAmount && o.minAmount <= raw.maxAmount,
       );
       if (overlap) {
         this.error.set(

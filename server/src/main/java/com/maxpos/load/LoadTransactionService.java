@@ -76,7 +76,7 @@ public class LoadTransactionService {
         String promo = req.promo() == null || req.promo().isBlank() ? null : req.promo().trim();
 
         Optional<LoadFeeTier> tier = tiers
-                .findFirstByActiveTrueAndMinAmountLessThanEqualAndMaxAmountGreaterThanOrderByMinAmount(
+                .findFirstByActiveTrueAndMinAmountLessThanEqualAndMaxAmountGreaterThanEqualOrderByMinAmount(
                         req.amount(), req.amount());
         if (tier.isPresent() && req.fee().compareTo(tier.get().getFee()) != 0) {
             throw new ConflictException(
