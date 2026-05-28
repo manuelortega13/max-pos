@@ -319,16 +319,61 @@ export class PrinterService {
   }
 
   /**
-   * Print a GCash service receipt. Helper-first with a browser
-   * fallback so registers without the helper still get paper.
+   * Print a GCash service receipt. Three-step fallback:
+   *  1. POST /print-gcash — dedicated endpoint, best formatting
+   *     ("GCASH CASH-IN" header, phone/inbound-ref lines).
+   *  2. POST /print — generic endpoint, present in every helper
+   *     version. Renders the transaction as a synthetic two-line
+   *     sale ("Amount" + "Service fee") so a helper binary that
+   *     pre-dates the GCash feature still prints silently instead
+   *     of triggering the browser dialog.
+   *  3. Browser print of the rendered .print-receipt DOM.
+   *
+   * The second step is the important one — without it, an older
+   * running helper produces a 404 on /print-gcash and the receipt
+   * falls all the way through to window.print() with its dialog +
+   * tiny 11px CSS. Restart the helper to get step 1 instead.
    */
   async printGcashTransaction(payload: GcashReceiptPayload): Promise<void> {
     if (this._helperEnabled() && this._helperUrl()) {
-      const ok = await this.postToHelper('/print-gcash', payload);
-      if (ok) return;
+      if (await this.postToHelper('/print-gcash', payload)) return;
+      if (await this.postToHelper('/print', this.gcashToReceiptPayload(payload))) return;
       console.warn('[printer] helper unreachable for GCash — falling back to browser');
     }
     this.printGcashBrowser(payload);
+  }
+
+  /**
+   * Convert a GCash receipt payload into the generic ReceiptPayload
+   * shape the /print endpoint understands. Loses the GCash-specific
+   * header and the "Customer paid / received" grand-total label,
+   * but preserves the reference, cashier, amount + fee breakdown,
+   * and notes so it's still operationally useful as a fallback.
+   */
+  private gcashToReceiptPayload(p: GcashReceiptPayload): ReceiptPayload {
+    const t = p.transaction;
+    const label = t.type === 'CASH_IN' ? 'GCASH CASH-IN' : 'GCASH CASH-OUT';
+    const lines: Array<{ name: string; quantity: number; lineTotal: number }> = [
+      { name: 'Amount', quantity: 1, lineTotal: t.amount },
+    ];
+    if (t.fee > 0) lines.push({ name: 'Service fee', quantity: 1, lineTotal: t.fee });
+    return {
+      storeName: p.storeName,
+      address: p.address,
+      phone: p.phone,
+      saleId: t.reference,
+      date: t.date,
+      cashierName: t.cashierName,
+      paymentMethod: label,
+      lines,
+      subtotal: t.amount + t.fee,
+      lineDiscountTotal: 0,
+      orderDiscountAmount: 0,
+      tax: 0,
+      total: t.amount + t.fee,
+      currencySymbol: p.currencySymbol,
+      footer: p.footer,
+    };
   }
 
   private printGcashBrowser(payload: GcashReceiptPayload): void {
@@ -346,16 +391,51 @@ export class PrinterService {
   }
 
   /**
-   * Print a load receipt. Helper-first with browser fallback —
-   * same pattern as the other receipts.
+   * Print a load receipt. Same three-step fallback as
+   * {@link printGcashTransaction}: dedicated /print-load first,
+   * then generic /print with a synthesized ReceiptPayload (so an
+   * older helper binary that pre-dates the load feature still
+   * prints silently), then browser as the last resort.
    */
   async printLoadTransaction(payload: LoadReceiptPayload): Promise<void> {
     if (this._helperEnabled() && this._helperUrl()) {
-      const ok = await this.postToHelper('/print-load', payload);
-      if (ok) return;
+      if (await this.postToHelper('/print-load', payload)) return;
+      if (await this.postToHelper('/print', this.loadToReceiptPayload(payload))) return;
       console.warn('[printer] helper unreachable for load — falling back to browser');
     }
     this.printLoadBrowser(payload);
+  }
+
+  /**
+   * Convert a load receipt payload into the generic ReceiptPayload
+   * shape. Carries the promo into the cashier-name slot when
+   * present (a known compromise — the generic renderer doesn't
+   * have a dedicated promo field; surfacing it on the receipt is
+   * worth the slight semantic stretch).
+   */
+  private loadToReceiptPayload(p: LoadReceiptPayload): ReceiptPayload {
+    const t = p.transaction;
+    const lines: Array<{ name: string; quantity: number; lineTotal: number }> = [
+      { name: t.promo ? `Load · ${t.promo}` : 'Load', quantity: 1, lineTotal: t.amount },
+    ];
+    if (t.fee > 0) lines.push({ name: 'Service fee', quantity: 1, lineTotal: t.fee });
+    return {
+      storeName: p.storeName,
+      address: p.address,
+      phone: p.phone,
+      saleId: t.reference,
+      date: t.date,
+      cashierName: t.cashierName,
+      paymentMethod: `LOAD · ${t.customerPhone}`,
+      lines,
+      subtotal: t.amount + t.fee,
+      lineDiscountTotal: 0,
+      orderDiscountAmount: 0,
+      tax: 0,
+      total: t.amount + t.fee,
+      currencySymbol: p.currencySymbol,
+      footer: p.footer,
+    };
   }
 
   private printLoadBrowser(payload: LoadReceiptPayload): void {
