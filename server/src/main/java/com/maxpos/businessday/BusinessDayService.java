@@ -169,9 +169,18 @@ public class BusinessDayService {
 
         Instant closedAt = Instant.now();
 
-        // Aggregate by FK — only sales explicitly attached to this day count.
-        // Offline replays that arrived between open and close also carry this
-        // FK; pre-feature sales (business_day_id = NULL) are correctly ignored.
+        // Claim orphan sales (NULL business_day_id) whose date fell
+        // within this day's window. Offline replays can land without
+        // an FK when no day was open at sync time; without this sweep
+        // those sales would silently miss the close snapshot. Run
+        // BEFORE the aggregation below so the FK-based query picks
+        // them up.
+        for (Sale s : sales.findAllByBusinessDayIsNullAndDateBetween(d.getOpenedAt(), closedAt)) {
+            s.setBusinessDay(d);
+        }
+
+        // Aggregate by FK — picks up everything explicitly attached
+        // to this day, including the orphans we just claimed.
         List<Sale> windowSales = sales.findAllByBusinessDayId(d.getId());
 
         BigDecimal totalSales = BigDecimal.ZERO;
