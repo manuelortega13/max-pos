@@ -46,6 +46,8 @@ public class SettingsService {
         s.setPhone(req.phone());
         s.setAllowNegativeStock(req.allowNegativeStock());
         s.setOfflineModeEnabled(req.offlineModeEnabled());
+        s.setCardAccountId(req.cardAccountId());
+        s.setTransferAccountId(req.transferAccountId());
         return StoreSettingsDto.from(s);
     }
 }

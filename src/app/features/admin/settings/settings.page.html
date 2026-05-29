@@ -302,6 +302,38 @@
 
     <mat-card appearance="outlined">
       <mat-card-header>
+        <mat-card-title>Finance accounts</mat-card-title>
+        <mat-card-subtitle>
+          Where card / transfer sales (and credit payments paid by card or
+          transfer) land in the finance ledger. Cash sales always go to the
+          Cash account.
+        </mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content class="form-grid">
+        <mat-form-field appearance="outline">
+          <mat-label>Card sales account</mat-label>
+          <mat-select formControlName="cardAccountId">
+            <mat-option [value]="''">— Not tracked —</mat-option>
+            @for (a of accounts(); track a.id) {
+              <mat-option [value]="a.id">{{ a.name }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Transfer sales account</mat-label>
+          <mat-select formControlName="transferAccountId">
+            <mat-option [value]="''">— Not tracked —</mat-option>
+            @for (a of accounts(); track a.id) {
+              <mat-option [value]="a.id">{{ a.name }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card appearance="outlined">
+      <mat-card-header>
         <mat-card-title>Receipt</mat-card-title>
         <mat-card-subtitle>What prints at the bottom of every receipt</mat-card-subtitle>
       </mat-card-header>

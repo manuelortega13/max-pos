@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { provideNativeDateAdapter } from '@angular/material/core';
@@ -8,9 +8,11 @@ import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/materia
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { Expense, ExpenseUpsertRequest } from '../../../core/models';
+import { Account, Expense, ExpenseUpsertRequest } from '../../../core/models';
 import { ExpenseService } from '../../../core/services/expense.service';
+import { FinanceService } from '../../../core/services/finance.service';
 import { SettingsService } from '../../../core/services/settings.service';
 
 export type ExpenseFormMode = 'create' | 'edit';
@@ -30,6 +32,7 @@ export interface ExpenseFormData {
     MatFormFieldModule,
     MatIconModule,
     MatInputModule,
+    MatSelectModule,
   ],
   providers: [provideNativeDateAdapter()],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -78,6 +81,18 @@ export interface ExpenseFormData {
             maxlength="64"
             placeholder="Rent, Utilities, Supplies…"
           />
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Paid from</mat-label>
+          <mat-select formControlName="paymentAccountId">
+            @for (a of accounts(); track a.id) {
+              <mat-option [value]="a.id">{{ a.name }}</mat-option>
+            }
+          </mat-select>
+          @if (form.controls.paymentAccountId.touched && form.controls.paymentAccountId.invalid) {
+            <mat-error>Pick an account</mat-error>
+          }
         </mat-form-field>
 
         <mat-form-field appearance="outline">
@@ -162,9 +177,10 @@ export interface ExpenseFormData {
     `,
   ],
 })
-export class ExpenseFormDialog {
+export class ExpenseFormDialog implements OnInit {
   private readonly fb = inject(FormBuilder);
   private readonly expenseService = inject(ExpenseService);
+  private readonly financeService = inject(FinanceService);
   private readonly settingsService = inject(SettingsService);
   private readonly snackBar = inject(MatSnackBar);
   private readonly dialogRef = inject(MatDialogRef<ExpenseFormDialog>);
@@ -175,12 +191,14 @@ export class ExpenseFormDialog {
   );
   protected readonly submitting = signal(false);
   protected readonly error = signal<string | null>(null);
+  protected readonly accounts = signal<Account[]>([]);
 
   protected readonly form = this.fb.nonNullable.group({
     date: [new Date(), Validators.required],
     category: [''],
     description: ['', [Validators.required, Validators.maxLength(2048)]],
     amount: [0, [Validators.required, Validators.min(0)]],
+    paymentAccountId: ['', Validators.required],
   });
 
   constructor() {
@@ -191,8 +209,24 @@ export class ExpenseFormDialog {
         category: e.category ?? '',
         description: e.description,
         amount: e.amount,
+        paymentAccountId: e.paymentAccountId,
       });
     }
+  }
+
+  ngOnInit(): void {
+    this.financeService.listAccounts().subscribe({
+      next: (rows) => {
+        const active = rows.filter((a) => a.active);
+        this.accounts.set(active);
+        // For "new" mode default to Cash so the typical case is one
+        // tap fewer; admins can switch in the dropdown.
+        if (this.data.mode === 'create' && this.form.controls.paymentAccountId.value === '') {
+          const cash = active.find((a) => a.kind === 'CASH') ?? active[0];
+          if (cash) this.form.patchValue({ paymentAccountId: cash.id });
+        }
+      },
+    });
   }
 
   protected submit(): void {
@@ -210,6 +244,7 @@ export class ExpenseFormDialog {
       category: value.category.trim() === '' ? null : value.category.trim(),
       description: value.description,
       amount: value.amount,
+      paymentAccountId: value.paymentAccountId,
     };
     const obs = this.data.mode === 'edit' && this.data.expense
       ? this.expenseService.update(this.data.expense.id, request)

@@ -3,6 +3,7 @@ package com.maxpos.settings.dto;
 import jakarta.validation.constraints.*;
 
 import java.math.BigDecimal;
+import java.util.UUID;
 
 public record StoreSettingsUpdateRequest(
         @NotBlank @Size(max = 255) String storeName,
@@ -13,5 +14,7 @@ public record StoreSettingsUpdateRequest(
         @Size(max = 255) String address,
         @Size(max = 64) String phone,
         boolean allowNegativeStock,
-        boolean offlineModeEnabled
+        boolean offlineModeEnabled,
+        UUID cardAccountId,
+        UUID transferAccountId
 ) {}

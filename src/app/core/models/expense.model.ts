@@ -4,6 +4,7 @@ export interface Expense {
   readonly category: string | null;
   readonly description: string;
   readonly amount: number;
+  readonly paymentAccountId: string;
   readonly createdAt: string;
   readonly createdById: string | null;
   readonly createdByName: string | null;
@@ -14,4 +15,5 @@ export interface ExpenseUpsertRequest {
   readonly category: string | null;
   readonly description: string;
   readonly amount: number;
+  readonly paymentAccountId: string;
 }

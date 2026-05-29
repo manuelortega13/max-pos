@@ -3,6 +3,7 @@ package com.maxpos.settings.dto;
 import com.maxpos.settings.StoreSettings;
 
 import java.math.BigDecimal;
+import java.util.UUID;
 
 public record StoreSettingsDto(
         String storeName,
@@ -13,7 +14,9 @@ public record StoreSettingsDto(
         String address,
         String phone,
         boolean allowNegativeStock,
-        boolean offlineModeEnabled
+        boolean offlineModeEnabled,
+        UUID cardAccountId,
+        UUID transferAccountId
 ) {
     public static StoreSettingsDto from(StoreSettings s) {
         return new StoreSettingsDto(
@@ -25,7 +28,9 @@ public record StoreSettingsDto(
                 s.getAddress(),
                 s.getPhone(),
                 s.isAllowNegativeStock(),
-                s.isOfflineModeEnabled()
+                s.isOfflineModeEnabled(),
+                s.getCardAccountId(),
+                s.getTransferAccountId()
         );
     }
 }

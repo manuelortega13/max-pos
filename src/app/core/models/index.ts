@@ -11,3 +11,4 @@ export * from './creditor.model';
 export * from './creditor-payment.model';
 export * from './gcash.model';
 export * from './load.model';
+export * from './finance.model';

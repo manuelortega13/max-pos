@@ -10,4 +10,6 @@ export const SETTINGS_MOCK: StoreSettings = {
   phone: '+1 (555) 010-2026',
   allowNegativeStock: false,
   offlineModeEnabled: false,
+  cardAccountId: null,
+  transferAccountId: null,
 };

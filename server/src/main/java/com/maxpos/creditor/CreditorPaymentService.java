@@ -31,6 +31,7 @@ public class CreditorPaymentService {
     private final CreditorRepository creditors;
     private final BusinessDayRepository businessDays;
     private final UserRepository users;
+    private final com.maxpos.finance.AccountMovementService accountMovements;
 
     @PersistenceContext
     private EntityManager em;
@@ -38,11 +39,13 @@ public class CreditorPaymentService {
     public CreditorPaymentService(CreditorPaymentRepository payments,
                                   CreditorRepository creditors,
                                   BusinessDayRepository businessDays,
-                                  UserRepository users) {
+                                  UserRepository users,
+                                  com.maxpos.finance.AccountMovementService accountMovements) {
         this.payments = payments;
         this.creditors = creditors;
         this.businessDays = businessDays;
         this.users = users;
+        this.accountMovements = accountMovements;
     }
 
     public List<CreditorPaymentDto> listByCreditor(UUID creditorId) {
@@ -115,7 +118,11 @@ public class CreditorPaymentService {
         p.setDate(Instant.now());
         p.setReference(generateReference());
         p.setNotes(req.notes() == null || req.notes().isBlank() ? null : req.notes().trim());
-        return CreditorPaymentDto.from(payments.save(p));
+        CreditorPayment saved = payments.save(p);
+        // Finance ledger — IN movement against cash / card / transfer
+        // account based on payment method.
+        accountMovements.recordForCreditorPayment(saved);
+        return CreditorPaymentDto.from(saved);
     }
 
     /**
@@ -142,6 +149,9 @@ public class CreditorPaymentService {
             String prior = p.getNotes() == null ? "" : p.getNotes() + "\n";
             p.setNotes(prior + "[VOID] " + trimmed);
         }
+        // Finance ledger — void the paired IN movement.
+        accountMovements.voidMovementsForSource(
+                com.maxpos.finance.MovementSourceKind.CREDITOR_PAYMENT, p.getId(), admin);
         em.flush();
         em.refresh(p);
         return CreditorPaymentDto.from(p);

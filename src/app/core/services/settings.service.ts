@@ -16,6 +16,8 @@ const SETTINGS_FALLBACK: StoreSettings = {
   phone: '',
   allowNegativeStock: false,
   offlineModeEnabled: false,
+  cardAccountId: null,
+  transferAccountId: null,
 };
 
 @Injectable({ providedIn: 'root' })

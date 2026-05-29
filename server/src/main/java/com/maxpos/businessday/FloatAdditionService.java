@@ -27,16 +27,19 @@ public class FloatAdditionService {
     private final FloatAdditionRepository additions;
     private final BusinessDayRepository businessDays;
     private final UserRepository users;
+    private final com.maxpos.finance.AccountMovementService accountMovements;
 
     @PersistenceContext
     private EntityManager em;
 
     public FloatAdditionService(FloatAdditionRepository additions,
                                 BusinessDayRepository businessDays,
-                                UserRepository users) {
+                                UserRepository users,
+                                com.maxpos.finance.AccountMovementService accountMovements) {
         this.additions = additions;
         this.businessDays = businessDays;
         this.users = users;
+        this.accountMovements = accountMovements;
     }
 
     /** Newest first — drives the EoD live preview log. */
@@ -60,7 +63,10 @@ public class FloatAdditionService {
         a.setNote(req.note() == null || req.note().isBlank() ? null : req.note().trim());
         a.setAddedAt(Instant.now());
         a.setAddedBy(admin);
-        return FloatAdditionDto.from(additions.save(a));
+        FloatAddition saved = additions.save(a);
+        // Finance ledger — IN movement on the Cash account.
+        accountMovements.recordForFloatAddition(saved);
+        return FloatAdditionDto.from(saved);
     }
 
     @Transactional
@@ -85,6 +91,10 @@ public class FloatAdditionService {
             String prior = a.getNote() == null ? "" : a.getNote() + "\n";
             a.setNote(prior + "[VOID] " + trimmed);
         }
+        // Finance ledger — void the IN movement so the cash balance
+        // reverts.
+        accountMovements.voidMovementsForSource(
+                com.maxpos.finance.MovementSourceKind.FLOAT_ADDITION, a.getId(), admin);
         em.flush();
         em.refresh(a);
         return FloatAdditionDto.from(a);

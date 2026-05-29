@@ -13,6 +13,7 @@ public record ExpenseDto(
         String category,
         String description,
         BigDecimal amount,
+        UUID paymentAccountId,
         Instant createdAt,
         UUID createdById,
         String createdByName
@@ -24,6 +25,7 @@ public record ExpenseDto(
                 e.getCategory(),
                 e.getDescription(),
                 e.getAmount(),
+                e.getPaymentAccountId(),
                 e.getCreatedAt(),
                 e.getCreatedBy() != null ? e.getCreatedBy().getId() : null,
                 e.getCreatedBy() != null ? e.getCreatedBy().getName() : null

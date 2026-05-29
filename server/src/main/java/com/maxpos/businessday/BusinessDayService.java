@@ -44,6 +44,7 @@ public class BusinessDayService {
     private final LoadTransactionRepository loadTransactions;
     private final FloatAdditionRepository floatAdditions;
     private final UserRepository users;
+    private final com.maxpos.finance.AccountMovementService accountMovements;
 
     public BusinessDayService(BusinessDayRepository days,
                               SaleRepository sales,
@@ -51,7 +52,8 @@ public class BusinessDayService {
                               GcashTransactionRepository gcashTransactions,
                               LoadTransactionRepository loadTransactions,
                               FloatAdditionRepository floatAdditions,
-                              UserRepository users) {
+                              UserRepository users,
+                              com.maxpos.finance.AccountMovementService accountMovements) {
         this.days = days;
         this.sales = sales;
         this.creditorPayments = creditorPayments;
@@ -59,6 +61,7 @@ public class BusinessDayService {
         this.loadTransactions = loadTransactions;
         this.floatAdditions = floatAdditions;
         this.users = users;
+        this.accountMovements = accountMovements;
     }
 
     public Optional<BusinessDayDto> current() {
@@ -86,7 +89,14 @@ public class BusinessDayService {
         d.setOpenedAt(Instant.now());
         d.setOpenedBy(opener);
         d.setOpeningFloat(req.openingFloat());
-        return BusinessDayDto.from(days.save(d));
+        BusinessDay saved = days.save(d);
+        // Finance ledger — opening float is the first cash IN of the
+        // day. Skipped when zero so we don't create empty ledger rows.
+        if (saved.getOpeningFloat() != null
+                && saved.getOpeningFloat().compareTo(BigDecimal.ZERO) > 0) {
+            accountMovements.recordForOpeningFloat(saved);
+        }
+        return BusinessDayDto.from(saved);
     }
 
     /**

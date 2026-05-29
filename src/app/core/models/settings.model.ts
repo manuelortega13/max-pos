@@ -18,4 +18,15 @@ export interface StoreSettings {
    * against exhausted stock on replay; the backend enforces the pairing.
    */
   offlineModeEnabled: boolean;
+  /**
+   * Finance account that card sales credit by default. Picked once
+   * in Settings — the auto-tracker reads this when writing the IN
+   * movement for a card sale or card credit payment.
+   */
+  cardAccountId: string | null;
+  /**
+   * Finance account that transfer (e-wallet send) sales credit by
+   * default. Typical mapping is GCash but the admin picks.
+   */
+  transferAccountId: string | null;
 }

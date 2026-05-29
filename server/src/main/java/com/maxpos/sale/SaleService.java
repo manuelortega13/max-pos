@@ -48,6 +48,7 @@ public class SaleService {
     private final NotificationPublisher notifications;
     private final BusinessDayRepository businessDays;
     private final CreditorRepository creditors;
+    private final com.maxpos.finance.AccountMovementService accountMovements;
 
     public SaleService(SaleRepository sales,
                        ProductRepository products,
@@ -57,7 +58,8 @@ public class SaleService {
                        StoreSettingsRepository settings,
                        NotificationPublisher notifications,
                        BusinessDayRepository businessDays,
-                       CreditorRepository creditors) {
+                       CreditorRepository creditors,
+                       com.maxpos.finance.AccountMovementService accountMovements) {
         this.sales = sales;
         this.products = products;
         this.batches = batches;
@@ -67,6 +69,7 @@ public class SaleService {
         this.notifications = notifications;
         this.businessDays = businessDays;
         this.creditors = creditors;
+        this.accountMovements = accountMovements;
     }
 
     public List<SaleDto> list() {
@@ -202,6 +205,11 @@ public class SaleService {
         sale.setTotal(total);
 
         Sale saved = sales.save(sale);
+        // Finance ledger — write the IN movement for the appropriate
+        // account (cash/card/transfer). CREDIT sales don't move
+        // cash; the recorder no-ops for them and waits for the
+        // matching creditor payment to land instead.
+        accountMovements.recordForSale(saved);
         notifications.publishInventoryChanged();
         publishDiscountNotificationIfAny(saved, cashier);
         return SaleDto.from(saved);
@@ -336,6 +344,8 @@ public class SaleService {
         }
 
         User requester = users.findById(requesterId).orElse(null);
+        // Finance ledger — write the offsetting OUT movement.
+        accountMovements.recordForSaleRefund(sale);
         publishRefundNotification(sale, requester);
         notifications.publishInventoryChanged();
         return SaleDto.from(sale);

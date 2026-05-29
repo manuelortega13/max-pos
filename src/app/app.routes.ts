@@ -98,6 +98,20 @@ export const routes: Routes = [
         title: 'Load — MaxPOS',
       },
       {
+        path: 'finances',
+        loadComponent: () =>
+          import('./features/admin/finances/finances.page').then((m) => m.FinancesPage),
+        title: 'Finances — MaxPOS',
+      },
+      {
+        path: 'finances/:id',
+        loadComponent: () =>
+          import('./features/admin/finances/account-detail.page').then(
+            (m) => m.FinancesAccountDetailPage,
+          ),
+        title: 'Account — MaxPOS',
+      },
+      {
         path: 'settings',
         loadComponent: () =>
           import('./features/admin/settings/settings.page').then((m) => m.SettingsPage),

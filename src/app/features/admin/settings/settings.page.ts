@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, effect, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
@@ -12,6 +12,8 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { Account } from '../../../core/models';
+import { FinanceService } from '../../../core/services/finance.service';
 import { SaleService } from '../../../core/services/sale.service';
 import { SettingsService } from '../../../core/services/settings.service';
 import { ThemeService } from '../../../core/services/theme.service';
@@ -36,13 +38,24 @@ import { PaperSize, PrinterService } from '../../../core/services/printer.servic
   templateUrl: './settings.page.html',
   styleUrl: './settings.page.scss',
 })
-export class SettingsPage {
+export class SettingsPage implements OnInit {
   private readonly fb = inject(FormBuilder);
   private readonly settingsService = inject(SettingsService);
   private readonly themeService = inject(ThemeService);
   private readonly printerService = inject(PrinterService);
   private readonly saleService = inject(SaleService);
+  private readonly financeService = inject(FinanceService);
   private readonly snackBar = inject(MatSnackBar);
+
+  /** Active finance accounts — drives the card / transfer mapping
+   *  selects in the Finance Accounts section. Loaded once on init. */
+  protected readonly accounts = signal<Account[]>([]);
+
+  ngOnInit(): void {
+    this.financeService.listAccounts().subscribe({
+      next: (rows) => this.accounts.set(rows.filter((a) => a.active)),
+    });
+  }
 
   /** Bound to the slide toggle. True = dark mode (toggle "on" = on-brand dark). */
   protected readonly darkTheme = this.themeService.mode;
@@ -139,6 +152,8 @@ export class SettingsPage {
     phone: [''],
     allowNegativeStock: [false],
     offlineModeEnabled: [false],
+    cardAccountId: [''],
+    transferAccountId: [''],
   });
 
   constructor() {
@@ -159,6 +174,8 @@ export class SettingsPage {
           phone: s.phone ?? '',
           allowNegativeStock: s.allowNegativeStock,
           offlineModeEnabled: s.offlineModeEnabled,
+          cardAccountId: s.cardAccountId ?? '',
+          transferAccountId: s.transferAccountId ?? '',
         },
         { emitEvent: false },
       );
@@ -209,6 +226,9 @@ export class SettingsPage {
         phone: value.phone,
         allowNegativeStock: value.allowNegativeStock,
         offlineModeEnabled: value.offlineModeEnabled,
+        cardAccountId: value.cardAccountId === '' ? null : value.cardAccountId,
+        transferAccountId:
+          value.transferAccountId === '' ? null : value.transferAccountId,
       })
       .subscribe({
         next: () => {
@@ -235,6 +255,8 @@ export class SettingsPage {
       phone: s.phone ?? '',
       allowNegativeStock: s.allowNegativeStock,
       offlineModeEnabled: s.offlineModeEnabled,
+      cardAccountId: s.cardAccountId ?? '',
+      transferAccountId: s.transferAccountId ?? '',
     });
     this.saveError.set(null);
   }

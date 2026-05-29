@@ -31,6 +31,7 @@ public class GcashTransactionService {
     private final GcashFeeTierRepository tiers;
     private final BusinessDayRepository businessDays;
     private final UserRepository users;
+    private final com.maxpos.finance.AccountMovementService accountMovements;
 
     @PersistenceContext
     private EntityManager em;
@@ -38,11 +39,13 @@ public class GcashTransactionService {
     public GcashTransactionService(GcashTransactionRepository transactions,
                                    GcashFeeTierRepository tiers,
                                    BusinessDayRepository businessDays,
-                                   UserRepository users) {
+                                   UserRepository users,
+                                   com.maxpos.finance.AccountMovementService accountMovements) {
         this.transactions = transactions;
         this.tiers = tiers;
         this.businessDays = businessDays;
         this.users = users;
+        this.accountMovements = accountMovements;
     }
 
     public List<GcashTransactionDto> listByCashier(UUID cashierId) {
@@ -132,7 +135,13 @@ public class GcashTransactionService {
         } else {
             t.setStatus(GcashTransactionStatus.PENDING);
         }
-        return GcashTransactionDto.from(transactions.save(t));
+        GcashTransaction saved = transactions.save(t);
+        // Finance ledger — only post completed rows. Pending cash-ins
+        // wait until the admin marks them complete.
+        if (saved.getStatus() == GcashTransactionStatus.COMPLETED) {
+            accountMovements.recordForGcashTransaction(saved);
+        }
+        return GcashTransactionDto.from(saved);
     }
 
     /**
@@ -155,6 +164,8 @@ public class GcashTransactionService {
         t.setStatus(GcashTransactionStatus.COMPLETED);
         t.setCompletedAt(Instant.now());
         t.setCompletedBy(admin);
+        // Finance ledger — first time the row counts toward balances.
+        accountMovements.recordForGcashTransaction(t);
         return GcashTransactionDto.from(t);
     }
 
@@ -175,6 +186,10 @@ public class GcashTransactionService {
             String prior = t.getNotes() == null ? "" : t.getNotes() + "\n";
             t.setNotes(prior + "[VOID] " + trimmed);
         }
+        // Finance ledger — void any associated movements (no-op if
+        // this was a pending cash-in that never posted).
+        accountMovements.voidMovementsForSource(
+                com.maxpos.finance.MovementSourceKind.GCASH_TXN, t.getId(), admin);
         em.flush();
         em.refresh(t);
         return GcashTransactionDto.from(t);

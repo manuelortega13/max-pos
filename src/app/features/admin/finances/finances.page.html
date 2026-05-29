@@ -1,0 +1,148 @@
+<section class="fp">
+  <header class="fp__header">
+    <div class="fp__title">
+      <h1>Finances</h1>
+      <p>Track cash, e-wallets, and bank balances across the business.</p>
+    </div>
+    <div class="fp__actions">
+      <button mat-stroked-button (click)="openTransfer()" [disabled]="loading()">
+        <mat-icon>swap_horiz</mat-icon> Transfer
+      </button>
+      <button mat-stroked-button color="warn" (click)="openRecordOut()" [disabled]="loading()">
+        <mat-icon>arrow_upward</mat-icon> Record out
+      </button>
+      <button mat-flat-button color="primary" (click)="openRecordIn()" [disabled]="loading()">
+        <mat-icon>arrow_downward</mat-icon> Record in
+      </button>
+      <button mat-icon-button [matMenuTriggerFor]="moreMenu" matTooltip="More">
+        <mat-icon>more_vert</mat-icon>
+      </button>
+      <mat-menu #moreMenu="matMenu">
+        <button mat-menu-item (click)="openNewAccount()">
+          <mat-icon>add</mat-icon><span>New account</span>
+        </button>
+        <button mat-menu-item (click)="reload()">
+          <mat-icon>refresh</mat-icon><span>Refresh</span>
+        </button>
+      </mat-menu>
+    </div>
+  </header>
+
+  @if (loading()) {
+    <div class="fp__loader">
+      <mat-spinner diameter="32"></mat-spinner>
+    </div>
+  } @else if (error(); as message) {
+    <div class="fp__error" role="alert">
+      <mat-icon>error_outline</mat-icon>
+      <span>{{ message }}</span>
+    </div>
+  } @else if (overview(); as data) {
+    <section class="fp__summary">
+      <div class="fp__net">
+        <small>Net across active accounts</small>
+        <strong>{{ data.net | money }}</strong>
+      </div>
+      <div class="fp__period">
+        <div>
+          <small>Last 30 days — in</small>
+          <strong class="fp__in">+{{ data.periodIn | money }}</strong>
+        </div>
+        <div>
+          <small>Last 30 days — out</small>
+          <strong class="fp__out">-{{ data.periodOut | money }}</strong>
+        </div>
+        <div>
+          <small>Net change (30d)</small>
+          <strong>{{ (data.periodIn - data.periodOut) | money }}</strong>
+        </div>
+      </div>
+    </section>
+
+    <section class="fp__accounts">
+      @for (a of visibleAccounts(); track a.id) {
+        <button
+          type="button"
+          class="fp__account"
+          [class.fp__account--inactive]="!a.active"
+          (click)="goToAccount(a.id)"
+        >
+          <div class="fp__account-head">
+            <div>
+              <small>{{ kindLabels[a.kind] }}</small>
+              <h3>{{ a.name }}</h3>
+            </div>
+            @if (!a.active) {
+              <mat-chip class="fp__inactive-chip">Inactive</mat-chip>
+            }
+          </div>
+          <strong class="fp__balance">{{ a.balance | money }}</strong>
+          <div class="fp__account-foot">
+            <div>
+              <small>In since last reconcile</small>
+              <span class="fp__in">+{{ a.periodIn | money }}</span>
+            </div>
+            <div>
+              <small>Out since last reconcile</small>
+              <span class="fp__out">-{{ a.periodOut | money }}</span>
+            </div>
+            @if (a.lastReconciledAt; as ts) {
+              <div>
+                <small>Reconciled</small>
+                <span>{{ ts | date: 'MMM d, h:mm a' }}</span>
+              </div>
+            } @else {
+              <div>
+                <small>Reconciled</small>
+                <span class="fp__muted">Never</span>
+              </div>
+            }
+          </div>
+          <span class="fp__edit" (click)="$event.stopPropagation(); editAccount(a)">
+            <mat-icon>edit</mat-icon>
+          </span>
+        </button>
+      }
+    </section>
+
+    <section class="fp__recent">
+      <header>
+        <h2>Recent activity</h2>
+        <small>Last 30 days · transfers excluded from totals above</small>
+      </header>
+
+      @if (recentDisplayed().length === 0) {
+        <p class="fp__muted">No activity yet.</p>
+      } @else {
+        <table mat-table [dataSource]="recentDisplayed()" class="fp__table">
+          <ng-container matColumnDef="occurredAt">
+            <th mat-header-cell *matHeaderCellDef>When</th>
+            <td mat-cell *matCellDef="let m">{{ m.occurredAt | date: 'MMM d, h:mm a' }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="account">
+            <th mat-header-cell *matHeaderCellDef>Account</th>
+            <td mat-cell *matCellDef="let m">{{ m.accountName }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="category">
+            <th mat-header-cell *matHeaderCellDef>Category</th>
+            <td mat-cell *matCellDef="let m">{{ categoryLabel(m.category) }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="amount">
+            <th mat-header-cell *matHeaderCellDef class="fp__amount-col">Amount</th>
+            <td mat-cell *matCellDef="let m" class="fp__amount-col">
+              <span [class.fp__in]="m.direction === 'IN'" [class.fp__out]="m.direction === 'OUT'">
+                {{ m.direction === 'IN' ? '+' : '-' }}{{ m.amount | money }}
+              </span>
+            </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="recentCols"></tr>
+          <tr mat-row *matRowDef="let row; columns: recentCols"></tr>
+        </table>
+      }
+    </section>
+  }
+</section>

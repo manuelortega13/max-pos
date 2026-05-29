@@ -32,6 +32,13 @@ public class Expense {
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal amount;
 
+    /** Which finance account paid for the expense. Required at the
+     *  DB level (default-backfilled to Cash by the V24 migration);
+     *  the finance auto-tracker writes an OUT movement against this
+     *  account when the expense is created. */
+    @Column(name = "payment_account_id", nullable = false)
+    private UUID paymentAccountId;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -53,6 +60,8 @@ public class Expense {
     public void setDescription(String description) { this.description = description; }
     public BigDecimal getAmount() { return amount; }
     public void setAmount(BigDecimal amount) { this.amount = amount; }
+    public UUID getPaymentAccountId() { return paymentAccountId; }
+    public void setPaymentAccountId(UUID paymentAccountId) { this.paymentAccountId = paymentAccountId; }
     public Instant getCreatedAt() { return createdAt; }
     public User getCreatedBy() { return createdBy; }
     public void setCreatedBy(User createdBy) { this.createdBy = createdBy; }

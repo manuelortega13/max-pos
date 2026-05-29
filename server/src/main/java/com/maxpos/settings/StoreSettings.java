@@ -3,6 +3,7 @@ package com.maxpos.settings;
 import jakarta.persistence.*;
 
 import java.math.BigDecimal;
+import java.util.UUID;
 
 /**
  * Single-row table holding store-wide settings. We pin the primary key to 1
@@ -39,6 +40,19 @@ public class StoreSettings {
     @Column(name = "offline_mode_enabled", nullable = false)
     private boolean offlineModeEnabled = false;
 
+    /** Default destination account for card sales / card credit
+     *  payments. Picked once in Settings; the auto-tracker reads it
+     *  to know which account to credit. Null disables auto-tracking
+     *  of card flows (those will leave the ledger out of sync with
+     *  reality — admins should set it). */
+    @Column(name = "card_account_id")
+    private UUID cardAccountId;
+
+    /** Default destination account for transfer sales / transfer
+     *  credit payments. Typical mapping is GCash but admin picks. */
+    @Column(name = "transfer_account_id")
+    private UUID transferAccountId;
+
     public Integer getId() { return id; }
     public String getStoreName() { return storeName; }
     public void setStoreName(String storeName) { this.storeName = storeName; }
@@ -58,4 +72,8 @@ public class StoreSettings {
     public void setAllowNegativeStock(boolean allowNegativeStock) { this.allowNegativeStock = allowNegativeStock; }
     public boolean isOfflineModeEnabled() { return offlineModeEnabled; }
     public void setOfflineModeEnabled(boolean offlineModeEnabled) { this.offlineModeEnabled = offlineModeEnabled; }
+    public UUID getCardAccountId() { return cardAccountId; }
+    public void setCardAccountId(UUID cardAccountId) { this.cardAccountId = cardAccountId; }
+    public UUID getTransferAccountId() { return transferAccountId; }
+    public void setTransferAccountId(UUID transferAccountId) { this.transferAccountId = transferAccountId; }
 }

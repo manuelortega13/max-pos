@@ -31,6 +31,7 @@ public class LoadTransactionService {
     private final LoadFeeTierRepository tiers;
     private final BusinessDayRepository businessDays;
     private final UserRepository users;
+    private final com.maxpos.finance.AccountMovementService accountMovements;
 
     @PersistenceContext
     private EntityManager em;
@@ -38,11 +39,13 @@ public class LoadTransactionService {
     public LoadTransactionService(LoadTransactionRepository transactions,
                                   LoadFeeTierRepository tiers,
                                   BusinessDayRepository businessDays,
-                                  UserRepository users) {
+                                  UserRepository users,
+                                  com.maxpos.finance.AccountMovementService accountMovements) {
         this.transactions = transactions;
         this.tiers = tiers;
         this.businessDays = businessDays;
         this.users = users;
+        this.accountMovements = accountMovements;
     }
 
     public List<LoadTransactionDto> listByCashier(UUID cashierId) {
@@ -117,6 +120,9 @@ public class LoadTransactionService {
         t.setStatus(LoadTransactionStatus.COMPLETED);
         t.setCompletedAt(Instant.now());
         t.setCompletedBy(admin);
+        // Finance ledger — only post once the admin has actually sent
+        // the load (mirrors the GCash cash-in lifecycle).
+        accountMovements.recordForLoadTransaction(t);
         return LoadTransactionDto.from(t);
     }
 
@@ -137,6 +143,10 @@ public class LoadTransactionService {
             String prior = t.getNotes() == null ? "" : t.getNotes() + "\n";
             t.setNotes(prior + "[VOID] " + trimmed);
         }
+        // Finance ledger — void any associated movements (no-op when
+        // the row was still pending and never posted).
+        accountMovements.voidMovementsForSource(
+                com.maxpos.finance.MovementSourceKind.LOAD_TXN, t.getId(), admin);
         em.flush();
         em.refresh(t);
         return LoadTransactionDto.from(t);
