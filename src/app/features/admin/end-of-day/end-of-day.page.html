@@ -250,16 +250,33 @@
                   <button
                     mat-icon-button
                     matTooltip="Reprint Z-report"
-                    (click)="reprint(d)"
+                    (click)="reprint(d); $event.stopPropagation()"
                   >
                     <mat-icon>print</mat-icon>
                   </button>
+                  @if (currentDay() === null && latestClosedId() === d.id) {
+                    <button
+                      mat-icon-button
+                      matTooltip="Reopen this day"
+                      color="warn"
+                      (click)="confirmReopen(d); $event.stopPropagation()"
+                    >
+                      <mat-icon>lock_open</mat-icon>
+                    </button>
+                  }
                 }
               </td>
             </ng-container>
 
             <tr mat-header-row *matHeaderRowDef="historyColumns"></tr>
-            <tr mat-row *matRowDef="let row; columns: historyColumns"></tr>
+            <tr
+              mat-row
+              *matRowDef="let row; columns: historyColumns"
+              class="eod__history-row"
+              (click)="openHistoryDetails(row)"
+              tabindex="0"
+              [attr.aria-label]="'View details for day opened ' + (row.openedAt | date: 'mediumDate')"
+            ></tr>
             <tr *matNoDataRow>
               <td [attr.colspan]="historyColumns.length" class="eod__empty">
                 No business days yet. Open one above to get started.

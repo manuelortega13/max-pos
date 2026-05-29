@@ -183,3 +183,19 @@
   color: var(--mat-sys-on-error-container) !important;
   font-size: 0.7rem !important;
 }
+
+// Make history rows feel clickable — the whole row opens the
+// details dialog. Per-cell action buttons stopPropagation in the
+// template so clicking Reprint/Reopen doesn't double-fire.
+.eod__history-row {
+  cursor: pointer;
+
+  &:hover {
+    background: var(--mat-sys-surface-container);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--mat-sys-primary);
+    outline-offset: -2px;
+  }
+}

@@ -12,4 +12,8 @@ public interface BusinessDayRepository extends JpaRepository<BusinessDay, UUID> 
     Optional<BusinessDay> findFirstByClosedAtIsNull();
 
     List<BusinessDay> findAllByOrderByOpenedAtDesc();
+
+    /** Most recently closed day, used as the only valid reopen target.
+     *  Returns empty when there are no closed days yet. */
+    Optional<BusinessDay> findFirstByClosedAtIsNotNullOrderByClosedAtDesc();
 }

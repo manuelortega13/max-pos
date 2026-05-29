@@ -94,6 +94,31 @@ export class BusinessDayService {
     );
   }
 
+  /**
+   * Reopen the most recently closed day. Backend enforces:
+   *   - id matches the latest-closed day
+   *   - no other day is currently open
+   *   - the day is actually closed
+   * On success, the returned BusinessDay has all close fields cleared
+   * and becomes the new "current open day". Orphan sales from the
+   * day's original window are silently re-attached.
+   */
+  reopen(id: string): Observable<BusinessDay> {
+    return this.http.post<BusinessDay>(`/api/business-days/${id}/reopen`, {}).pipe(
+      tap((day) => {
+        // Day moves from history → current.
+        this._current.set(day);
+        this._history.update((list) => {
+          const idx = list.findIndex((d) => d.id === day.id);
+          if (idx < 0) return [day, ...list];
+          const next = list.slice();
+          next[idx] = day;
+          return next;
+        });
+      }),
+    );
+  }
+
   // ─── Float additions (mid-day cash top-ups) ─────────────────────
   //
   // Audit-log endpoints scoped to the currently-open business day.

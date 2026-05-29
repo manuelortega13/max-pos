@@ -89,6 +89,77 @@ public class BusinessDayService {
         return BusinessDayDto.from(days.save(d));
     }
 
+    /**
+     * Reopen the most recently closed business day. Used to recover
+     * from a premature close — the typical case is a sale that
+     * landed with NULL business_day_id (orphan) and got missed by
+     * the close snapshot. Reopening clears the close-time fields
+     * and, as a bonus, sweeps any orphan sales whose timestamp
+     * falls within the day's original window back onto the day's
+     * FK so the next close will catch them.
+     *
+     * Constraints:
+     *   - Only the latest-closed day can be reopened. Older days
+     *     are immutable history.
+     *   - Reject if any other day is currently open — the system
+     *     enforces a single open day at a time.
+     *   - The day must actually be closed (defensive — the latest-
+     *     closed check already implies this).
+     */
+    @Transactional
+    public BusinessDayDto reopen(UUID id, UUID adminId) {
+        if (days.findFirstByClosedAtIsNull().isPresent()) {
+            throw new ConflictException(
+                    "Another business day is currently open. Close it before reopening this one.");
+        }
+
+        BusinessDay latestClosed = days.findFirstByClosedAtIsNotNullOrderByClosedAtDesc()
+                .orElseThrow(() -> new ConflictException("No closed business day to reopen."));
+        if (!latestClosed.getId().equals(id)) {
+            throw new ConflictException(
+                    "Only the most recently closed day can be reopened. Older days are locked.");
+        }
+
+        users.findById(adminId)
+                .orElseThrow(() -> new NotFoundException("User not found"));
+
+        // Re-attach orphan sales whose date fell within this day's
+        // original window. Catches sales that landed with NULL FK
+        // because no day was open at sync time (offline replay).
+        Instant openedAt = latestClosed.getOpenedAt();
+        Instant originalClosedAt = latestClosed.getClosedAt();
+        for (Sale s : sales.findAllByBusinessDayIsNullAndDateBetween(openedAt, originalClosedAt)) {
+            s.setBusinessDay(latestClosed);
+        }
+
+        // Clear close-time fields so the day reverts to "open". The
+        // snapshot columns get repopulated on the next close.
+        latestClosed.setClosedAt(null);
+        latestClosed.setClosedBy(null);
+        latestClosed.setCountedCash(null);
+        latestClosed.setNotes(null);
+        latestClosed.setExpectedCash(null);
+        latestClosed.setVariance(null);
+        latestClosed.setTotalSales(null);
+        latestClosed.setTotalRefunds(null);
+        latestClosed.setCashSales(null);
+        latestClosed.setCashRefunds(null);
+        latestClosed.setCardSales(null);
+        latestClosed.setTransferSales(null);
+        latestClosed.setCreditSales(null);
+        latestClosed.setCashCreditPayments(null);
+        latestClosed.setGcashCashInAmount(null);
+        latestClosed.setGcashCashInFees(null);
+        latestClosed.setGcashCashOutAmount(null);
+        latestClosed.setGcashCashOutFees(null);
+        latestClosed.setLoadAmount(null);
+        latestClosed.setLoadFees(null);
+        latestClosed.setFloatAdditions(null);
+        latestClosed.setSalesCount(null);
+        latestClosed.setItemsSold(null);
+        return BusinessDayDto.from(latestClosed);
+    }
+
     @Transactional
     public BusinessDayDto close(CloseDayRequest req, UUID closerId) {
         BusinessDay d = days.findFirstByClosedAtIsNull()

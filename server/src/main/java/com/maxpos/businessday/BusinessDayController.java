@@ -66,4 +66,17 @@ public class BusinessDayController {
                                 @AuthenticationPrincipal AppUserDetails principal) {
         return service.close(req, principal.getId());
     }
+
+    /**
+     * Reopen the most recently closed day. Service-level guards:
+     *   - {id} must equal the latest closed day's id
+     *   - no other day may currently be open
+     *   - the day must be closed (defensive)
+     */
+    @PostMapping("/{id}/reopen")
+    @PreAuthorize("hasRole('ADMIN')")
+    public BusinessDayDto reopen(@PathVariable java.util.UUID id,
+                                 @AuthenticationPrincipal AppUserDetails principal) {
+        return service.reopen(id, principal.getId());
+    }
 }

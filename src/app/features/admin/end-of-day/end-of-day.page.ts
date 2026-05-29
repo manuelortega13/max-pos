@@ -13,6 +13,12 @@ import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { BusinessDay, CreditorPayment, FloatAddition, GcashTransaction, LoadTransaction } from '../../../core/models';
 import { AddToFloatDialog, AddToFloatDialogData } from './add-to-float-dialog';
+import {
+  HistoryDetailsDialog,
+  HistoryDetailsDialogData,
+  HistoryDetailsDialogResult,
+} from './history-details-dialog';
+import { ConfirmDialog } from '../../../shared/dialogs/confirm-dialog';
 import { BusinessDayService } from '../../../core/services/business-day.service';
 import { CreditorPaymentService } from '../../../core/services/creditor-payment.service';
 import { GcashService } from '../../../core/services/gcash.service';
@@ -415,6 +421,96 @@ export class EndOfDayPage implements OnInit {
       footer: this.receiptFooter(),
       currencySymbol: this.currencySymbol(),
       day,
+    });
+  }
+
+  /** Id of the latest-closed day, or null when no closed days exist.
+   *  Only this id is reopenable — older days are immutable history. */
+  protected readonly latestClosedId = computed<string | null>(() => {
+    const closed = this.history().filter((d) => d.closedAt !== null);
+    if (closed.length === 0) return null;
+    // history is ordered openedAt DESC — sort by closedAt instead so
+    // a same-day reopen-then-close doesn't fool us.
+    let latest = closed[0];
+    for (const d of closed) {
+      if (!latest.closedAt || (d.closedAt && d.closedAt > latest.closedAt)) {
+        latest = d;
+      }
+    }
+    return latest.id;
+  });
+
+  /**
+   * Open the read-only Z-report-style details dialog for a closed day.
+   * If the admin clicks "Reopen" inside the dialog, route to the
+   * reopen confirmation here. The reopen action is hidden by the
+   * dialog itself when the row isn't reopenable.
+   */
+  protected openHistoryDetails(day: BusinessDay): void {
+    const canReopen = day.closedAt !== null
+      && this.currentDay() === null
+      && this.latestClosedId() === day.id;
+    const ref = this.dialog.open<
+      HistoryDetailsDialog,
+      HistoryDetailsDialogData,
+      HistoryDetailsDialogResult
+    >(HistoryDetailsDialog, {
+      width: '640px',
+      maxWidth: '95vw',
+      panelClass: 'dialog-fullscreen-mobile',
+      autoFocus: false,
+      data: { day, canReopen },
+    });
+    ref.afterClosed().subscribe((result) => {
+      if (result === 'reopen') this.confirmReopen(day);
+      else if (result === 'reprint') this.reprint(day);
+    });
+  }
+
+  /**
+   * Two-step reopen — show a clear confirmation first, then call
+   * the API. The backend re-attaches any orphan sales whose date
+   * falls within the day's original window, so a missed sale gets
+   * caught on the re-close.
+   */
+  protected confirmReopen(day: BusinessDay): void {
+    if (this.currentDay() !== null) {
+      this.snackBar.open(
+        'Cannot reopen — another business day is currently open. Close it first.',
+        'Dismiss',
+        { duration: 4000 },
+      );
+      return;
+    }
+    const ref = this.dialog.open(ConfirmDialog, {
+      width: '500px',
+      data: {
+        title: 'Reopen this business day?',
+        message:
+          `This will revert the day from closed to open. The Z-report snapshot ` +
+          `is discarded; you'll need to count cash and close again. Any orphan ` +
+          `sales (sales recorded without a day attached) made during this day's ` +
+          `window will be re-attached so they're counted on the next close.`,
+        confirmLabel: 'Reopen day',
+        icon: 'lock_open',
+      },
+    });
+    ref.afterClosed().subscribe((confirmed) => {
+      if (!confirmed) return;
+      this.businessDayService.reopen(day.id).subscribe({
+        next: () => {
+          this.snackBar.open('Business day reopened.', 'Dismiss', { duration: 2500 });
+          // Refresh dependent services so the preview reflects the
+          // reattached orphans immediately.
+          this.saleService.load();
+          this.loadFloatAdditions();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.snackBar.open(err.error?.message ?? 'Could not reopen day.', 'Dismiss', {
+            duration: 4000,
+          });
+        },
+      });
     });
   }
 
