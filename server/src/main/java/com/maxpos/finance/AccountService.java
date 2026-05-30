@@ -95,11 +95,7 @@ public class AccountService {
         BigDecimal periodIn = BigDecimal.ZERO;
         BigDecimal periodOut = BigDecimal.ZERO;
         for (AccountMovement m : movements.findAllByOccurredAtBetweenOrderByOccurredAtDesc(thirtyDaysAgo, now)) {
-            if (m.getVoidedAt() != null) continue;
-            // Skip TRANSFER rows from the headline period sum — they
-            // net to zero across accounts and would inflate both
-            // sides of the gross in/out display without meaning.
-            if (m.getSourceKind() == MovementSourceKind.TRANSFER) continue;
+            if (!countsForPeriod(m)) continue;
             if (m.getDirection() == MovementDirection.IN) {
                 periodIn = periodIn.add(m.getAmount());
             } else {
@@ -124,8 +120,7 @@ public class AccountService {
         Instant since = lastAt != null ? lastAt : Instant.EPOCH;
         for (AccountMovement m : movements.findAllByAccountIdAndOccurredAtBetweenOrderByOccurredAtDesc(
                 a.getId(), since, Instant.now())) {
-            if (m.getVoidedAt() != null) continue;
-            if (m.getSourceKind() == MovementSourceKind.TRANSFER) continue;
+            if (!countsForPeriod(m)) continue;
             if (m.getDirection() == MovementDirection.IN) {
                 periodIn = periodIn.add(m.getAmount());
             } else {
@@ -141,5 +136,32 @@ public class AccountService {
         a.setKind(req.kind());
         a.setActive(req.active());
         a.setSortOrder(req.sortOrder());
+    }
+
+    /**
+     * True when a movement should contribute to the period IN/OUT
+     * totals shown in summaries.
+     *
+     * Excluded:
+     *  - Voided rows (never happened).
+     *  - {@link MovementSourceKind#TRANSFER} — nets to zero across
+     *    accounts; counting both legs would double-inflate the gross.
+     *  - {@link MovementCategory#OPENING_FLOAT} and
+     *    {@link MovementCategory#FLOAT_TOPUP} — repositioning of the
+     *    store's own working capital into the till, not real income.
+     *    Including them would make the period IN look like revenue
+     *    when it's not.
+     *
+     * Balances themselves still reflect float movements (so the Cash
+     * account ledger matches the till); this filter is for the
+     * "what flowed in and out" display only.
+     */
+    private boolean countsForPeriod(AccountMovement m) {
+        if (m.getVoidedAt() != null) return false;
+        if (m.getSourceKind() == MovementSourceKind.TRANSFER) return false;
+        String category = m.getCategory();
+        if (MovementCategory.OPENING_FLOAT.equals(category)) return false;
+        if (MovementCategory.FLOAT_TOPUP.equals(category)) return false;
+        return true;
     }
 }
