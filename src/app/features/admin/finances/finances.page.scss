@@ -68,7 +68,9 @@
     strong { font-size: 1.2rem; font-variant-numeric: tabular-nums; }
   }
 
-  &__in { color: var(--mat-sys-tertiary); }
+  // IN reads as default text (black in light, white in dark) so it
+  // doesn't fight for attention; OUT pops red to flag money leaving.
+  &__in { color: var(--mat-sys-on-surface); }
   &__out { color: var(--mat-sys-error); }
 
   &__accounts {
@@ -170,6 +172,13 @@
   }
 
   &__amount-col { text-align: right; }
+
+  // Tint outgoing rows with a very light red so the eye finds money
+  // leaving without re-reading the sign. Subtle alpha keeps the
+  // text/contrast unchanged in both light and dark themes.
+  &__row--out td.mat-mdc-cell {
+    background-color: color-mix(in srgb, var(--mat-sys-error) 8%, transparent);
+  }
 
   &__muted {
     color: var(--mat-sys-on-surface-variant);

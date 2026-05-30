@@ -148,6 +148,7 @@
                 mat-row
                 *matRowDef="let row; columns: movementCols"
                 [class.ad__row--voided]="row.voidedAt"
+                [class.ad__row--out]="row.direction === 'OUT' && !row.voidedAt"
               ></tr>
             </table>
           }

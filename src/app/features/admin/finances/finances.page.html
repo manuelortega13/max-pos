@@ -140,7 +140,11 @@
           </ng-container>
 
           <tr mat-header-row *matHeaderRowDef="recentCols"></tr>
-          <tr mat-row *matRowDef="let row; columns: recentCols"></tr>
+          <tr
+            mat-row
+            *matRowDef="let row; columns: recentCols"
+            [class.fp__row--out]="row.direction === 'OUT'"
+          ></tr>
         </table>
       }
     </section>
