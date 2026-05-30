@@ -65,6 +65,53 @@
   &--completed { background: rgba(16, 185, 129, 0.15) !important; color: #047857 !important; }
   &--refunded { background: rgba(239, 68, 68, 0.15) !important; color: #b91c1c !important; }
   &--pending { background: rgba(245, 158, 11, 0.15) !important; color: #b45309 !important; }
+  &--voided { background: rgba(107, 114, 128, 0.18) !important; color: #4b5563 !important; }
+}
+
+.ref-static {
+  font-weight: 600;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+/* Type pill for non-sale rows in the Type/Items column. Reads as a
+   tag, not a button — there's no drill-in for these rows on the
+   Sales page itself (use the GCash / Load admin pages). */
+.type-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  background: var(--mat-sys-surface-container);
+  color: var(--mat-sys-on-surface-variant);
+
+  mat-icon {
+    font-size: 1rem;
+    width: 1rem;
+    height: 1rem;
+  }
+
+  &[data-kind='GCASH_IN'],
+  &[data-kind='GCASH_OUT'] {
+    background: rgba(0, 119, 224, 0.12);
+    color: #075985;
+  }
+  &[data-kind='LOAD'] {
+    background: rgba(168, 85, 247, 0.12);
+    color: #6b21a8;
+  }
+}
+
+/* Service-fee chip rendered below the principal amount in the Total
+   column. Subtle so it doesn't compete with the sale total. */
+.fee-pill {
+  display: block;
+  margin-top: 0.1rem;
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--mat-sys-tertiary);
 }
 
 /* Clickable items count — looks like text by default, becomes a

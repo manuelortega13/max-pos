@@ -16,8 +16,10 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { Expense, Sale } from '../../../core/models';
+import { Expense, GcashTransaction, LoadTransaction, Sale } from '../../../core/models';
 import { ExpenseService } from '../../../core/services/expense.service';
+import { GcashService } from '../../../core/services/gcash.service';
+import { LoadService } from '../../../core/services/load.service';
 import { ProductService } from '../../../core/services/product.service';
 import { SaleService } from '../../../core/services/sale.service';
 import { SettingsService } from '../../../core/services/settings.service';
@@ -53,6 +55,8 @@ type RangePreset = 'today' | 'week' | 'month' | 'year' | 'custom';
 export class ReportsPage {
   private readonly saleService = inject(SaleService);
   private readonly expenseService = inject(ExpenseService);
+  private readonly gcashService = inject(GcashService);
+  private readonly loadService = inject(LoadService);
   private readonly productService = inject(ProductService);
   private readonly settingsService = inject(SettingsService);
   private readonly dialog = inject(MatDialog);
@@ -80,16 +84,59 @@ export class ReportsPage {
     });
   });
 
+  /** GCash transactions inside the selected window, completed and
+   *  not voided. */
+  protected readonly rangeGcash = computed<readonly GcashTransaction[]>(() => {
+    const from = startOfDay(this.fromDate()).getTime();
+    const to = endOfDay(this.toDate()).getTime();
+    return this.gcashService.completedTransactions().filter((t) => {
+      const ts = Date.parse(t.date);
+      return ts >= from && ts <= to;
+    });
+  });
+
+  /** Load transactions inside the selected window, completed and
+   *  not voided. */
+  protected readonly rangeLoad = computed<readonly LoadTransaction[]>(() => {
+    const from = startOfDay(this.fromDate()).getTime();
+    const to = endOfDay(this.toDate()).getTime();
+    return this.loadService.completedTransactions().filter((t) => {
+      const ts = Date.parse(t.date);
+      return ts >= from && ts <= to;
+    });
+  });
+
+  /** Service-fee revenue from GCash transactions in range — the fee
+   *  is the store's cut; the principal passes through to the wallet. */
+  protected readonly gcashFeeRevenue = computed(() =>
+    round2(this.rangeGcash().reduce((sum, t) => sum + Number(t.fee ?? 0), 0)),
+  );
+
+  /** Service-fee revenue from cellphone-load transactions in range. */
+  protected readonly loadFeeRevenue = computed(() =>
+    round2(this.rangeLoad().reduce((sum, t) => sum + Number(t.fee ?? 0), 0)),
+  );
+
+  /** Combined service-fee revenue (GCash + Load) shown on the dashboard
+   *  alongside product sales revenue. */
+  protected readonly serviceFeeRevenue = computed(() =>
+    round2(this.gcashFeeRevenue() + this.loadFeeRevenue()),
+  );
+
   /**
-   * Revenue = sum of sale.subtotal − sale.discountAmount (post line+order
-   * discount, pre-tax). Tax is excluded because it's a pass-through to
-   * the government, not real revenue for the store.
+   * Product-sales revenue: sum of {@code sale.total} (already net of
+   * line + order discounts, inclusive of tax). Matches the Dashboard
+   * KPI so both screens report the same headline — otherwise a
+   * non-zero tax rate makes Reports look lower than Dashboard for
+   * the same window.
    */
+  protected readonly productRevenue = computed(() =>
+    round2(this.rangeSales().reduce((sum, s) => sum + Number(s.total), 0)),
+  );
+
+  /** Total revenue = product sales + GCash service fees + Load fees. */
   protected readonly revenue = computed(() =>
-    round2(this.rangeSales().reduce((sum, s) => {
-      const orderDiscount = Number(s.discountAmount ?? 0);
-      return sum + Number(s.subtotal) - orderDiscount;
-    }, 0)),
+    round2(this.productRevenue() + this.serviceFeeRevenue()),
   );
 
   /** COGS = sum of unit_cost × qty across every sold line item in range. */
@@ -274,6 +321,9 @@ export class ReportsPage {
 
       const summary: [string, string][] = [
         ['Revenue', `${sym}${this.revenue().toFixed(2)}`],
+        ['  Product sales', `${sym}${this.productRevenue().toFixed(2)}`],
+        ['  GCash fees', `${sym}${this.gcashFeeRevenue().toFixed(2)}`],
+        ['  Load fees', `${sym}${this.loadFeeRevenue().toFixed(2)}`],
         ['COGS', `${sym}${this.cogs().toFixed(2)}`],
         [
           'Gross profit',
@@ -335,6 +385,9 @@ export class ReportsPage {
       [],
       ['Metric', 'Amount'],
       ['Revenue', `${sym}${this.revenue().toFixed(2)}`],
+      ['  Product sales', `${sym}${this.productRevenue().toFixed(2)}`],
+      ['  GCash fees', `${sym}${this.gcashFeeRevenue().toFixed(2)}`],
+      ['  Load fees', `${sym}${this.loadFeeRevenue().toFixed(2)}`],
       ['COGS', `${sym}${this.cogs().toFixed(2)}`],
       ['Gross profit', `${sym}${this.grossProfit().toFixed(2)}`],
       ['Gross margin %', `${this.grossMargin().toFixed(1)}%`],

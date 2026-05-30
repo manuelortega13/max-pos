@@ -1,24 +1,48 @@
-import { HttpClient } from '@angular/common/http';
-import { Injectable, inject } from '@angular/core';
-import { EMPTY, Observable, catchError } from 'rxjs';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
+import { Injectable, computed, inject, signal } from '@angular/core';
+import { EMPTY, Observable, catchError, tap } from 'rxjs';
 import {
   CreateGcashTransactionRequest,
   GcashFeeTier,
   GcashFeeTierUpsertRequest,
   GcashTransaction,
 } from '../models';
+import { AuthService } from './auth.service';
 
 /**
  * Thin HTTP layer for the GCash service feature.
  *
- * Tiers + transactions are intentionally fetched fresh on each
- * navigation rather than cached in service state: the admin can
- * change tiers at any moment and the cashier's tier lookup must
- * always see the latest schedule.
+ * Tiers are fetched fresh on each navigation — the admin can change
+ * tiers at any moment and the cashier's tier lookup must always see
+ * the latest schedule.
+ *
+ * Transactions are cached in a signal so admin dashboards (Reports,
+ * Dashboard, Sales, EoD) can read the same list without each page
+ * issuing its own GET. Mutating endpoints (create, complete, void)
+ * update the signal optimistically/post-response so the cache stays
+ * in sync.
  */
 @Injectable({ providedIn: 'root' })
 export class GcashService {
   private readonly http = inject(HttpClient);
+  private readonly authService = inject(AuthService);
+
+  private readonly _transactions = signal<GcashTransaction[]>([]);
+  private readonly _loading = signal<boolean>(false);
+  private readonly _error = signal<string | null>(null);
+
+  readonly transactions = this._transactions.asReadonly();
+  readonly loading = this._loading.asReadonly();
+  readonly error = this._error.asReadonly();
+
+  /** Active (non-voided) completed rows — useful for revenue math. */
+  readonly completedTransactions = computed(() =>
+    this._transactions().filter((t) => !t.voidedAt && t.status === 'COMPLETED'),
+  );
+
+  constructor() {
+    this.load();
+  }
 
   // ─── fee tiers ──────────────────────────────────────────────────
 
@@ -54,8 +78,31 @@ export class GcashService {
 
   // ─── transactions ───────────────────────────────────────────────
 
+  /** Refresh the cached transaction list. Admins fetch every row;
+   *  cashiers fetch their own. No-op when unauthenticated. */
+  load(): void {
+    if (!this.authService.isAuthenticated()) return;
+    const url = this.authService.isAdmin()
+      ? '/api/gcash-transactions'
+      : '/api/gcash-transactions/mine';
+    this._loading.set(true);
+    this._error.set(null);
+    this.http.get<GcashTransaction[]>(url).subscribe({
+      next: (rows) => {
+        this._transactions.set(rows);
+        this._loading.set(false);
+      },
+      error: (err: HttpErrorResponse) => {
+        this._error.set(err.error?.message ?? 'Could not load GCash transactions.');
+        this._loading.set(false);
+      },
+    });
+  }
+
   create(req: CreateGcashTransactionRequest): Observable<GcashTransaction> {
-    return this.http.post<GcashTransaction>('/api/gcash-transactions', req);
+    return this.http
+      .post<GcashTransaction>('/api/gcash-transactions', req)
+      .pipe(tap((row) => this._transactions.update((list) => [row, ...list])));
   }
 
   /** Calling cashier's own — drives My Transactions card. */
@@ -70,13 +117,29 @@ export class GcashService {
 
   /** Admin marks a PENDING cash-in as COMPLETED. One-way. */
   complete(id: string): Observable<GcashTransaction> {
-    return this.http.post<GcashTransaction>(`/api/gcash-transactions/${id}/complete`, {});
+    return this.http
+      .post<GcashTransaction>(`/api/gcash-transactions/${id}/complete`, {})
+      .pipe(
+        tap((updated) =>
+          this._transactions.update((list) =>
+            list.map((t) => (t.id === id ? updated : t)),
+          ),
+        ),
+      );
   }
 
   /** Admin soft-void. */
   void(id: string, reason?: string | null): Observable<GcashTransaction> {
-    return this.http.post<GcashTransaction>(`/api/gcash-transactions/${id}/void`, {
-      reason: reason ?? null,
-    });
+    return this.http
+      .post<GcashTransaction>(`/api/gcash-transactions/${id}/void`, {
+        reason: reason ?? null,
+      })
+      .pipe(
+        tap((updated) =>
+          this._transactions.update((list) =>
+            list.map((t) => (t.id === id ? updated : t)),
+          ),
+        ),
+      );
   }
 }

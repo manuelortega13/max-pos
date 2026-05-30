@@ -1,21 +1,41 @@
-import { HttpClient } from '@angular/common/http';
-import { Injectable, inject } from '@angular/core';
-import { EMPTY, Observable, catchError } from 'rxjs';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
+import { Injectable, computed, inject, signal } from '@angular/core';
+import { EMPTY, Observable, catchError, tap } from 'rxjs';
 import {
   CreateLoadTransactionRequest,
   LoadFeeTier,
   LoadFeeTierUpsertRequest,
   LoadTransaction,
 } from '../models';
+import { AuthService } from './auth.service';
 
 /**
- * Thin HTTP layer for the load feature. Tiers + transactions are
- * fetched fresh per navigation (same rationale as GCash) so the
- * cashier always sees the latest fee schedule.
+ * Thin HTTP layer for the load feature. Tiers are fetched fresh per
+ * navigation (same rationale as GCash). Transactions are cached in
+ * a signal so admin dashboards (Reports, Dashboard, Sales, EoD) can
+ * read one shared list; mutating endpoints update the cache.
  */
 @Injectable({ providedIn: 'root' })
 export class LoadService {
   private readonly http = inject(HttpClient);
+  private readonly authService = inject(AuthService);
+
+  private readonly _transactions = signal<LoadTransaction[]>([]);
+  private readonly _loading = signal<boolean>(false);
+  private readonly _error = signal<string | null>(null);
+
+  readonly transactions = this._transactions.asReadonly();
+  readonly loading = this._loading.asReadonly();
+  readonly error = this._error.asReadonly();
+
+  /** Active (non-voided) completed rows — useful for revenue math. */
+  readonly completedTransactions = computed(() =>
+    this._transactions().filter((t) => !t.voidedAt && t.status === 'COMPLETED'),
+  );
+
+  constructor() {
+    this.load();
+  }
 
   // ─── fee tiers ──────────────────────────────────────────────────
 
@@ -44,8 +64,30 @@ export class LoadService {
 
   // ─── transactions ───────────────────────────────────────────────
 
+  /** Refresh the cached transaction list. */
+  load(): void {
+    if (!this.authService.isAuthenticated()) return;
+    const url = this.authService.isAdmin()
+      ? '/api/load-transactions'
+      : '/api/load-transactions/mine';
+    this._loading.set(true);
+    this._error.set(null);
+    this.http.get<LoadTransaction[]>(url).subscribe({
+      next: (rows) => {
+        this._transactions.set(rows);
+        this._loading.set(false);
+      },
+      error: (err: HttpErrorResponse) => {
+        this._error.set(err.error?.message ?? 'Could not load load transactions.');
+        this._loading.set(false);
+      },
+    });
+  }
+
   create(req: CreateLoadTransactionRequest): Observable<LoadTransaction> {
-    return this.http.post<LoadTransaction>('/api/load-transactions', req);
+    return this.http
+      .post<LoadTransaction>('/api/load-transactions', req)
+      .pipe(tap((row) => this._transactions.update((list) => [row, ...list])));
   }
 
   listMine(): Observable<LoadTransaction[]> {
@@ -57,12 +99,28 @@ export class LoadService {
   }
 
   complete(id: string): Observable<LoadTransaction> {
-    return this.http.post<LoadTransaction>(`/api/load-transactions/${id}/complete`, {});
+    return this.http
+      .post<LoadTransaction>(`/api/load-transactions/${id}/complete`, {})
+      .pipe(
+        tap((updated) =>
+          this._transactions.update((list) =>
+            list.map((t) => (t.id === id ? updated : t)),
+          ),
+        ),
+      );
   }
 
   void(id: string, reason?: string | null): Observable<LoadTransaction> {
-    return this.http.post<LoadTransaction>(`/api/load-transactions/${id}/void`, {
-      reason: reason ?? null,
-    });
+    return this.http
+      .post<LoadTransaction>(`/api/load-transactions/${id}/void`, {
+        reason: reason ?? null,
+      })
+      .pipe(
+        tap((updated) =>
+          this._transactions.update((list) =>
+            list.map((t) => (t.id === id ? updated : t)),
+          ),
+        ),
+      );
   }
 }

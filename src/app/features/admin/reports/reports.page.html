@@ -81,7 +81,12 @@
     <mat-card appearance="outlined" class="summary__tile">
       <span class="summary__label">Revenue</span>
       <span class="summary__value">{{ revenue() | money }}</span>
-      <small class="summary__meta">{{ rangeSales().length }} completed sale(s)</small>
+      <small class="summary__meta">
+        {{ rangeSales().length }} sale(s)
+        @if (serviceFeeRevenue() > 0) {
+          · {{ serviceFeeRevenue() | money }} in service fees
+        }
+      </small>
     </mat-card>
     <mat-card appearance="outlined" class="summary__tile">
       <span class="summary__label">COGS</span>

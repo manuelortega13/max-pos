@@ -13,6 +13,8 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { RouterLink } from '@angular/router';
 import { ExpiringBatch } from '../../../core/models';
 import { ExpenseService } from '../../../core/services/expense.service';
+import { GcashService } from '../../../core/services/gcash.service';
+import { LoadService } from '../../../core/services/load.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { ProductService } from '../../../core/services/product.service';
 import { SaleService } from '../../../core/services/sale.service';
@@ -47,6 +49,8 @@ export class DashboardPage {
   private readonly userService = inject(UserService);
   private readonly notifications = inject(NotificationService);
   private readonly expenseService = inject(ExpenseService);
+  private readonly gcashService = inject(GcashService);
+  private readonly loadService = inject(LoadService);
   private readonly settingsService = inject(SettingsService);
   private readonly dialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
@@ -55,7 +59,32 @@ export class DashboardPage {
     () => this.settingsService.settings().currencySymbol,
   );
 
-  protected readonly todayRevenue = this.saleService.todayRevenue;
+  /** "Today" boundary used by every today-* computed below. */
+  private readonly todayIso = computed(() => new Date().toISOString().slice(0, 10));
+
+  /** Today's GCash service-fee revenue (completed, non-voided rows). */
+  private readonly todayGcashFees = computed(() => {
+    const today = this.todayIso();
+    return this.gcashService
+      .completedTransactions()
+      .filter((t) => t.date.startsWith(today))
+      .reduce((sum, t) => sum + Number(t.fee ?? 0), 0);
+  });
+
+  /** Today's cellphone-load service-fee revenue. */
+  private readonly todayLoadFees = computed(() => {
+    const today = this.todayIso();
+    return this.loadService
+      .completedTransactions()
+      .filter((t) => t.date.startsWith(today))
+      .reduce((sum, t) => sum + Number(t.fee ?? 0), 0);
+  });
+
+  /** Today's revenue = product sales + GCash fees + Load fees. */
+  protected readonly todayRevenue = computed(
+    () => this.saleService.todayRevenue() + this.todayGcashFees() + this.todayLoadFees(),
+  );
+
   protected readonly todayTransactions = this.saleService.todayTransactionCount;
   protected readonly averageTicket = this.saleService.averageTicket;
   protected readonly activeCashiers = computed(() => this.userService.activeCashiers().length);
@@ -98,6 +127,29 @@ export class DashboardPage {
     return this.saleService.completedSales().filter((s) => Date.parse(s.date) >= startMs);
   });
 
+  private readonly windowGcash = computed(() => {
+    const startMs = this.windowStartMs();
+    return this.gcashService
+      .completedTransactions()
+      .filter((t) => Date.parse(t.date) >= startMs);
+  });
+
+  private readonly windowLoad = computed(() => {
+    const startMs = this.windowStartMs();
+    return this.loadService
+      .completedTransactions()
+      .filter((t) => Date.parse(t.date) >= startMs);
+  });
+
+  /** 30-day service-fee revenue (GCash + Load). Fees are the store's
+   *  cut on each transaction — the principal passes through to the
+   *  wallet, so it isn't counted toward revenue. */
+  private readonly windowServiceFees = computed(
+    () =>
+      this.windowGcash().reduce((s, t) => s + Number(t.fee ?? 0), 0) +
+      this.windowLoad().reduce((s, t) => s + Number(t.fee ?? 0), 0),
+  );
+
   private readonly windowExpenses = computed(() => {
     const startMs = this.windowStartMs();
     return this.expenseService
@@ -105,8 +157,10 @@ export class DashboardPage {
       .filter((e) => Date.parse(e.date) >= startMs);
   });
 
-  protected readonly windowRevenue = computed(() =>
-    this.windowSales().reduce((sum, s) => sum + s.total, 0),
+  protected readonly windowRevenue = computed(
+    () =>
+      this.windowSales().reduce((sum, s) => sum + s.total, 0) +
+      this.windowServiceFees(),
   );
 
   /** Pre-V14 sales have null unitCost — treated as zero cost. The UI
