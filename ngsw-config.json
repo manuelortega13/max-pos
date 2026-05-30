@@ -31,22 +31,14 @@
     {
       "name": "api-data",
       "urls": [
-        "/api/products/**",
-        "/api/products",
         "/api/categories/**",
         "/api/categories",
         "/api/settings/**",
         "/api/settings",
         "/api/users/**",
         "/api/users",
-        "/api/sales/**",
-        "/api/sales",
-        "/api/business-days/**",
-        "/api/business-days",
         "/api/auth/me",
-        "/api/health",
-        "/api/expenses/**",
-        "/api/expenses"
+        "/api/health"
       ],
       "cacheConfig": {
         "strategy": "freshness",
