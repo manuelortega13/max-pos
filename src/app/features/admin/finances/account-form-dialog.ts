@@ -31,6 +31,7 @@ const ACCOUNT_KINDS: AccountKind[] = [
   'MAYA',
   'BANK',
   'LOAD_WALLET',
+  'RECEIVABLES',
   'OTHER',
 ];
 
@@ -58,7 +59,7 @@ const ACCOUNT_KINDS: AccountKind[] = [
       {{ data.account ? 'Edit account' : 'New account' }}
     </h2>
 
-    <mat-dialog-content class="afd__content">
+    <mat-dialog-content class="afd__content pt-2!">
       <mat-form-field appearance="outline" class="afd__field">
         <mat-label>Name</mat-label>
         <input matInput [(ngModel)]="name" maxlength="64" autofocus />

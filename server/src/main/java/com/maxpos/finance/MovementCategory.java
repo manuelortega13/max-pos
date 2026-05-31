@@ -16,11 +16,13 @@ public final class MovementCategory {
     public static final String CASH_SALE     = "CASH_SALE";
     public static final String CARD_SALE     = "CARD_SALE";
     public static final String TRANSFER_SALE = "TRANSFER_SALE";
+    public static final String CREDIT_SALE   = "CREDIT_SALE";
 
     // Refunds
     public static final String CASH_REFUND     = "CASH_REFUND";
     public static final String CARD_REFUND     = "CARD_REFUND";
     public static final String TRANSFER_REFUND = "TRANSFER_REFUND";
+    public static final String CREDIT_REFUND   = "CREDIT_REFUND";
 
     // GCash service (in/out + fees)
     public static final String GCASH_CASH_IN  = "GCASH_CASH_IN";

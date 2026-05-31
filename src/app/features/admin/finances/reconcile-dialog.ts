@@ -45,7 +45,7 @@ export interface ReconcileDialogData {
       Reconcile {{ data.accountName }}
     </h2>
 
-    <mat-dialog-content class="rc__content">
+    <mat-dialog-content class="rc__content pt-2!">
       <section class="rc__expected">
         <div>
           <small>Expected balance</small>

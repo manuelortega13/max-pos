@@ -65,9 +65,11 @@ public class AccountMovementService {
 
     /**
      * Record the cash/card/transfer/credit movement triggered by a sale.
-     * Credit sales don't move cash (the customer owes); we still write
-     * a placeholder is intentionally NOT done — credit sales don't hit
-     * any account until the corresponding creditor payment lands.
+     * Cash/card/transfer sales hit their mapped account directly; credit
+     * sales hit the RECEIVABLES account (the customer now owes the
+     * store, and that obligation is an asset). The receivable is paid
+     * down later when the matching creditor payment lands — see
+     * {@link #recordForCreditorPayment(CreditorPayment)}.
      */
     @Transactional
     public void recordForSale(Sale sale) {
@@ -75,26 +77,21 @@ public class AccountMovementService {
         if (movements.existsBySourceKindAndSourceId(MovementSourceKind.SALE, sale.getId())) return;
 
         Account target = resolveAccountForPaymentMethod(sale.getPaymentMethod());
-        if (target == null) return; // CREDIT or unmapped — no account movement
+        if (target == null) return; // unmapped (e.g., card account not configured)
 
-        AccountMovement m = new AccountMovement();
-        m.setAccount(target);
-        m.setDirection(MovementDirection.IN);
-        m.setAmount(sale.getTotal());
-        m.setCategory(categoryForSale(sale.getPaymentMethod()));
-        m.setNote("Sale " + sale.getReference());
-        m.setOccurredAt(sale.getDate());
-        m.setRecordedBy(sale.getCashier());
-        m.setSourceKind(MovementSourceKind.SALE);
-        m.setSourceId(sale.getId());
-        movements.save(m);
+        saveSourceRow(target, MovementDirection.IN,
+                sale.getTotal(),
+                categoryForSale(sale.getPaymentMethod()),
+                noteForSale(sale),
+                sale.getDate(), sale.getCashier(),
+                MovementSourceKind.SALE, sale.getId());
     }
 
     /**
-     * Record the OUT side when a sale is refunded. The original sale's
-     * IN movement stays (gross accounting — the till saw the money go
-     * in and then go back out), and this method writes the offsetting
-     * row.
+     * Record the OUT side when a sale is refunded. Mirrors the sale's
+     * original target: cash/card/transfer refunds reverse against the
+     * same wallet; credit-sale refunds reverse against RECEIVABLES so
+     * the customer's outstanding balance drops by the refunded amount.
      */
     @Transactional
     public void recordForSaleRefund(Sale sale) {
@@ -104,17 +101,12 @@ public class AccountMovementService {
         Account target = resolveAccountForPaymentMethod(sale.getPaymentMethod());
         if (target == null) return;
 
-        AccountMovement m = new AccountMovement();
-        m.setAccount(target);
-        m.setDirection(MovementDirection.OUT);
-        m.setAmount(sale.getTotal());
-        m.setCategory(categoryForRefund(sale.getPaymentMethod()));
-        m.setNote("Refund of " + sale.getReference());
-        m.setOccurredAt(Instant.now());
-        m.setRecordedBy(sale.getCashier());
-        m.setSourceKind(MovementSourceKind.REFUND);
-        m.setSourceId(sale.getId());
-        movements.save(m);
+        saveSourceRow(target, MovementDirection.OUT,
+                sale.getTotal(),
+                categoryForRefund(sale.getPaymentMethod()),
+                "Refund of " + sale.getReference(),
+                Instant.now(), sale.getCashier(),
+                MovementSourceKind.REFUND, sale.getId());
     }
 
     /**
@@ -231,26 +223,39 @@ public class AccountMovementService {
         movements.save(m);
     }
 
-    /** Creditor cash/card/transfer payment — IN to the appropriate account. */
+    /**
+     * Creditor payment — two paired rows: +IN to cash/card/transfer
+     * (cash physically lands in the chosen wallet) and -OUT from
+     * Receivables (the outstanding balance drops by the same amount).
+     * Both share {@code (sourceKind=CREDITOR_PAYMENT, sourceId)} so the
+     * void cascade picks them up together.
+     */
     @Transactional
     public void recordForCreditorPayment(CreditorPayment p) {
         if (p == null || p.getId() == null) return;
         if (movements.existsBySourceKindAndSourceId(MovementSourceKind.CREDITOR_PAYMENT, p.getId())) return;
 
         Account target = resolveAccountForPaymentMethod(p.getPaymentMethod());
-        if (target == null) return;
+        if (target != null) {
+            saveSourceRow(target, MovementDirection.IN,
+                    p.getAmount(),
+                    MovementCategory.CREDIT_PAYMENT,
+                    "Credit payment " + p.getReference(),
+                    p.getDate(), p.getCashier(),
+                    MovementSourceKind.CREDITOR_PAYMENT, p.getId());
+        }
 
-        AccountMovement m = new AccountMovement();
-        m.setAccount(target);
-        m.setDirection(MovementDirection.IN);
-        m.setAmount(p.getAmount());
-        m.setCategory(MovementCategory.CREDIT_PAYMENT);
-        m.setNote("Credit payment " + p.getReference());
-        m.setOccurredAt(p.getDate());
-        m.setRecordedBy(p.getCashier());
-        m.setSourceKind(MovementSourceKind.CREDITOR_PAYMENT);
-        m.setSourceId(p.getId());
-        movements.save(m);
+        Account receivables = accounts
+                .findFirstByKindAndActiveTrueOrderBySortOrderAsc(AccountKind.RECEIVABLES)
+                .orElse(null);
+        if (receivables != null) {
+            saveSourceRow(receivables, MovementDirection.OUT,
+                    p.getAmount(),
+                    MovementCategory.CREDIT_PAYMENT,
+                    "Credit payment " + p.getReference(),
+                    p.getDate(), p.getCashier(),
+                    MovementSourceKind.CREDITOR_PAYMENT, p.getId());
+        }
     }
 
     /** Mid-day cash float top-up → Cash account. */
@@ -483,8 +488,9 @@ public class AccountMovementService {
      *   CASH     → Cash account
      *   CARD     → store_settings.card_account_id (admin-configurable)
      *   TRANSFER → store_settings.transfer_account_id (admin-configurable)
-     *   CREDIT   → null (credit sales don't move cash; only the
-     *               subsequent creditor payment does)
+     *   CREDIT   → Receivables account (asset booked against the
+     *               creditor; settled when {@link
+     *               #recordForCreditorPayment(CreditorPayment)} fires)
      *
      * Returns null when no mapping is set — the caller no-ops in
      * that case rather than failing the source operation.
@@ -506,9 +512,16 @@ public class AccountMovementService {
                 return accounts.findById(s.getTransferAccountId()).orElse(null);
             }
             case CREDIT:
+                return accounts.findFirstByKindAndActiveTrueOrderBySortOrderAsc(AccountKind.RECEIVABLES)
+                        .orElse(null);
             default:
                 return null;
         }
+    }
+
+    private String noteForSale(Sale sale) {
+        String prefix = sale.getPaymentMethod() == PaymentMethod.CREDIT ? "Credit sale " : "Sale ";
+        return prefix + sale.getReference();
     }
 
     private String categoryForSale(PaymentMethod method) {
@@ -516,7 +529,7 @@ public class AccountMovementService {
             case CASH     -> MovementCategory.CASH_SALE;
             case CARD     -> MovementCategory.CARD_SALE;
             case TRANSFER -> MovementCategory.TRANSFER_SALE;
-            default       -> MovementCategory.CASH_SALE; // unreachable for null target
+            case CREDIT   -> MovementCategory.CREDIT_SALE;
         };
     }
 
@@ -525,7 +538,7 @@ public class AccountMovementService {
             case CASH     -> MovementCategory.CASH_REFUND;
             case CARD     -> MovementCategory.CARD_REFUND;
             case TRANSFER -> MovementCategory.TRANSFER_REFUND;
-            default       -> MovementCategory.CASH_REFUND;
+            case CREDIT   -> MovementCategory.CREDIT_REFUND;
         };
     }
 

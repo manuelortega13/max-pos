@@ -149,16 +149,21 @@ public class AccountService {
      *  - {@link MovementCategory#OPENING_FLOAT} and
      *    {@link MovementCategory#FLOAT_TOPUP} — repositioning of the
      *    store's own working capital into the till, not real income.
-     *    Including them would make the period IN look like revenue
-     *    when it's not.
+     *  - Movements on a {@link AccountKind#RECEIVABLES} account —
+     *    these are asset position changes (a credit sale creates an
+     *    IOU; a creditor payment settles one). Counting them as
+     *    period IN/OUT would double-book against the cash side of
+     *    the same event.
      *
-     * Balances themselves still reflect float movements (so the Cash
-     * account ledger matches the till); this filter is for the
-     * "what flowed in and out" display only.
+     * Balances themselves still reflect every movement (the Cash
+     * ledger matches the till and the Receivables balance equals
+     * outstanding); this filter is for the "what flowed in and out"
+     * display only.
      */
     private boolean countsForPeriod(AccountMovement m) {
         if (m.getVoidedAt() != null) return false;
         if (m.getSourceKind() == MovementSourceKind.TRANSFER) return false;
+        if (m.getAccount() != null && m.getAccount().getKind() == AccountKind.RECEIVABLES) return false;
         String category = m.getCategory();
         if (MovementCategory.OPENING_FLOAT.equals(category)) return false;
         if (MovementCategory.FLOAT_TOPUP.equals(category)) return false;

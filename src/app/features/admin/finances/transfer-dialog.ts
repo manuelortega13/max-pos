@@ -43,7 +43,7 @@ export interface TransferDialogData {
       Transfer between accounts
     </h2>
 
-    <mat-dialog-content class="tx__content">
+    <mat-dialog-content class="tx__content pt-2!">
       <div class="tx__row">
         <mat-form-field appearance="outline" class="tx__field">
           <mat-label>From</mat-label>

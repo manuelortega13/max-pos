@@ -1,4 +1,11 @@
-export type AccountKind = 'CASH' | 'GCASH' | 'MAYA' | 'BANK' | 'LOAD_WALLET' | 'OTHER';
+export type AccountKind =
+  | 'CASH'
+  | 'GCASH'
+  | 'MAYA'
+  | 'BANK'
+  | 'LOAD_WALLET'
+  | 'RECEIVABLES'
+  | 'OTHER';
 
 export type MovementDirection = 'IN' | 'OUT';
 
@@ -121,9 +128,11 @@ export const MOVEMENT_CATEGORY_LABELS: Readonly<Record<string, string>> = {
   CASH_SALE: 'Cash sale',
   CARD_SALE: 'Card sale',
   TRANSFER_SALE: 'Transfer sale',
+  CREDIT_SALE: 'Credit sale',
   CASH_REFUND: 'Cash refund',
   CARD_REFUND: 'Card refund',
   TRANSFER_REFUND: 'Transfer refund',
+  CREDIT_REFUND: 'Credit refund',
   GCASH_CASH_IN: 'GCash cash-in',
   GCASH_CASH_OUT: 'GCash cash-out',
   GCASH_FEE: 'GCash fee',
@@ -149,5 +158,6 @@ export const ACCOUNT_KIND_LABELS: Readonly<Record<AccountKind, string>> = {
   MAYA: 'Maya',
   BANK: 'Bank',
   LOAD_WALLET: 'Load wallet',
+  RECEIVABLES: 'Receivables',
   OTHER: 'Other',
 };

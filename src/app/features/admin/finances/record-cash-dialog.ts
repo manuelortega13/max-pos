@@ -48,7 +48,7 @@ export interface RecordCashDialogData {
       Record {{ isIn() ? 'cash in' : 'cash out' }}
     </h2>
 
-    <mat-dialog-content class="rcd__content">
+    <mat-dialog-content class="rcd__content pt-2!">
       <mat-form-field appearance="outline" class="rcd__field">
         <mat-label>Account</mat-label>
         <mat-select [(ngModel)]="accountId" [disabled]="submitting()">
