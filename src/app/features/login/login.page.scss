@@ -60,9 +60,44 @@
     font-size: 0.9rem;
   }
 
+  // Cold-start notice shown when /api/health hasn't responded in 2s.
+  // Render free tier spins down idle services and a JVM cold start
+  // can take 30s — better to set expectations than let the cashier
+  // think the page is broken.
+  &__warming {
+    display: flex;
+    gap: 0.75rem;
+    align-items: flex-start;
+    padding: 0.85rem 1rem;
+    border-radius: 0.5rem;
+    background: var(--mat-sys-secondary-container);
+    color: var(--mat-sys-on-secondary-container);
+    font-size: 0.875rem;
+
+    mat-icon {
+      margin-top: 0.1rem;
+      animation: spin 1.6s linear infinite;
+    }
+
+    strong {
+      display: block;
+      font-weight: 600;
+    }
+
+    small {
+      display: block;
+      opacity: 0.85;
+      margin-top: 0.15rem;
+    }
+  }
+
   &__submit {
     height: 3rem;
     font-size: 1rem;
     font-weight: 600;
   }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }

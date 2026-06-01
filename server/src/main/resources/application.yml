@@ -8,6 +8,21 @@ spring:
     import: optional:file:.env[.properties]
 
   # ────────────────────────────────────────────────────────────────
+  # Cold-start tuning.
+  #   - lazy-initialization: beans are instantiated on first use
+  #     rather than at container boot. Cuts Render's cold start from
+  #     ~30s to ~10s; the cost is the first request paying ~2–4s as
+  #     dependent beans wake up. The login-screen warm ping makes
+  #     that invisible to the cashier.
+  #   - jmx.enabled=false: skip the management bean registration
+  #     pass we don't use.
+  # ────────────────────────────────────────────────────────────────
+  main:
+    lazy-initialization: true
+  jmx:
+    enabled: false
+
+  # ────────────────────────────────────────────────────────────────
   # PostgreSQL — fill in these values or set them as env vars:
   #   DB_URL        jdbc:postgresql://localhost:5432/maxpos
   #   DB_USERNAME   maxpos
@@ -18,6 +33,15 @@ spring:
     username: ${DB_USERNAME:postgres}
     password: ${DB_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
+    # HikariCP — minimal pool sized for a single-store POS. Smaller
+    # pool = faster pool initialization on cold start. minimum-idle
+    # at 1 keeps one warm connection so the first request after
+    # boot doesn't pay a TCP/TLS handshake.
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 1
+      connection-timeout: 30000
+      initialization-fail-timeout: -1
 
   jpa:
     hibernate:
@@ -33,6 +57,11 @@ spring:
     enabled: true
     locations: classpath:db/migration
     baseline-on-migrate: true
+    # Render's managed Postgres can be slow to accept the first
+    # connection after the app cold-starts in tandem with the DB.
+    # Retry the migration connect for ~30s instead of failing fast.
+    connect-retries: 6
+    connect-retries-interval: 5
 
 server:
   # Render injects PORT; local dev uses SERVER_PORT (see server/.env.example).

@@ -13,6 +13,16 @@
         </div>
       </div>
 
+      @if (warming()) {
+        <div class="login__warming" role="status" aria-live="polite">
+          <mat-icon>schedule</mat-icon>
+          <div>
+            <strong>Waking the server…</strong>
+            <small>First sign-in after a quiet period can take ~30s.</small>
+          </div>
+        </div>
+      }
+
       <form [formGroup]="form" (ngSubmit)="submit()" class="login__form">
         <mat-form-field appearance="outline">
           <mat-label>Email</mat-label>
