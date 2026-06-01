@@ -194,8 +194,26 @@
       <mat-form-field appearance="outline">
         <mat-label>Stock</mat-label>
         <input matInput type="number" min="0" step="1" formControlName="stock" />
+        @if (isEdit()) {
+          <mat-hint>Edit stock via Restock on the Inventory page.</mat-hint>
+        }
         @if (form.controls.stock.touched && form.controls.stock.invalid) {
           <mat-error>Must be ≥ 0</mat-error>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Stock expires</mat-label>
+        <input
+          matInput
+          [matDatepicker]="expiryPicker"
+          formControlName="initialStockExpiry"
+          autocomplete="off"
+        />
+        <mat-datepicker-toggle matIconSuffix [for]="expiryPicker"></mat-datepicker-toggle>
+        <mat-datepicker #expiryPicker></mat-datepicker>
+        @if (!isEdit()) {
+          <mat-hint>Optional. Leave blank for no expiry.</mat-hint>
         }
       </mat-form-field>
     </div>

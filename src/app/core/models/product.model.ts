@@ -31,6 +31,13 @@ export interface ProductUpsertRequest {
   imageUrl: string | null;
   description: string;
   active: boolean;
+  /**
+   * Optional expiry date applied to the opening-balance batch when
+   * a new product is created with `stock > 0`. ISO date
+   * (`YYYY-MM-DD`). Ignored on update — stock changes after create
+   * go through the Restock flow instead.
+   */
+  initialStockExpiry: string | null;
 }
 
 export interface ProductBatch {

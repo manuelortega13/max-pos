@@ -107,6 +107,13 @@ public class ProductService {
             opening.setProduct(saved);
             opening.setQuantityReceived(req.stock());
             opening.setQuantityRemaining(req.stock());
+            // Stamp the product's current cost on the batch so future
+            // gross-profit reports against this opening stock stay
+            // accurate even when product.cost drifts later.
+            opening.setCostPerUnit(req.cost());
+            // Optional expiry — null means "never expires", matching
+            // the existing Restock-without-expiry semantics.
+            opening.setExpiryDate(req.initialStockExpiry());
             opening.setNote("Opening balance");
             batches.save(opening);
         }

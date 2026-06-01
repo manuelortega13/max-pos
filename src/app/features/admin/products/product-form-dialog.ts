@@ -13,6 +13,8 @@ import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/materia
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatButtonModule } from '@angular/material/button';
 import { MatChipsModule, MatChipInputEvent } from '@angular/material/chips';
+import { provideNativeDateAdapter } from '@angular/material/core';
+import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
@@ -47,6 +49,7 @@ const SKU_PATTERN = /^([A-Z]+)-?(\d+)$/;
     MatDialogModule,
     MatButtonModule,
     MatChipsModule,
+    MatDatepickerModule,
     MatFormFieldModule,
     MatIconModule,
     MatInputModule,
@@ -54,6 +57,7 @@ const SKU_PATTERN = /^([A-Z]+)-?(\d+)$/;
     MatSlideToggleModule,
     MatTooltipModule,
   ],
+  providers: [provideNativeDateAdapter()],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './product-form-dialog.html',
   styleUrl: './product-form-dialog.scss',
@@ -115,11 +119,19 @@ export class ProductFormDialog {
     markup: [0, [Validators.min(-100)]],
     price: [0, [Validators.required, Validators.min(0)]],
     stock: [0, [Validators.required, Validators.min(0)]],
+    initialStockExpiry: this.fb.control<Date | null>(null),
     categoryId: ['', [Validators.required]],
     image: ['', [Validators.maxLength(16)]],
     description: ['', [Validators.maxLength(2048)]],
     active: [true],
   });
+
+  /** True when the dialog is in edit mode. Stock + opening-batch
+   *  expiry are locked in edit mode because the existing update
+   *  endpoint doesn't touch batches — stock changes go through
+   *  Restock from the Inventory page instead. Without the lock the
+   *  field accepts input but the change silently disappears on save. */
+  protected readonly isEdit = computed(() => this.data.mode === 'edit');
 
   /** Live text of the icon input — drives the autocomplete filter. */
   private readonly iconQuery = toSignal(
@@ -229,18 +241,31 @@ export class ProductFormDialog {
     this.error.set(null);
 
     const raw = this.form.getRawValue();
+    // Coerce stock defensively: nonNullable + a cleared number input
+    // can stage `null` mid-edit that getRawValue surfaces as NaN. The
+    // backend then receives 0 and silently skips the opening batch.
+    const stockValue = Number.isFinite(Number(raw.stock)) ? Number(raw.stock) : 0;
     const request: ProductUpsertRequest = {
       name: raw.name,
       sku: raw.sku,
       barcodes: this.barcodes(),
       price: raw.price,
       cost: raw.cost,
-      stock: raw.stock,
+      stock: stockValue,
       categoryId: raw.categoryId,
       image: raw.image,
       imageUrl: this.imageUrl(),
       description: raw.description,
       active: raw.active,
+      // Applies to the opening-balance batch — only meaningful when
+      // this submit hits the backend's create() path (create OR
+      // duplicate, since duplicate mints a fresh product). Edit
+      // disables the field and the backend's update() ignores it
+      // either way, so null is safe there.
+      initialStockExpiry:
+        this.data.mode !== 'edit' && raw.initialStockExpiry
+          ? toIsoDate(raw.initialStockExpiry)
+          : null,
     };
     const obs =
       this.data.mode === 'edit' && this.data.product
@@ -275,6 +300,14 @@ export class ProductFormDialog {
       description: p.description ?? '',
       active: p.active,
     });
+
+    // Stock + expiry only mean "opening balance" — they apply to a
+    // brand-new product. In edit mode the existing stock is read-only
+    // from this dialog; changes go through Restock.
+    if (this.data.mode === 'edit') {
+      this.form.controls.stock.disable();
+      this.form.controls.initialStockExpiry.disable();
+    }
     // Duplicating mints a fresh product — barcodes are globally
     // UNIQUE, so we can't carry the source's codes across.
     this.barcodes.set(this.data.mode === 'duplicate' ? [] : [...p.barcodes]);
@@ -387,4 +420,13 @@ export class ProductFormDialog {
         : null;
     return apiMessage ?? 'Something went wrong.';
   }
+}
+
+/** Format a Date as `YYYY-MM-DD` in local time. Avoids the TZ drift
+ *  that `toISOString()` introduces by stringifying UTC. */
+function toIsoDate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }

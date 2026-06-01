@@ -447,6 +447,8 @@ export class MarkupDialog {
         price: newPrice,
         cost: newCost,
         stock: p.stock,
+        // Update path; backend ignores initialStockExpiry on update.
+        initialStockExpiry: null,
         categoryId: p.categoryId,
         image: p.image,
         imageUrl: p.imageUrl,
