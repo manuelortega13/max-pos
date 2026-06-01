@@ -1,8 +1,28 @@
-import { HttpClient, HttpErrorResponse, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Injectable, computed, effect, inject, signal } from '@angular/core';
 import { Observable, tap } from 'rxjs';
 import { ExpiringBatch, Product, ProductBatch, ProductUpsertRequest } from '../models';
 import { RealtimeService } from './realtime.service';
+
+/**
+ * Headers attached to every product/batch GET to defeat the four
+ * caching layers that can sneak in between client and backend:
+ *   - {@code ngsw-bypass}: makes Angular's service worker pass the
+ *     request straight to the network even if a stale dataGroup
+ *     config from a previous deploy still lists /api/products.
+ *   - {@code Cache-Control: no-cache}: tells browsers/proxies to
+ *     revalidate with the origin rather than reuse a stored copy.
+ *   - {@code Pragma: no-cache}: legacy HTTP/1.0 fallback for the
+ *     same intent — harmless when ignored.
+ *
+ * Restock / add-product errors prompted this — stale GETs were
+ * masking fresh writes.
+ */
+const NO_CACHE_HEADERS = new HttpHeaders({
+  'ngsw-bypass': 'true',
+  'Cache-Control': 'no-cache',
+  'Pragma': 'no-cache',
+});
 
 export interface RestockPayload {
   readonly quantity: number;
@@ -61,7 +81,7 @@ export class ProductService {
   load(): void {
     this._loading.set(true);
     this._error.set(null);
-    this.http.get<Product[]>('/api/products').subscribe({
+    this.http.get<Product[]>('/api/products', { headers: NO_CACHE_HEADERS }).subscribe({
       next: (products) => {
         this._products.set(products);
         this._loading.set(false);
@@ -117,7 +137,9 @@ export class ProductService {
   }
 
   listBatches(productId: string): Observable<ProductBatch[]> {
-    return this.http.get<ProductBatch[]>(`/api/products/${productId}/batches`);
+    return this.http.get<ProductBatch[]>(`/api/products/${productId}/batches`, {
+      headers: NO_CACHE_HEADERS,
+    });
   }
 
   writeOffBatch(batchId: string): Observable<ProductBatch> {
@@ -126,7 +148,10 @@ export class ProductService {
 
   listExpiring(withinDays: number): Observable<ExpiringBatch[]> {
     const params = new HttpParams().set('withinDays', withinDays);
-    return this.http.get<ExpiringBatch[]>('/api/batches/expiring', { params });
+    return this.http.get<ExpiringBatch[]>('/api/batches/expiring', {
+      params,
+      headers: NO_CACHE_HEADERS,
+    });
   }
 
   private describe(err: HttpErrorResponse): string {

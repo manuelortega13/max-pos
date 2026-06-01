@@ -61,7 +61,7 @@
       </div>
 
       @if (paymentMethod() === 'CASH') {
-        <mat-form-field appearance="outline">
+        <mat-form-field appearance="outline" class="cash-received">
           <mat-label>Cash received</mat-label>
           <input
             matInput
@@ -78,10 +78,14 @@
             <mat-hint class="hint-error">Amount is less than the total</mat-hint>
           }
         </mat-form-field>
-        <div class="change">
-          <span>Change</span>
-          <strong>{{ change() | money }}</strong>
-        </div>
+        <section class="change-card" role="status" aria-live="polite">
+          <header class="change-card__head">
+            <mat-icon>payments</mat-icon>
+            <span>Change</span>
+          </header>
+          <strong class="change-card__amount">{{ change() | money }}</strong>
+          <small class="change-card__hint">Hand this back to the customer</small>
+        </section>
       } @else if (paymentMethod() === 'CREDIT') {
         <mat-form-field appearance="outline">
           <mat-label>Charge to creditor</mat-label>
@@ -167,6 +171,17 @@
           <p class="success__subtitle">{{ data.total | money }} · {{ saleId() }}</p>
         </div>
       </div>
+
+      @if (paymentMethod() === 'CASH' && change() > 0) {
+        <section class="change-card change-card--receipt" role="status" aria-live="polite">
+          <header class="change-card__head">
+            <mat-icon>payments</mat-icon>
+            <span>Change due</span>
+          </header>
+          <strong class="change-card__amount">{{ change() | money }}</strong>
+          <small class="change-card__hint">Hand this back to the customer</small>
+        </section>
+      }
 
       <section class="receipt print-receipt">
         <header class="receipt__header">

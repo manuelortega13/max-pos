@@ -74,14 +74,85 @@ h2[mat-dialog-title] {
   color: var(--mat-sys-error);
 }
 
-.change {
+// Cash received — bumped for at-a-glance legibility while the cashier
+// is mid-transaction. The <input> is projected from this dialog's
+// template (so it picks up our encapsulation attribute and matches
+// directly); the .mat-mdc-form-field-infix wrapper is rendered by
+// Angular Material's own template (different encapsulation attribute),
+// so it needs ::ng-deep to be reachable. Material's defaults live in
+// unlayered CSS, so every rule still needs !important to win against
+// Tailwind's @layer utilities and Material's own selectors.
+.cash-received input.mat-mdc-input-element {
+  font-size: 2.25rem !important;
+  font-weight: 700 !important;
+  font-variant-numeric: tabular-nums !important;
+  line-height: 1.1 !important;
+}
+
+.cash-received ::ng-deep .mat-mdc-form-field-infix {
+  // Grow the infix so the larger glyphs aren't clipped against the
+  // outline border, and the floating label has room to sit above.
+  min-height: 4rem !important;
+  padding-top: 1.5rem !important;
+  padding-bottom: 0.5rem !important;
+}
+
+// Change panel — the cashier reads this mid-transaction with the
+// customer at the counter, so it has to dominate the dialog visually.
+// Big amount, high-contrast primary-container background, slight
+// elevation and an icon header so it reads as the "answer" of the
+// transaction, not just another row of inputs.
+.change-card {
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
+  gap: 0.4rem;
   align-items: center;
+  padding: 1.5rem 1.75rem 1.25rem;
+  border-radius: 1rem;
   background: var(--mat-sys-primary-container);
-  padding: 0.75rem 1rem;
-  border-radius: 0.5rem;
   color: var(--mat-sys-on-primary-container);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.08),
+    0 8px 24px rgba(0, 0, 0, 0.06);
+  text-align: center;
+
+  &__head {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: 1rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    opacity: 0.85;
+
+    mat-icon {
+      font-size: 1.25rem;
+      width: 1.25rem;
+      height: 1.25rem;
+    }
+  }
+
+  &__amount {
+    font-size: 3.5rem;
+    font-weight: 800;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+  }
+
+  &__hint {
+    font-size: 0.8rem;
+    opacity: 0.75;
+  }
+
+  // Receipt-stage variant: lives above the receipt and below the
+  // success header. Receipts are printed via window.print() which
+  // takes only .print-receipt — this card is screen-only, so the
+  // global @media print rules already hide it without extra work.
+  &--receipt {
+    margin: 0.25rem 0 1rem;
+  }
 }
 
 .success {

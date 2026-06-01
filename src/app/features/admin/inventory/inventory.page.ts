@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
@@ -48,7 +48,7 @@ type StockFilter = 'all' | 'low' | 'out' | 'ok';
   templateUrl: './inventory.page.html',
   styleUrl: './inventory.page.scss',
 })
-export class InventoryPage {
+export class InventoryPage implements OnInit {
   private readonly productService = inject(ProductService);
   private readonly categoryService = inject(CategoryService);
   private readonly dialog = inject(MatDialog);
@@ -59,6 +59,15 @@ export class InventoryPage {
   private readonly authService = inject(AuthService);
 
   protected readonly cameraSupported = this.scanner.isSupported;
+
+  /** Force a fresh fetch every time the page is opened. ProductService
+   *  caches the list in a signal across the app, and realtime events
+   *  don't always make it through (backgrounded tab, dropped SSE) —
+   *  refreshing on navigation keeps the inventory view authoritative
+   *  without depending on those side channels. */
+  ngOnInit(): void {
+    this.productService.load();
+  }
 
   protected readonly filter = signal<StockFilter>('all');
   protected readonly search = signal<string>('');
