@@ -155,4 +155,38 @@
     display: flex;
     justify-content: center;
   }
+
+  // Fee-included toggle (cash-out only). Sits above the amount input
+  // as its own labeled block so the cashier reads it before typing.
+  &__fee-toggle {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+    border-radius: 0.5rem;
+    background: var(--mat-sys-surface-container-low);
+    border: 1px solid var(--mat-sys-outline-variant);
+  }
+
+  &__fee-toggle-hint {
+    margin: 0;
+    font-size: 0.8rem;
+    color: var(--mat-sys-on-surface-variant);
+    line-height: 1.35;
+  }
+
+  // Verification line under the grand total when in fee-on-top mode —
+  // shows the GCash amount the cashier should see in their app, so a
+  // mismatch with the customer's actual send is caught before submit.
+  &__gcash-sent-hint {
+    margin: 0.5rem 0 0;
+    font-size: 0.85rem;
+    color: var(--mat-sys-on-surface-variant);
+
+    strong {
+      color: var(--mat-sys-on-surface);
+      font-variant-numeric: tabular-nums;
+    }
+  }
 }

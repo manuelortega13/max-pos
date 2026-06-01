@@ -16,6 +16,7 @@ import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { BusinessDayService } from '../../../core/services/business-day.service';
 import { GcashService } from '../../../core/services/gcash.service';
@@ -57,6 +58,7 @@ import {
     MatFormFieldModule,
     MatIconModule,
     MatInputModule,
+    MatSlideToggleModule,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './gcash.page.html',
@@ -113,20 +115,60 @@ export class GcashPage implements OnInit {
   });
 
   /**
+   * Cash-out only: does the GCash amount the customer transferred
+   * already include the service fee, or did they add it on top?
+   * Default = true (current behavior); the cashier flips it after
+   * confirming with the customer.
+   *
+   *   ON  → amount typed = GCash received. Cash given = amount − fee.
+   *         (e.g. customer sent ₱1000, cashier hands ₱980)
+   *   OFF → amount typed = cash to hand back. Customer sent fee on
+   *         top, so GCash actually received = cash + fee.
+   *         (e.g. customer sent ₱1020, cashier hands ₱1000)
+   */
+  protected readonly feeIncludedInGcashSend = signal<boolean>(true);
+
+  /** Convenience: true only in cash-out + fee-on-top mode. */
+  protected readonly cashOutFeeOnTop = computed(
+    () => this.type() === 'CASH_OUT' && !this.feeIncludedInGcashSend(),
+  );
+
+  /**
+   * The GCash amount actually transferred — what the cashier sees in
+   * their GCash app and what the backend stores as `amount`. Differs
+   * from the typed input only in cash-out + fee-on-top mode, where
+   * the cashier types the cash they intend to hand back and the
+   * system adds the fee to recover the real transferred amount.
+   */
+  protected readonly gcashAmountSent = computed(() => {
+    if (this.type() === 'CASH_IN') return this.amount();
+    return this.cashOutFeeOnTop()
+      ? this.amount() + this.fee()
+      : this.amount();
+  });
+
+  /** Label on the amount input — phrased to match what the cashier
+   *  is actually typing in each mode. */
+  protected readonly amountLabel = computed(() => {
+    if (this.type() === 'CASH_IN') return 'Amount';
+    return this.cashOutFeeOnTop() ? 'Cash to hand back' : 'GCash amount sent';
+  });
+
+  /**
    * Cash the customer hands over (cash-in) or receives (cash-out).
    *
-   *   CASH_IN  → amount + fee  (customer pays the GCash amount plus
-   *                              the service fee, in cash, at the till)
-   *   CASH_OUT → amount − fee  (customer gets the GCash amount minus
-   *                              the service fee, in cash, at the till)
+   *   CASH_IN              → amount + fee (customer pays GCash + fee in cash)
+   *   CASH_OUT, fee in     → amount − fee (typed GCash received minus fee)
+   *   CASH_OUT, fee on top → amount        (typed cash is what we hand back)
    *
-   * Surfaced prominently on the page so the cashier sees the exact
-   * cash total to collect / hand out without doing the math in their
-   * head.
+   * Surfaced prominently so the cashier reads the exact cash total
+   * without doing the math.
    */
   protected readonly grandTotal = computed(() => {
     if (this.type() === 'CASH_IN') return this.amount() + this.fee();
-    return Math.max(0, this.amount() - this.fee());
+    return this.cashOutFeeOnTop()
+      ? this.amount()
+      : Math.max(0, this.amount() - this.fee());
   });
 
   protected readonly grandTotalLabel = computed(() =>
@@ -152,7 +194,16 @@ export class GcashPage implements OnInit {
     // previous timer is canceled. effect() naturally re-runs on
     // signal change so we get cancellation via onCleanup.
     effect((onCleanup) => {
-      const a = this.amount();
+      // Lookup uses the *actual GCash amount transferred* so the
+      // correct tier is picked even in cash-out + fee-on-top mode
+      // (where the typed value is the cash to hand back, not the
+      // GCash). The signal reactivity converges in one or two
+      // iterations: the first lookup gives a fee, the new fee
+      // shifts gcashAmountSent slightly in fee-on-top mode, which
+      // re-triggers the effect; the next lookup either matches the
+      // same tier (no-op — signal value unchanged → no further
+      // re-runs) or settles on the adjacent tier.
+      const a = this.gcashAmountSent();
       if (a <= 0) {
         this.matchedTier.set(null);
         return;
@@ -213,7 +264,9 @@ export class GcashPage implements OnInit {
     this.gcashService
       .create({
         type: this.type(),
-        amount: this.amount(),
+        // Backend stores the GCash amount actually transferred — in
+        // fee-on-top cash-out mode this differs from the typed value.
+        amount: this.gcashAmountSent(),
         fee: this.fee(),
         // Send only the fields that belong to the current direction.
         // Backend strips the other side too, but keeping the wire
@@ -261,6 +314,7 @@ export class GcashPage implements OnInit {
     this.inboundRef.set('');
     this.notes.set('');
     this.matchedTier.set(null);
+    this.feeIncludedInGcashSend.set(true);
   }
 
   protected normalizeAmount(): void {
