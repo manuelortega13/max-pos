@@ -133,42 +133,25 @@ export class GcashPage implements OnInit {
     () => this.type() === 'CASH_OUT' && !this.feeIncludedInGcashSend(),
   );
 
-  /**
-   * The GCash amount actually transferred — what the cashier sees in
-   * their GCash app and what the backend stores as `amount`. Differs
-   * from the typed input only in cash-out + fee-on-top mode, where
-   * the cashier types the cash they intend to hand back and the
-   * system adds the fee to recover the real transferred amount.
-   */
-  protected readonly gcashAmountSent = computed(() => {
-    if (this.type() === 'CASH_IN') return this.amount();
-    return this.cashOutFeeOnTop()
-      ? this.amount() + this.fee()
-      : this.amount();
-  });
-
-  /** Label on the amount input — phrased to match what the cashier
-   *  is actually typing in each mode. */
-  protected readonly amountLabel = computed(() => {
-    if (this.type() === 'CASH_IN') return 'Amount';
-    return this.cashOutFeeOnTop() ? 'Cash to hand back' : 'GCash amount sent';
-  });
+  /** Label on the amount input. Always "GCash amount sent" for
+   *  cash-out — the cashier types what they see in their GCash app
+   *  regardless of the fee-included toggle. The toggle only changes
+   *  which tier the fee is computed against, not what the cashier
+   *  types. */
+  protected readonly amountLabel = computed(() =>
+    this.type() === 'CASH_IN' ? 'Amount' : 'GCash amount sent',
+  );
 
   /**
    * Cash the customer hands over (cash-in) or receives (cash-out).
-   *
-   *   CASH_IN              → amount + fee (customer pays GCash + fee in cash)
-   *   CASH_OUT, fee in     → amount − fee (typed GCash received minus fee)
-   *   CASH_OUT, fee on top → amount        (typed cash is what we hand back)
-   *
-   * Surfaced prominently so the cashier reads the exact cash total
-   * without doing the math.
+   * Cash-out is always {@code amount − fee} — the cashier types the
+   * GCash they received and the fee comes out of the cash given back.
+   * The fee-included toggle does NOT change this number; it only
+   * shifts which tier the fee was matched against.
    */
   protected readonly grandTotal = computed(() => {
     if (this.type() === 'CASH_IN') return this.amount() + this.fee();
-    return this.cashOutFeeOnTop()
-      ? this.amount()
-      : Math.max(0, this.amount() - this.fee());
+    return Math.max(0, this.amount() - this.fee());
   });
 
   protected readonly grandTotalLabel = computed(() =>
@@ -188,26 +171,61 @@ export class GcashPage implements OnInit {
    *  the fee in that case — admin's schedule wins. */
   protected readonly feeLocked = computed(() => this.matchedTier() !== null);
 
+  /**
+   * The amount the tier table should be matched against. Tiers are
+   * defined in terms of the *principal* (the customer's intended
+   * transaction value), not the gross GCash transfer.
+   *
+   *   CASH_IN              → principal = typed (GCash sent to customer)
+   *   CASH_OUT, fee on top → principal = typed (cashier typed the cash-out)
+   *   CASH_OUT, fee in     → principal = typed − fee (typed includes fee,
+   *                          so cash-out is what's left after subtracting it)
+   *
+   * For the fee-included case we have a chicken-and-egg: the fee
+   * affects the lookup amount which determines the fee. Signal
+   * reactivity converges naturally — the first lookup picks the
+   * wrong tier, sets the fee, which re-triggers; the second lookup
+   * picks the right tier and settles. The iteration guard below
+   * caps the loop at 5 in case of a tier-boundary oscillation.
+   */
+  protected readonly tierLookupAmount = computed(() => {
+    if (this.type() === 'CASH_IN') return this.amount();
+    if (this.cashOutFeeOnTop()) return this.amount();
+    return Math.max(0, this.amount() - this.fee());
+  });
+
+  /** Iteration counter for the tier-lookup feedback loop in cash-out
+   *  fee-included mode. Reset whenever the cashier types a new amount
+   *  (a real user action vs. a feedback-driven re-run). */
+  private tierLookupIterations = 0;
+  private lastTypedAmount = -1;
+
   constructor() {
     // Debounced lookup. Each amount change schedules a 250ms
     // timer; if the amount changes again before it fires, the
     // previous timer is canceled. effect() naturally re-runs on
     // signal change so we get cancellation via onCleanup.
     effect((onCleanup) => {
-      // Lookup uses the *actual GCash amount transferred* so the
-      // correct tier is picked even in cash-out + fee-on-top mode
-      // (where the typed value is the cash to hand back, not the
-      // GCash). The signal reactivity converges in one or two
-      // iterations: the first lookup gives a fee, the new fee
-      // shifts gcashAmountSent slightly in fee-on-top mode, which
-      // re-triggers the effect; the next lookup either matches the
-      // same tier (no-op — signal value unchanged → no further
-      // re-runs) or settles on the adjacent tier.
-      const a = this.gcashAmountSent();
+      const typed = this.amount();
+      const a = this.tierLookupAmount();
+
+      // Reset iteration counter on a user-driven amount change.
+      // Feedback re-runs (from fee changes) keep the counter going.
+      if (typed !== this.lastTypedAmount) {
+        this.lastTypedAmount = typed;
+        this.tierLookupIterations = 0;
+      }
+
       if (a <= 0) {
         this.matchedTier.set(null);
         return;
       }
+      if (this.tierLookupIterations >= 5) {
+        // Tier-boundary oscillation — accept the last-known fee
+        // rather than spinning HTTP requests forever.
+        return;
+      }
+      this.tierLookupIterations++;
       this.lookingUp.set(true);
       const handle = window.setTimeout(() => {
         this.gcashService.lookupTier(a).subscribe({
@@ -264,10 +282,13 @@ export class GcashPage implements OnInit {
     this.gcashService
       .create({
         type: this.type(),
-        // Backend stores the GCash amount actually transferred — in
-        // fee-on-top cash-out mode this differs from the typed value.
-        amount: this.gcashAmountSent(),
+        amount: this.amount(),
         fee: this.fee(),
+        // Only the toggle's tier-lookup semantics need to cross the
+        // wire; storage is unchanged. Send the flag only for cash-out
+        // so cash-in requests stay byte-identical to before.
+        feeIncluded:
+          this.type() === 'CASH_OUT' ? this.feeIncludedInGcashSend() : undefined,
         // Send only the fields that belong to the current direction.
         // Backend strips the other side too, but keeping the wire
         // payload clean makes the request log easier to read.
@@ -315,6 +336,8 @@ export class GcashPage implements OnInit {
     this.notes.set('');
     this.matchedTier.set(null);
     this.feeIncludedInGcashSend.set(true);
+    this.tierLookupIterations = 0;
+    this.lastTypedAmount = -1;
   }
 
   protected normalizeAmount(): void {

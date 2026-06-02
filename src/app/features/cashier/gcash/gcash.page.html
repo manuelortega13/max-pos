@@ -93,11 +93,12 @@
             </mat-slide-toggle>
             <p class="gcash__fee-toggle-hint">
               @if (feeIncludedInGcashSend()) {
-                Customer's send already covers the fee — type what's in
-                your GCash app. Cash you hand back = GCash received − fee.
+                Customer's GCash send already includes the fee — fee is
+                matched against (GCash received − fee).
               } @else {
-                Customer added the fee on top of what they want as cash —
-                type the cash you'll hand back. GCash received = cash + fee.
+                Customer sent the cash-out value as-is — fee is matched
+                against the GCash received and deducted from the cash
+                you hand back.
               }
             </p>
           </div>
@@ -161,13 +162,6 @@
             </span>
           </div>
 
-          @if (cashOutFeeOnTop() && fee() > 0) {
-            <p class="gcash__gcash-sent-hint">
-              GCash actually received:
-              <strong>{{ currencySymbol() }}{{ gcashAmountSent().toFixed(2) }}</strong>
-              — verify this matches your GCash app before confirming.
-            </p>
-          }
         }
       </mat-card-content>
     </mat-card>

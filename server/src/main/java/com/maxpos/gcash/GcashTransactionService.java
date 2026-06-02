@@ -100,9 +100,26 @@ public class GcashTransactionService {
             phone = null;
         }
 
+        // Tier table is keyed by the principal of the transaction.
+        // For cash-in that's req.amount() (the GCash sent to the
+        // customer). For cash-out it depends on the cashier's
+        // "fee included" toggle:
+        //   feeIncluded = true  → customer's GCash send already
+        //     contained the fee, so the principal is amount − fee.
+        //   feeIncluded = false → customer sent the principal as-is
+        //     and the fee comes out of the cash handed back, so the
+        //     principal is amount.
+        // amount stored on the row is always the literal GCash
+        // transferred — only the validation lookup shifts.
+        boolean feeBundled =
+                req.type() == GcashTransactionType.CASH_OUT
+                && Boolean.TRUE.equals(req.feeIncluded());
+        BigDecimal lookupAmount = feeBundled
+                ? req.amount().subtract(req.fee())
+                : req.amount();
         Optional<GcashFeeTier> tier = tiers
                 .findFirstByActiveTrueAndMinAmountLessThanEqualAndMaxAmountGreaterThanEqualOrderByMinAmount(
-                        req.amount(), req.amount());
+                        lookupAmount, lookupAmount);
         if (tier.isPresent() && req.fee().compareTo(tier.get().getFee()) != 0) {
             // The cashier UI auto-fills + locks the fee when a tier
             // matches, so this 409 only fires for misbehaving clients.

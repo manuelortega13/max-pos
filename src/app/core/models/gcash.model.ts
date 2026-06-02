@@ -62,4 +62,13 @@ export interface CreateGcashTransactionRequest {
   readonly customerPhone?: string | null;
   readonly inboundRef?: string | null;
   readonly notes?: string | null;
+  /**
+   * Cash-out only: true when the customer's GCash send already
+   * includes the service fee (so the tier table is matched against
+   * `amount − fee`, the cash-out value). When false (the default),
+   * the customer sent the cash-out value as-is and the fee is
+   * deducted from the cash the cashier hands back; the tier table
+   * is matched against `amount` directly. Ignored for cash-in.
+   */
+  readonly feeIncluded?: boolean;
 }
