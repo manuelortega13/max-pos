@@ -1,3 +1,5 @@
+import { PaymentMethod } from './sale.model';
+
 export type LoadTransactionStatus = 'PENDING' | 'COMPLETED';
 
 /** Admin-configured fee slice for cellphone load. Same shape as the
@@ -27,6 +29,11 @@ export interface LoadTransaction {
   readonly fee: number;
   readonly promo: string | null;
   readonly customerPhone: string;
+  /** How the customer paid: CASH (default) or CREDIT (charged to a creditor). */
+  readonly paymentMethod: PaymentMethod;
+  /** Set only when paymentMethod = 'CREDIT', null otherwise. */
+  readonly creditorId: string | null;
+  readonly creditorName: string | null;
   readonly cashierId: string;
   readonly cashierName: string;
   readonly businessDayId: string | null;
@@ -47,4 +54,8 @@ export interface CreateLoadTransactionRequest {
   readonly promo?: string | null;
   readonly customerPhone: string;
   readonly notes?: string | null;
+  /** CASH or CREDIT. Loads support only those two methods. */
+  readonly paymentMethod: PaymentMethod;
+  /** Required when paymentMethod = 'CREDIT', omitted otherwise. */
+  readonly creditorId?: string | null;
 }

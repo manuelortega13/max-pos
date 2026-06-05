@@ -9,17 +9,23 @@ import {
   signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatButtonModule } from '@angular/material/button';
+import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatCardModule } from '@angular/material/card';
+import { MatDialog } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { firstValueFrom } from 'rxjs';
 import { BusinessDayService } from '../../../core/services/business-day.service';
+import { CreditorService } from '../../../core/services/creditor.service';
 import { LoadService } from '../../../core/services/load.service';
 import { PrinterService } from '../../../core/services/printer.service';
 import { SettingsService } from '../../../core/services/settings.service';
-import { LoadFeeTier, LoadTransaction } from '../../../core/models';
+import { Creditor, LoadFeeTier, LoadTransaction, PaymentMethod } from '../../../core/models';
+import { ConfirmDialog } from '../../../shared/dialogs/confirm-dialog';
 
 /**
  * Cashier-facing page for cellphone load. Same shape as the GCash
@@ -37,7 +43,9 @@ import { LoadFeeTier, LoadTransaction } from '../../../core/models';
   selector: 'app-load-page',
   imports: [
     FormsModule,
+    MatAutocompleteModule,
     MatButtonModule,
+    MatButtonToggleModule,
     MatCardModule,
     MatFormFieldModule,
     MatIconModule,
@@ -52,6 +60,8 @@ export class LoadPage implements OnInit {
   private readonly businessDayService = inject(BusinessDayService);
   private readonly settingsService = inject(SettingsService);
   private readonly printerService = inject(PrinterService);
+  private readonly creditorService = inject(CreditorService);
+  private readonly confirmDialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
 
   protected readonly currentDay = this.businessDayService.current;
@@ -67,6 +77,52 @@ export class LoadPage implements OnInit {
   protected readonly promo = signal<string>('');
   protected readonly customerPhone = signal<string>('');
   protected readonly notes = signal<string>('');
+
+  // ───────────────────── payment method ────────────────────────
+
+  /** CASH (the default — cash at the till) or CREDIT (charged to a
+   *  creditor's tab). Loads support only these two. */
+  protected readonly paymentMethod = signal<PaymentMethod>('CASH');
+  protected readonly isCredit = computed(() => this.paymentMethod() === 'CREDIT');
+
+  /** Creditor picker — same UX as the POS checkout dialog. Live query
+   *  bound to the autocomplete input; selectedCreditor is null until a
+   *  pick is confirmed. */
+  protected readonly creditorQuery = signal<string>('');
+  protected readonly selectedCreditor = signal<Creditor | null>(null);
+
+  protected readonly creditorOptions = computed<readonly Creditor[]>(() => {
+    const q = this.creditorQuery().trim().toLowerCase();
+    const all = this.creditorService.active();
+    if (!q) return all;
+    // Already-picked: query holds the displayWith string — show all so
+    // the cashier can re-pick easily.
+    const picked = this.selectedCreditor();
+    if (picked && this.displayCreditor(picked).toLowerCase() === q) return all;
+    return all.filter(
+      (c) => c.fullName.toLowerCase().includes(q) || c.phone.toLowerCase().includes(q),
+    );
+  });
+
+  protected readonly creditorMissing = computed(
+    () => this.isCredit() && this.selectedCreditor() === null,
+  );
+
+  /** mat-autocomplete displayWith — what shows in the input after pick. */
+  protected readonly displayCreditor = (c: Creditor | string | null): string => {
+    if (!c) return '';
+    if (typeof c === 'string') return c;
+    return `${c.fullName} · ${c.phone}`;
+  };
+
+  protected onCreditorPicked(c: Creditor): void {
+    this.selectedCreditor.set(c);
+    this.creditorQuery.set(this.displayCreditor(c));
+  }
+
+  private formatMoney(v: number): string {
+    return `${this.currencySymbol()}${v.toFixed(2)}`;
+  }
 
   /** Defensive parse — ngModel on type="number" can send back string,
    *  number, or null. parseFloat alone would NaN on the second two. */
@@ -100,6 +156,10 @@ export class LoadPage implements OnInit {
   protected readonly feeLocked = computed(() => this.matchedTier() !== null);
 
   constructor() {
+    // Pre-load active creditors so the picker is ready the instant the
+    // cashier flips to Credit. Cashier endpoint — no admin role needed.
+    this.creditorService.loadActive();
+
     // Debounced lookup. Each amount change schedules a 250ms timer;
     // signal re-runs the effect and onCleanup cancels the prior timer.
     effect((onCleanup) => {
@@ -137,14 +197,47 @@ export class LoadPage implements OnInit {
     if (this.amount() <= 0) return false;
     if (this.fee() < 0) return false;
     if (this.phoneMissing()) return false;
+    if (this.creditorMissing()) return false;
     // Manual-fee mode: require an explicit fee entry (don't silently
     // submit a zero fee just because the field starts empty).
     if (!this.feeLocked() && String(this.feeText() ?? '').trim() === '') return false;
     return true;
   });
 
-  protected submit(): void {
+  protected async submit(): Promise<void> {
     if (!this.canSubmit() || this.submitting()) return;
+
+    // Soft credit-limit warning — mirrors the POS checkout dialog. The
+    // backend doesn't hard-enforce the limit; we ask the cashier to
+    // confirm before posting whenever the new total (amount + fee, what
+    // the customer owes) would push the creditor past their limit.
+    if (this.isCredit()) {
+      const c = this.selectedCreditor();
+      if (c?.creditLimit != null) {
+        const projected = c.outstandingBalance + this.grandTotal();
+        if (projected > c.creditLimit) {
+          const proceed = await firstValueFrom(
+            this.confirmDialog
+              .open(ConfirmDialog, {
+                width: '460px',
+                data: {
+                  title: 'Over credit limit',
+                  message:
+                    `This load puts ${c.fullName} at ${this.formatMoney(projected)}, ` +
+                    `which is over their limit of ${this.formatMoney(c.creditLimit)}. ` +
+                    `Continue anyway?`,
+                  confirmLabel: 'Continue',
+                  destructive: false,
+                  icon: 'warning',
+                },
+              })
+              .afterClosed(),
+          );
+          if (!proceed) return;
+        }
+      }
+    }
+
     const phone = this.customerPhone().trim();
     const promo = this.promo().trim();
     const note = this.notes().trim();
@@ -156,13 +249,18 @@ export class LoadPage implements OnInit {
         promo: promo === '' ? undefined : promo,
         customerPhone: phone,
         notes: note === '' ? undefined : note,
+        paymentMethod: this.paymentMethod(),
+        creditorId: this.isCredit() ? this.selectedCreditor()?.id : undefined,
       })
       .subscribe({
         next: (txn) => {
           this.submitting.set(false);
           this.receipt.set(txn);
+          const who = txn.creditorName
+            ? ` on ${txn.creditorName}'s tab`
+            : '';
           this.snackBar.open(
-            `Recorded load of ${this.currencySymbol()}${txn.amount.toFixed(2)} to ${txn.customerPhone}`,
+            `Recorded load of ${this.currencySymbol()}${txn.amount.toFixed(2)} to ${txn.customerPhone}${who}`,
             'Dismiss',
             { duration: 2500 },
           );
@@ -194,6 +292,9 @@ export class LoadPage implements OnInit {
     this.customerPhone.set('');
     this.notes.set('');
     this.matchedTier.set(null);
+    this.paymentMethod.set('CASH');
+    this.selectedCreditor.set(null);
+    this.creditorQuery.set('');
   }
 
   protected normalizeAmount(): void {

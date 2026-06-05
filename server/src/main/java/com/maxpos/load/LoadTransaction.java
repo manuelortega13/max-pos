@@ -1,6 +1,8 @@
 package com.maxpos.load;
 
 import com.maxpos.businessday.BusinessDay;
+import com.maxpos.creditor.Creditor;
+import com.maxpos.sale.PaymentMethod;
 import com.maxpos.user.User;
 import jakarta.persistence.*;
 
@@ -40,6 +42,21 @@ public class LoadTransaction {
      *  can't send the load. DB-level NOT NULL enforces. */
     @Column(name = "customer_phone", nullable = false)
     private String customerPhone;
+
+    /** How the customer paid. CASH (cash at the till — the default and
+     *  original behaviour) or CREDIT (charged to a creditor's tab).
+     *  Constrained to those two by the V26 check constraint. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_method", nullable = false, length = 16)
+    private PaymentMethod paymentMethod = PaymentMethod.CASH;
+
+    /** Set only when {@link #paymentMethod} = CREDIT — the creditor
+     *  whose account this load is charged to. Null for cash loads
+     *  (symmetry enforced by the V26 check constraint, mirroring
+     *  sales.creditor_id). */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "creditor_id")
+    private Creditor creditor;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 16)
@@ -90,6 +107,10 @@ public class LoadTransaction {
     public void setPromo(String promo) { this.promo = promo; }
     public String getCustomerPhone() { return customerPhone; }
     public void setCustomerPhone(String customerPhone) { this.customerPhone = customerPhone; }
+    public PaymentMethod getPaymentMethod() { return paymentMethod; }
+    public void setPaymentMethod(PaymentMethod paymentMethod) { this.paymentMethod = paymentMethod; }
+    public Creditor getCreditor() { return creditor; }
+    public void setCreditor(Creditor creditor) { this.creditor = creditor; }
     public LoadTransactionStatus getStatus() { return status; }
     public void setStatus(LoadTransactionStatus status) { this.status = status; }
     public Instant getCompletedAt() { return completedAt; }

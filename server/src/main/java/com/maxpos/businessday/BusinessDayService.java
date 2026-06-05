@@ -270,11 +270,15 @@ public class BusinessDayService {
             }
         }
 
-        // Load transactions are always cash-in for the till: customer
-        // hands cash, store sends mobile load. Drawer gains amount +
-        // fee. Voided rows excluded (same rule as GCash).
+        // Cash loads are cash-in for the till: customer hands cash,
+        // store sends mobile load. Drawer gains amount + fee. Voided
+        // rows excluded (same rule as GCash). Credit loads charge the
+        // creditor's tab — no cash hits the drawer, so they're excluded
+        // from these cash-reconciliation buckets (they surface in the
+        // creditor's outstanding balance instead, like credit sales).
         for (LoadTransaction l : loadTransactions.findAllByBusinessDayId(d.getId())) {
             if (l.getVoidedAt() != null) continue;
+            if (l.getPaymentMethod() == PaymentMethod.CREDIT) continue;
             loadAmount = loadAmount.add(l.getAmount());
             loadFees   = loadFees.add(l.getFee());
         }

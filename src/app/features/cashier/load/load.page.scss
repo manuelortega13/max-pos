@@ -21,6 +21,19 @@
   &__step { width: 100%; }
   &__field { width: 100%; }
 
+  &__methods {
+    width: 100%;
+    margin-bottom: 0.85rem;
+    display: flex;
+
+    mat-button-toggle { flex: 1; }
+  }
+
+  &__creditor-bal {
+    color: var(--mat-sys-on-surface-variant);
+    font-size: 0.85em;
+  }
+
   &__grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));

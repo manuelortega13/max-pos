@@ -4,8 +4,11 @@ import com.maxpos.businessday.BusinessDay;
 import com.maxpos.businessday.BusinessDayRepository;
 import com.maxpos.common.ConflictException;
 import com.maxpos.common.NotFoundException;
+import com.maxpos.creditor.Creditor;
+import com.maxpos.creditor.CreditorRepository;
 import com.maxpos.load.dto.CreateLoadTransactionRequest;
 import com.maxpos.load.dto.LoadTransactionDto;
+import com.maxpos.sale.PaymentMethod;
 import com.maxpos.user.User;
 import com.maxpos.user.UserRepository;
 import jakarta.persistence.EntityManager;
@@ -31,6 +34,7 @@ public class LoadTransactionService {
     private final LoadFeeTierRepository tiers;
     private final BusinessDayRepository businessDays;
     private final UserRepository users;
+    private final CreditorRepository creditors;
     private final com.maxpos.finance.AccountMovementService accountMovements;
 
     @PersistenceContext
@@ -40,11 +44,13 @@ public class LoadTransactionService {
                                   LoadFeeTierRepository tiers,
                                   BusinessDayRepository businessDays,
                                   UserRepository users,
+                                  CreditorRepository creditors,
                                   com.maxpos.finance.AccountMovementService accountMovements) {
         this.transactions = transactions;
         this.tiers = tiers;
         this.businessDays = businessDays;
         this.users = users;
+        this.creditors = creditors;
         this.accountMovements = accountMovements;
     }
 
@@ -78,6 +84,15 @@ public class LoadTransactionService {
         }
         String promo = req.promo() == null || req.promo().isBlank() ? null : req.promo().trim();
 
+        // CASH (the default) or CREDIT only — loads never settle by
+        // card/transfer. Resolve the creditor with the same
+        // CREDIT ↔ creditorId symmetry the V26 check constraint enforces.
+        PaymentMethod method = req.paymentMethod() == null ? PaymentMethod.CASH : req.paymentMethod();
+        if (method != PaymentMethod.CASH && method != PaymentMethod.CREDIT) {
+            throw new ConflictException("Loads can only be paid by cash or credit.");
+        }
+        Creditor creditor = resolveCreditor(method, req.creditorId());
+
         Optional<LoadFeeTier> tier = tiers
                 .findFirstByActiveTrueAndMinAmountLessThanEqualAndMaxAmountGreaterThanEqualOrderByMinAmount(
                         req.amount(), req.amount());
@@ -93,6 +108,8 @@ public class LoadTransactionService {
         t.setFee(req.fee());
         t.setPromo(promo);
         t.setCustomerPhone(phone);
+        t.setPaymentMethod(method);
+        t.setCreditor(creditor);
         t.setCashier(cashier);
         t.setBusinessDay(openDay);
         t.setDate(Instant.now());
@@ -150,6 +167,28 @@ public class LoadTransactionService {
         em.flush();
         em.refresh(t);
         return LoadTransactionDto.from(t);
+    }
+
+    /**
+     * Enforce the "payment method ↔ creditor" symmetry from the V26
+     * schema check, mirroring {@code SaleService.resolveCreditor}.
+     * Throws a clean 409 instead of a bare DataIntegrityViolation 500.
+     */
+    private Creditor resolveCreditor(PaymentMethod method, UUID creditorId) {
+        boolean isCredit = method == PaymentMethod.CREDIT;
+        if (isCredit && creditorId == null) {
+            throw new ConflictException("Credit loads require a creditor.");
+        }
+        if (!isCredit && creditorId != null) {
+            throw new ConflictException("Only credit loads can be linked to a creditor.");
+        }
+        if (creditorId == null) return null;
+        Creditor c = creditors.findById(creditorId)
+                .orElseThrow(() -> new NotFoundException("Creditor not found"));
+        if (!c.isActive()) {
+            throw new ConflictException("Creditor \"" + c.getFullName() + "\" is inactive.");
+        }
+        return c;
     }
 
     private String generateReference() {

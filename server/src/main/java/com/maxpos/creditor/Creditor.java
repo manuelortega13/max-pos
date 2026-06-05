@@ -50,13 +50,20 @@ public class Creditor {
     /**
      * Live outstanding balance:
      *   sum(non-refunded credit-sale totals)
+     *   + sum(non-voided credit-load amount+fee)
      *   − sum(non-voided payment amounts)
      *
      * Read-only from the entity's perspective — changes come from new
-     * sales, refunds, or recorded/voided payments. Skips the CREDIT
-     * check on payment_method because every sale with a creditor_id
-     * IS a credit sale (enforced by the V18 check constraint), making
-     * the extra filter redundant.
+     * sales, credit loads, refunds, or recorded/voided payments. The
+     * sales term skips the CREDIT check on payment_method because every
+     * sale with a creditor_id IS a credit sale (enforced by the V18
+     * check constraint); the load term keeps the explicit
+     * payment_method filter as a guard alongside the V26 constraint.
+     *
+     * Credit loads count from the moment they're recorded (PENDING
+     * included) — the customer owes the money the instant they take
+     * the load on credit, just like a credit sale. A voided load drops
+     * back out.
      */
     @Formula("""
         COALESCE((
@@ -64,6 +71,14 @@ public class Creditor {
               FROM sales s
              WHERE s.creditor_id = id
                AND s.status <> 'REFUNDED'
+        ), 0)
+        +
+        COALESCE((
+            SELECT SUM(l.amount + l.fee)
+              FROM load_transactions l
+             WHERE l.creditor_id = id
+               AND l.payment_method = 'CREDIT'
+               AND l.voided_at IS NULL
         ), 0)
         -
         COALESCE((

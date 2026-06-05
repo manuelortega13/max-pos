@@ -168,28 +168,44 @@ public class AccountMovementService {
 
     /**
      * Cellphone load.
+     *
+     * Cash load:
      *   Cash         +amount+fee (customer paid for the load + service fee)
      *   Load wallet  -amount     (store's prepaid balance with the carrier)
+     *
+     * Credit load: no cash changes hands — the customer owes amount+fee,
+     * booked against RECEIVABLES (same asset the CREDIT sale path uses),
+     * settled later by a creditor payment.
+     *   Receivables  +amount+fee
+     *   Load wallet  -amount
+     *
+     * Either way the net is +fee in store net worth, so the fee is
+     * booked as revenue regardless of payment method.
      */
     @Transactional
     public void recordForLoadTransaction(LoadTransaction t) {
         if (t == null || t.getId() == null) return;
         if (movements.existsBySourceKindAndSourceId(MovementSourceKind.LOAD_TXN, t.getId())) return;
 
-        Account cash       = requireAccount(AccountKind.CASH);
         Account loadWallet = requireAccount(AccountKind.LOAD_WALLET);
+        boolean isCredit = t.getPaymentMethod() == PaymentMethod.CREDIT;
 
-        saveSourceRow(cash, MovementDirection.IN,
+        Account target = isCredit
+                ? requireAccount(AccountKind.RECEIVABLES)
+                : requireAccount(AccountKind.CASH);
+        String note = (isCredit ? "Credit load " : "Load ") + t.getReference();
+
+        saveSourceRow(target, MovementDirection.IN,
                 t.getAmount().add(t.getFee()),
                 MovementCategory.LOAD_SALE,
-                "Load " + t.getReference(),
+                note,
                 t.getDate(), t.getCashier(),
                 MovementSourceKind.LOAD_TXN, t.getId());
 
         saveSourceRow(loadWallet, MovementDirection.OUT,
                 t.getAmount(),
                 MovementCategory.LOAD_SALE,
-                "Load " + t.getReference(),
+                note,
                 t.getDate(), t.getCashier(),
                 MovementSourceKind.LOAD_TXN, t.getId());
     }

@@ -2,6 +2,7 @@ package com.maxpos.load.dto;
 
 import com.maxpos.load.LoadTransaction;
 import com.maxpos.load.LoadTransactionStatus;
+import com.maxpos.sale.PaymentMethod;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -14,6 +15,9 @@ public record LoadTransactionDto(
         BigDecimal fee,
         String promo,
         String customerPhone,
+        PaymentMethod paymentMethod,
+        UUID creditorId,
+        String creditorName,
         UUID cashierId,
         String cashierName,
         UUID businessDayId,
@@ -35,6 +39,9 @@ public record LoadTransactionDto(
                 t.getFee(),
                 t.getPromo(),
                 t.getCustomerPhone(),
+                t.getPaymentMethod(),
+                t.getCreditor() != null ? t.getCreditor().getId() : null,
+                t.getCreditor() != null ? t.getCreditor().getFullName() : null,
                 t.getCashier() != null ? t.getCashier().getId() : null,
                 t.getCashier() != null ? t.getCashier().getName() : null,
                 t.getBusinessDay() != null ? t.getBusinessDay().getId() : null,
