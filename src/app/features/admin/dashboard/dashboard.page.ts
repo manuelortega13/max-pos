@@ -1,10 +1,9 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
-import { DatePipe, DecimalPipe, TitleCasePipe } from '@angular/common';
+import { DecimalPipe } from '@angular/common';
 import { MatCardModule } from '@angular/material/card';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
-import { MatTableModule } from '@angular/material/table';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDividerModule } from '@angular/material/divider';
@@ -22,22 +21,23 @@ import { SettingsService } from '../../../core/services/settings.service';
 import { UserService } from '../../../core/services/user.service';
 import { ConfirmDialog } from '../../../shared/dialogs/confirm-dialog';
 import { MoneyPipe } from '../../../shared/pipes/currency-symbol.pipe';
+import { SalesGrowthChart } from './components/sales-growth-chart';
+import { TopProducts } from './components/top-products';
 
 @Component({
   selector: 'app-dashboard-page',
   imports: [
-    DatePipe,
     DecimalPipe,
-    TitleCasePipe,
     RouterLink,
     MatCardModule,
     MatIconModule,
-    MatTableModule,
     MatChipsModule,
     MatButtonModule,
     MatDividerModule,
     MatTooltipModule,
     MoneyPipe,
+    SalesGrowthChart,
+    TopProducts,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './dashboard.page.html',
@@ -90,7 +90,6 @@ export class DashboardPage {
   protected readonly activeCashiers = computed(() => this.userService.activeCashiers().length);
   protected readonly lowStock = this.productService.lowStockProducts;
   protected readonly outOfStock = this.productService.outOfStockProducts;
-  protected readonly recentSales = computed(() => this.saleService.sales().slice(0, 5));
 
   /** Batches that have already passed their expiry — surfaced with write-off actions. */
   protected readonly expiredBatches = computed(() =>
@@ -100,8 +99,6 @@ export class DashboardPage {
   protected readonly upcomingExpiring = computed(() =>
     this.notifications.expiring().filter((b) => b.daysUntilExpiry >= 0),
   );
-
-  protected readonly saleColumns = ['id', 'date', 'cashier', 'items', 'total', 'status'] as const;
 
   // ─── Profit insights (rolling 30-day window) ─────────────────────
   //
