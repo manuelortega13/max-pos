@@ -208,7 +208,14 @@ export class PosPage implements AfterViewInit, OnDestroy {
       if (event.ctrlKey || event.metaKey) return;
       event.preventDefault();
 
-      const term = this.search().trim();
+      // Read the live DOM value rather than the `search()` signal. A fast
+      // keyboard-wedge scanner fires its terminating Enter immediately
+      // after the last digit, and the `(ngModelChange)` write-back of that
+      // final character can still be in flight — the signal would then be
+      // missing the last digit, so the exact-barcode lookup would miss.
+      // The input element's own value is always complete and synchronous.
+      const inputValue = (event.target as HTMLInputElement | null)?.value;
+      const term = (inputValue ?? this.search()).trim();
 
       // Scanner-friendly path: when there's a term AND it exactly matches
       // a product's barcode, add that product regardless of what's
@@ -368,8 +375,17 @@ export class PosPage implements AfterViewInit, OnDestroy {
   private clearSearchAndRefocus(): void {
     this.search.set('');
     this.activeIndex.set(-1);
-    // Defer so Angular's ngModel write-back settles before we focus.
-    queueMicrotask(() => this.searchInputRef()?.nativeElement.focus());
+    const input = this.searchInputRef()?.nativeElement;
+    if (!input) return;
+    // Clear the DOM value imperatively too. The `[ngModel]="search()"`
+    // write-back of '' only lands on the next change-detection pass; a
+    // keyboard-wedge scanner firing its next barcode in that window would
+    // otherwise concatenate onto the stale value (so the field reads as
+    // "not cleared", and the lookup runs against the wrong string). Setting
+    // .value now closes that gap — ngModel writes the matching '' next pass.
+    input.value = '';
+    // Defer focus so it doesn't fight dialog/CD work in this tick.
+    queueMicrotask(() => input.focus({ preventScroll: true }));
   }
 
   /**
@@ -417,7 +433,14 @@ export class PosPage implements AfterViewInit, OnDestroy {
     });
   }
 
-  protected addToCart(product: Product): void {
+  /**
+   * Add a product to the cart. Returns `true` when something was
+   * actually added, `false` when the add was blocked (out of stock /
+   * at limit). Callers use the result to decide whether to clear the
+   * search — a blocked add leaves the term in place so the cashier can
+   * see what they tried to ring up.
+   */
+  protected addToCart(product: Product): boolean {
     // Always consult the live ProductService signal — stock may have changed
     // via realtime updates since the tile was rendered.
     const fresh = this.productService.getById(product.id) ?? product;
@@ -426,7 +449,7 @@ export class PosPage implements AfterViewInit, OnDestroy {
     // Hard-stop on zero stock unless the store has opted in to oversells.
     if (fresh.stock === 0 && !allowNegative) {
       this.showStockLimit({ reason: 'out-of-stock', productName: fresh.name, stock: 0 });
-      return;
+      return false;
     }
 
     const existing = this.cart().find((l) => l.product.id === fresh.id);
@@ -434,7 +457,7 @@ export class PosPage implements AfterViewInit, OnDestroy {
     const available = fresh.stock - inCart;
     if (!allowNegative && available <= 0) {
       this.showStockLimit({ reason: 'at-limit', productName: fresh.name, stock: fresh.stock });
-      return;
+      return false;
     }
 
     const requested = this.pendingQuantity() ?? 1;
@@ -454,6 +477,21 @@ export class PosPage implements AfterViewInit, OnDestroy {
     }
     if (this.pendingQuantity() !== null) {
       this.pendingQuantity.set(null);
+    }
+    return true;
+  }
+
+  /**
+   * Tile tap / click handler. Adds the product and — on a successful
+   * add — clears the search and returns focus to the input. Without
+   * this, selecting a product by tile left the previous search term in
+   * place AND left focus on the tile button, so the next keyboard-wedge
+   * scan was typed into the button (and its trailing Enter re-clicked
+   * the same tile) instead of doing a barcode lookup.
+   */
+  protected selectProduct(product: Product): void {
+    if (this.addToCart(product)) {
+      this.clearSearchAndRefocus();
     }
   }
 

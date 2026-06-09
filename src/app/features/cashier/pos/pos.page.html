@@ -109,7 +109,7 @@
           [class.product-tile--low]="product.stock > 0 && product.stock <= 5"
           [class.product-tile--out]="product.stock <= 0"
           [class.product-tile--active]="i === activeIndex()"
-          (click)="addToCart(product)"
+          (click)="selectProduct(product)"
           [disabled]="product.stock === 0 && !allowNegativeStock()"
         >
           <div class="product-tile__media">
