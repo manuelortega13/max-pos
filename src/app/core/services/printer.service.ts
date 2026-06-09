@@ -349,14 +349,27 @@ export class PrinterService {
    * header and the "Customer paid / received" grand-total label,
    * but preserves the reference, cashier, amount + fee breakdown,
    * and notes so it's still operationally useful as a fallback.
+   *
+   * Direction matters for the money: cash-in is what the customer
+   * *paid* (amount + fee), but cash-out is what the customer
+   * *received* (amount − fee — the fee is deducted from the cash
+   * handed back, not added to it). The earlier version totalled
+   * amount + fee for both, which over-stated a cash-out receipt by
+   * twice the fee. So for cash-out the fee line is negative and the
+   * subtotal/total net it out, matching the dedicated /print-gcash
+   * renderer and the on-screen "Customer received" figure.
    */
   private gcashToReceiptPayload(p: GcashReceiptPayload): ReceiptPayload {
     const t = p.transaction;
     const label = t.type === 'CASH_IN' ? 'GCASH CASH-IN' : 'GCASH CASH-OUT';
+    const isCashOut = t.type === 'CASH_OUT';
+    // Cash-out: fee is subtracted from what the customer gets.
+    const feeSigned = isCashOut ? -t.fee : t.fee;
+    const total = isCashOut ? t.amount - t.fee : t.amount + t.fee;
     const lines: Array<{ name: string; quantity: number; lineTotal: number }> = [
       { name: 'Amount', quantity: 1, lineTotal: t.amount },
     ];
-    if (t.fee > 0) lines.push({ name: 'Service fee', quantity: 1, lineTotal: t.fee });
+    if (t.fee > 0) lines.push({ name: 'Service fee', quantity: 1, lineTotal: feeSigned });
     return {
       storeName: p.storeName,
       address: p.address,
@@ -366,11 +379,11 @@ export class PrinterService {
       cashierName: t.cashierName,
       paymentMethod: label,
       lines,
-      subtotal: t.amount + t.fee,
+      subtotal: total,
       lineDiscountTotal: 0,
       orderDiscountAmount: 0,
       tax: 0,
-      total: t.amount + t.fee,
+      total,
       currencySymbol: p.currencySymbol,
       footer: p.footer,
     };
