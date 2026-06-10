@@ -83,6 +83,13 @@ public class LoadTransaction {
     @Column(nullable = false, unique = true, length = 64)
     private String reference;
 
+    /** Optional offline-queue idempotency key (UUID-based) stamped by the
+     *  cashier register when the transaction was rung up offline. Null for
+     *  online transactions. Replays dedupe on this so a lost response can't
+     *  create a duplicate row. */
+    @Column(name = "client_ref", length = 64)
+    private String clientRef;
+
     @Column(columnDefinition = "text")
     private String notes;
 
@@ -125,6 +132,8 @@ public class LoadTransaction {
     public void setDate(Instant date) { this.date = date; }
     public String getReference() { return reference; }
     public void setReference(String reference) { this.reference = reference; }
+    public String getClientRef() { return clientRef; }
+    public void setClientRef(String clientRef) { this.clientRef = clientRef; }
     public String getNotes() { return notes; }
     public void setNotes(String notes) { this.notes = notes; }
     public Instant getVoidedAt() { return voidedAt; }

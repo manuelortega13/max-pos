@@ -12,7 +12,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
-import { CreditorPayment, GcashTransaction, LoadTransaction, Sale, SaleStatus } from '../../../core/models';
+import { CreditorPayment, Sale, SaleStatus } from '../../../core/models';
 import { AuthService } from '../../../core/services/auth.service';
 import { CreditorPaymentService } from '../../../core/services/creditor-payment.service';
 import { GcashService } from '../../../core/services/gcash.service';
@@ -60,12 +60,29 @@ export class TransactionsPage implements OnInit {
    *  no pagination needed. */
   protected readonly todayPayments = signal<CreditorPayment[]>([]);
 
-  /** GCash transactions the cashier recorded today. Same shape as
-   *  todayPayments — additive context next to sales. */
-  protected readonly todayGcash = signal<GcashTransaction[]>([]);
+  /**
+   * GCash transactions the cashier recorded today. Read from the service's
+   * cached signal (refreshed on init) rather than a one-shot fetch so rows
+   * rung up offline — which live only in the local queue/cache until they
+   * sync — still appear here, and the list updates live when they sync.
+   */
+  protected readonly todayGcash = computed(() =>
+    this.gcashService.transactions().filter((t) => this.inToday(t.date)),
+  );
 
-  /** Load transactions the cashier recorded today. */
-  protected readonly todayLoad = signal<LoadTransaction[]>([]);
+  /** Load transactions the cashier recorded today. Same offline-aware source. */
+  protected readonly todayLoad = computed(() =>
+    this.loadService.transactions().filter((t) => this.inToday(t.date)),
+  );
+
+  /** True for an ISO timestamp falling within the cashier's local calendar
+   *  day. Used to scope the GCash/Load tables to "today". */
+  private inToday(iso: string): boolean {
+    const now = new Date();
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const t = Date.parse(iso);
+    return t >= startOfDay && t < startOfDay + 86_400_000;
+  }
 
   protected readonly paymentColumns = [
     'ref',
@@ -112,15 +129,11 @@ export class TransactionsPage implements OnInit {
       error: () => {},
     });
 
-    this.gcashService.listMine().subscribe({
-      next: (list) => this.todayGcash.set(list.filter((t) => inToday(t.date))),
-      error: () => {},
-    });
-
-    this.loadService.listMine().subscribe({
-      next: (list) => this.todayLoad.set(list.filter((t) => inToday(t.date))),
-      error: () => {},
-    });
+    // Refresh the cached GCash/Load lists (the `today*` computeds read them).
+    // A network failure here is fine — the cache keeps whatever it had,
+    // including any offline-queued rows, so the tables still render.
+    this.gcashService.load();
+    this.loadService.load();
   }
 
   protected readonly currentUser = this.authService.user;

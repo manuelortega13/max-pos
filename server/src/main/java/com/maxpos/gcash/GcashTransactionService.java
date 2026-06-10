@@ -66,11 +66,34 @@ public class GcashTransactionService {
      * {@code fee == tier.fee} so the cashier UI can't undercut the
      * admin's schedule. If no tier matches, the cashier's fee
      * passes through (the "manual entry" path).
+     *
+     * @param offlineReplay true when replayed from the cashier's offline
+     *   queue (X-Maxpos-Offline-Replay header). Replays are idempotent on
+     *   {@code clientRef} and bypass the open-day + tier-fee checks: the
+     *   cash physically changed hands at the captured fee while offline, so
+     *   re-validating against a possibly-changed tier (or a now-closed day)
+     *   would wrongly reject a transaction that already happened.
      */
     @Transactional
-    public GcashTransactionDto create(CreateGcashTransactionRequest req, UUID cashierId) {
-        BusinessDay openDay = businessDays.findFirstByClosedAtIsNull().orElseThrow(
-                () -> new ConflictException("No business day is open."));
+    public GcashTransactionDto create(CreateGcashTransactionRequest req, UUID cashierId, boolean offlineReplay) {
+        // Idempotent replay: a transaction rung up offline carries a
+        // client-generated clientRef. If we've already persisted it, return
+        // the existing row instead of creating a duplicate (handles a POST
+        // whose response was lost before the client saw it).
+        if (req.clientRef() != null && !req.clientRef().isBlank()) {
+            var existing = transactions.findByClientRef(req.clientRef().trim());
+            if (existing.isPresent()) {
+                return GcashTransactionDto.from(existing.get());
+            }
+        }
+
+        // Live transactions require an open day; offline replays attach to
+        // the current open day if one exists, else null (the day may have
+        // closed between capture and reconnect).
+        BusinessDay openDay = businessDays.findFirstByClosedAtIsNull().orElse(null);
+        if (!offlineReplay && openDay == null) {
+            throw new ConflictException("No business day is open.");
+        }
 
         User cashier = users.findById(cashierId)
                 .orElseThrow(() -> new NotFoundException("Cashier not found"));
@@ -120,7 +143,11 @@ public class GcashTransactionService {
         Optional<GcashFeeTier> tier = tiers
                 .findFirstByActiveTrueAndMinAmountLessThanEqualAndMaxAmountGreaterThanEqualOrderByMinAmount(
                         lookupAmount, lookupAmount);
-        if (tier.isPresent() && req.fee().compareTo(tier.get().getFee()) != 0) {
+        // Skip tier-fee enforcement on offline replays: the fee was correct
+        // against the tier in effect when the cashier rang it up offline;
+        // re-validating against a tier the admin may have edited since would
+        // wrongly reject a transaction that already happened at the till.
+        if (!offlineReplay && tier.isPresent() && req.fee().compareTo(tier.get().getFee()) != 0) {
             // The cashier UI auto-fills + locks the fee when a tier
             // matches, so this 409 only fires for misbehaving clients.
             throw new ConflictException(
@@ -140,6 +167,7 @@ public class GcashTransactionService {
         t.setBusinessDay(openDay);
         t.setDate(Instant.now());
         t.setReference(generateReference());
+        t.setClientRef(req.clientRef() == null || req.clientRef().isBlank() ? null : req.clientRef().trim());
         t.setNotes(req.notes() == null || req.notes().isBlank() ? null : req.notes().trim());
         // Workflow defaults: cash-in starts PENDING (admin must send
         // the GCash from their phone, then mark it complete). Cash-out

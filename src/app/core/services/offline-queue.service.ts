@@ -1,5 +1,12 @@
 import { Injectable, computed, signal } from '@angular/core';
-import { CreateSaleRequest, Sale } from '../models';
+import {
+  CreateGcashTransactionRequest,
+  CreateLoadTransactionRequest,
+  CreateSaleRequest,
+  GcashTransaction,
+  LoadTransaction,
+  Sale,
+} from '../models';
 
 /**
  * Common fields for every queued mutation. `clientRef` is the queue
@@ -38,7 +45,26 @@ export interface QueuedRefund extends QueuedBase {
   readonly reason: string | null;
 }
 
-export type QueuedMutation = QueuedSale | QueuedRefund;
+/**
+ * A GCash transaction rung up while offline. `optimistic` is the locally
+ * synthesized row shown on the receipt and in My Transactions until the
+ * backend's canonical record replaces it on replay.
+ */
+export interface QueuedGcash extends QueuedBase {
+  readonly kind: 'gcash';
+  readonly request: CreateGcashTransactionRequest;
+  readonly optimistic: GcashTransaction;
+}
+
+/** A cellphone-load transaction rung up while offline. Same shape as the
+ *  GCash entry. */
+export interface QueuedLoad extends QueuedBase {
+  readonly kind: 'load';
+  readonly request: CreateLoadTransactionRequest;
+  readonly optimistic: LoadTransaction;
+}
+
+export type QueuedMutation = QueuedSale | QueuedRefund | QueuedGcash | QueuedLoad;
 
 const STORAGE_KEY = 'maxpos.offline.sale-queue.v1';
 
@@ -65,6 +91,12 @@ export class OfflineQueueService {
   );
   readonly pendingRefunds = computed(
     () => this._queue().filter((q): q is QueuedRefund => q.kind === 'refund').length,
+  );
+  readonly pendingGcash = computed(
+    () => this._queue().filter((q): q is QueuedGcash => q.kind === 'gcash').length,
+  );
+  readonly pendingLoad = computed(
+    () => this._queue().filter((q): q is QueuedLoad => q.kind === 'load').length,
   );
 
   /** Push a new mutation to the back of the queue and persist. */

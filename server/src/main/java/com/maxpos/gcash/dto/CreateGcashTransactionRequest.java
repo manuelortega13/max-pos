@@ -19,5 +19,10 @@ public record CreateGcashTransactionRequest(
         // matched against amount as-is. Storage isn't affected — this
         // flag only steers the server-side fee-vs-tier validation so
         // it agrees with the cashier's toggle.
-        Boolean feeIncluded
+        Boolean feeIncluded,
+        // Optional offline-queue idempotency key. Set by the cashier
+        // register only for transactions rung up while offline; a replayed
+        // POST with the same clientRef returns the existing row instead of
+        // creating a duplicate. Online transactions leave it null.
+        @Size(max = 64) String clientRef
 ) {}

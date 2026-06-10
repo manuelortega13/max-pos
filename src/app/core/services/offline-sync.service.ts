@@ -3,10 +3,14 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import {
   OfflineQueueService,
+  QueuedGcash,
+  QueuedLoad,
   QueuedMutation,
   QueuedRefund,
   QueuedSale,
 } from './offline-queue.service';
+import { GcashService } from './gcash.service';
+import { LoadService } from './load.service';
 import { SaleService } from './sale.service';
 
 /**
@@ -25,6 +29,8 @@ import { SaleService } from './sale.service';
 export class OfflineSyncService {
   private readonly queue = inject(OfflineQueueService);
   private readonly saleService = inject(SaleService);
+  private readonly gcashService = inject(GcashService);
+  private readonly loadService = inject(LoadService);
 
   private readonly _online = signal<boolean>(
     typeof navigator === 'undefined' ? true : navigator.onLine,
@@ -174,6 +180,14 @@ export class OfflineSyncService {
       case 'refund':
         return firstValueFrom(
           this.saleService.replayQueuedRefund(entry as QueuedRefund),
+        );
+      case 'gcash':
+        return firstValueFrom(
+          this.gcashService.replayQueued(entry as QueuedGcash),
+        );
+      case 'load':
+        return firstValueFrom(
+          this.loadService.replayQueued(entry as QueuedLoad),
         );
     }
   }

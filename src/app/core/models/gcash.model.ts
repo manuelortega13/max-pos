@@ -52,6 +52,10 @@ export interface GcashTransaction {
   readonly voidedAt: string | null;
   readonly voidedById: string | null;
   readonly voidedByName: string | null;
+  /** Client-only flag: true on an optimistic row that was rung up offline
+   *  and is still waiting in the sync queue. Never sent by the server —
+   *  cleared once the canonical row replaces it on replay. */
+  readonly pendingSync?: boolean;
 }
 
 export interface CreateGcashTransactionRequest {
@@ -71,4 +75,8 @@ export interface CreateGcashTransactionRequest {
    * is matched against `amount` directly. Ignored for cash-in.
    */
   readonly feeIncluded?: boolean;
+  /** Offline-queue idempotency key (UUID-based). Set only for transactions
+   *  rung up offline; a replayed POST with the same clientRef dedupes
+   *  server-side instead of creating a duplicate. */
+  readonly clientRef?: string;
 }

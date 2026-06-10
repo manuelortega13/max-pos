@@ -15,5 +15,10 @@ public record CreateLoadTransactionRequest(
         /** CASH (default when null) or CREDIT. Loads support only those two. */
         PaymentMethod paymentMethod,
         /** Required when paymentMethod = CREDIT, forbidden otherwise. */
-        UUID creditorId
+        UUID creditorId,
+        // Optional offline-queue idempotency key. Set by the cashier
+        // register only for loads rung up while offline; a replayed POST
+        // with the same clientRef returns the existing row instead of
+        // creating a duplicate. Online transactions leave it null.
+        @Size(max = 64) String clientRef
 ) {}

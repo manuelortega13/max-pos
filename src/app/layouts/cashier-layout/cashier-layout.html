@@ -89,7 +89,7 @@
         type="button"
         class="cashier-shell__sync"
         [class.cashier-shell__sync--syncing]="syncing()"
-        [matTooltip]="pendingSync() + ' pending sale(s). Tap to retry now.'"
+        [matTooltip]="pendingSync() + ' pending transaction(s). Tap to retry now.'"
         (click)="retrySync()"
         [disabled]="syncing()"
       >
@@ -134,7 +134,7 @@
   @if (showOfflineBanner()) {
     <div class="cashier-shell__offline-banner" role="status" aria-live="polite">
       <mat-icon>cloud_off</mat-icon>
-      <span>Offline — sales are queued locally and will sync when you reconnect.</span>
+      <span>Offline — transactions are queued locally and will sync when you reconnect.</span>
     </div>
   }
 

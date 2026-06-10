@@ -69,11 +69,29 @@ public class LoadTransactionService {
      * an open day is required, the fee must match the tier when one
      * applies, otherwise the cashier-supplied fee passes through.
      * Phone is the destination number — required by the DTO + DB.
+     *
+     * @param offlineReplay true when replayed from the cashier's offline
+     *   queue (X-Maxpos-Offline-Replay header). Replays are idempotent on
+     *   {@code clientRef} and bypass the open-day + tier-fee checks — the
+     *   cash changed hands at the captured fee while offline.
      */
     @Transactional
-    public LoadTransactionDto create(CreateLoadTransactionRequest req, UUID cashierId) {
-        BusinessDay openDay = businessDays.findFirstByClosedAtIsNull().orElseThrow(
-                () -> new ConflictException("No business day is open."));
+    public LoadTransactionDto create(CreateLoadTransactionRequest req, UUID cashierId, boolean offlineReplay) {
+        // Idempotent replay — return the already-persisted row if this
+        // clientRef was seen before (handles a lost POST response).
+        if (req.clientRef() != null && !req.clientRef().isBlank()) {
+            var existing = transactions.findByClientRef(req.clientRef().trim());
+            if (existing.isPresent()) {
+                return LoadTransactionDto.from(existing.get());
+            }
+        }
+
+        // Live loads require an open day; offline replays attach to the
+        // current open day if one exists, else null.
+        BusinessDay openDay = businessDays.findFirstByClosedAtIsNull().orElse(null);
+        if (!offlineReplay && openDay == null) {
+            throw new ConflictException("No business day is open.");
+        }
 
         User cashier = users.findById(cashierId)
                 .orElseThrow(() -> new NotFoundException("Cashier not found"));
@@ -96,7 +114,9 @@ public class LoadTransactionService {
         Optional<LoadFeeTier> tier = tiers
                 .findFirstByActiveTrueAndMinAmountLessThanEqualAndMaxAmountGreaterThanEqualOrderByMinAmount(
                         req.amount(), req.amount());
-        if (tier.isPresent() && req.fee().compareTo(tier.get().getFee()) != 0) {
+        // Skip tier-fee enforcement on offline replays — the fee was correct
+        // against the tier in effect when the cashier rang it up offline.
+        if (!offlineReplay && tier.isPresent() && req.fee().compareTo(tier.get().getFee()) != 0) {
             throw new ConflictException(
                     "Fee " + req.fee() + " doesn't match the configured tier (" +
                     tier.get().getFee() + " for " + tier.get().getMinAmount() + "–" +
@@ -114,6 +134,7 @@ public class LoadTransactionService {
         t.setBusinessDay(openDay);
         t.setDate(Instant.now());
         t.setReference(generateReference());
+        t.setClientRef(req.clientRef() == null || req.clientRef().isBlank() ? null : req.clientRef().trim());
         t.setNotes(req.notes() == null || req.notes().isBlank() ? null : req.notes().trim());
         // Load lifecycle always starts PENDING — cash is at the till,
         // admin still has to send from their phone.

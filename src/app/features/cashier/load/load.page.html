@@ -18,6 +18,12 @@
             Cash is at the till. Admin will send the load and mark this complete.
           }
         </p>
+        @if (txn.pendingSync) {
+          <p class="load__pending-note">
+            <mat-icon>cloud_off</mat-icon>
+            Saved offline — this will sync automatically when you reconnect.
+          </p>
+        }
         <dl class="load__success-detail">
           <div><dt>Reference</dt><dd>{{ txn.reference }}</dd></div>
           <div><dt>Fee</dt><dd>{{ currencySymbol() }}{{ txn.fee.toFixed(2) }}</dd></div>

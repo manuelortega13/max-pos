@@ -46,6 +46,9 @@ export interface LoadTransaction {
   readonly voidedAt: string | null;
   readonly voidedById: string | null;
   readonly voidedByName: string | null;
+  /** Client-only flag: true on an optimistic row that was rung up offline
+   *  and is still waiting in the sync queue. Never sent by the server. */
+  readonly pendingSync?: boolean;
 }
 
 export interface CreateLoadTransactionRequest {
@@ -58,4 +61,7 @@ export interface CreateLoadTransactionRequest {
   readonly paymentMethod: PaymentMethod;
   /** Required when paymentMethod = 'CREDIT', omitted otherwise. */
   readonly creditorId?: string | null;
+  /** Offline-queue idempotency key (UUID-based). Set only for loads rung up
+   *  offline; a replayed POST with the same clientRef dedupes server-side. */
+  readonly clientRef?: string;
 }

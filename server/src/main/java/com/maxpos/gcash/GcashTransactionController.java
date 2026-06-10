@@ -35,12 +35,16 @@ public class GcashTransactionController {
         return service.listAll();
     }
 
-    /** Record a transaction. Any authed user; backend enforces tier-fee match. */
+    /** Record a transaction. Any authed user; backend enforces tier-fee match.
+     *  The X-Maxpos-Offline-Replay header marks a request replayed from the
+     *  cashier's offline queue — the service then bypasses the open-day and
+     *  tier-fee checks (the cash already changed hands at the captured fee). */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public GcashTransactionDto create(@Valid @RequestBody CreateGcashTransactionRequest req,
-                                      @AuthenticationPrincipal AppUserDetails principal) {
-        return service.create(req, principal.getId());
+                                      @AuthenticationPrincipal AppUserDetails principal,
+                                      @RequestHeader(value = "X-Maxpos-Offline-Replay", required = false) Boolean offlineReplay) {
+        return service.create(req, principal.getId(), Boolean.TRUE.equals(offlineReplay));
     }
 
     /** Admin marks a PENDING cash-in as COMPLETED after sending. */

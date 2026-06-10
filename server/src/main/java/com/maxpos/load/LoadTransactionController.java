@@ -33,11 +33,16 @@ public class LoadTransactionController {
         return service.listAll();
     }
 
+    /** Record a load. The X-Maxpos-Offline-Replay header marks a request
+     *  replayed from the cashier's offline queue — the service then bypasses
+     *  the open-day and tier-fee checks (cash already changed hands at the
+     *  captured fee). */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public LoadTransactionDto create(@Valid @RequestBody CreateLoadTransactionRequest req,
-                                     @AuthenticationPrincipal AppUserDetails principal) {
-        return service.create(req, principal.getId());
+                                     @AuthenticationPrincipal AppUserDetails principal,
+                                     @RequestHeader(value = "X-Maxpos-Offline-Replay", required = false) Boolean offlineReplay) {
+        return service.create(req, principal.getId(), Boolean.TRUE.equals(offlineReplay));
     }
 
     @PostMapping("/{id}/complete")

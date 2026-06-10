@@ -8,6 +8,14 @@ import {
   GcashTransaction,
 } from '../models';
 import { AuthService } from './auth.service';
+import { BusinessDayService } from './business-day.service';
+import { OfflineQueueService, QueuedGcash } from './offline-queue.service';
+import {
+  OFFLINE_REPLAY_HEADER,
+  createWithOfflineFallback,
+  newClientRef,
+} from './offline-mutation.util';
+import { SettingsService } from './settings.service';
 
 /**
  * Thin HTTP layer for the GCash service feature.
@@ -26,6 +34,9 @@ import { AuthService } from './auth.service';
 export class GcashService {
   private readonly http = inject(HttpClient);
   private readonly authService = inject(AuthService);
+  private readonly offlineQueue = inject(OfflineQueueService);
+  private readonly settingsService = inject(SettingsService);
+  private readonly businessDayService = inject(BusinessDayService);
 
   private readonly _transactions = signal<GcashTransaction[]>([]);
   private readonly _loading = signal<boolean>(false);
@@ -99,10 +110,108 @@ export class GcashService {
     });
   }
 
+  /**
+   * Record a GCash transaction. Behaves like a plain POST online. When the
+   * store has offline mode enabled and the device is offline (or the POST
+   * fails with a network error), the transaction is queued to
+   * {@link OfflineQueueService} and an optimistic row is returned so the
+   * cashier still gets a receipt; {@link OfflineSyncService} replays it once
+   * the network is back. A clientRef is always attached so a lost response
+   * can be replayed without creating a duplicate (backend dedupes on it).
+   */
   create(req: CreateGcashTransactionRequest): Observable<GcashTransaction> {
+    const clientRef = req.clientRef ?? newClientRef('G');
+    const payload: CreateGcashTransactionRequest = { ...req, clientRef };
+    const offlineEnabled = this.settingsService.settings().offlineModeEnabled;
+
+    return createWithOfflineFallback<GcashTransaction>({
+      offlineEnabled,
+      post: () =>
+        this.http
+          .post<GcashTransaction>('/api/gcash-transactions', payload)
+          .pipe(tap((row) => this._transactions.update((list) => [row, ...list]))),
+      enqueue: (reason) => this.enqueueOffline(payload, clientRef, reason),
+    });
+  }
+
+  /**
+   * Replay a queued GCash transaction. The offline-replay header tells the
+   * backend to skip the open-day + tier-fee checks. On success the optimistic
+   * row is swapped for the canonical one (matched by the optimistic id).
+   */
+  replayQueued(entry: QueuedGcash): Observable<GcashTransaction> {
     return this.http
-      .post<GcashTransaction>('/api/gcash-transactions', req)
-      .pipe(tap((row) => this._transactions.update((list) => [row, ...list])));
+      .post<GcashTransaction>('/api/gcash-transactions', entry.request, {
+        headers: OFFLINE_REPLAY_HEADER,
+      })
+      .pipe(
+        tap((row) =>
+          this._transactions.update((list) => {
+            const idx = list.findIndex((t) => t.id === entry.optimistic.id);
+            if (idx < 0) return [row, ...list];
+            const next = list.slice();
+            next[idx] = row;
+            return next;
+          }),
+        ),
+      );
+  }
+
+  /** Build the optimistic row, enqueue the request, and prepend it to the
+   *  cache so My Transactions reflects it immediately. */
+  private enqueueOffline(
+    payload: CreateGcashTransactionRequest,
+    clientRef: string,
+    reason: string,
+  ): GcashTransaction {
+    const optimistic = this.buildOptimistic(payload, clientRef);
+    this.offlineQueue.enqueue({
+      kind: 'gcash',
+      clientRef,
+      request: payload,
+      optimistic,
+      enqueuedAt: new Date().toISOString(),
+      attempts: 0,
+      lastError: reason,
+    });
+    this._transactions.update((list) => [optimistic, ...list]);
+    return optimistic;
+  }
+
+  /** Synthesize a GcashTransaction locally so the receipt + My Transactions
+   *  have something to show while the real row is pending in the queue.
+   *  Mirrors the server's status defaults: cash-in lands PENDING, cash-out
+   *  is COMPLETED at the till. */
+  private buildOptimistic(
+    payload: CreateGcashTransactionRequest,
+    clientRef: string,
+  ): GcashTransaction {
+    const user = this.authService.user();
+    const now = new Date().toISOString();
+    const isCashIn = payload.type === 'CASH_IN';
+    return {
+      id: clientRef,
+      type: payload.type,
+      status: isCashIn ? 'PENDING' : 'COMPLETED',
+      amount: payload.amount,
+      fee: payload.fee,
+      customerName: payload.customerName ?? null,
+      customerPhone: payload.customerPhone ?? null,
+      inboundRef: payload.inboundRef ?? null,
+      cashierId: user?.id ?? '',
+      cashierName: user?.name ?? '',
+      businessDayId: this.businessDayService.current()?.id ?? null,
+      date: now,
+      reference: clientRef,
+      notes: payload.notes ?? null,
+      completedAt: isCashIn ? null : now,
+      completedById: isCashIn ? null : (user?.id ?? null),
+      completedByName: isCashIn ? null : (user?.name ?? null),
+      voidedAt: null,
+      voidedById: null,
+      voidedByName: null,
+      pendingSync: true,
+    };
   }
 
   /** Calling cashier's own — drives My Transactions card. */

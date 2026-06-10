@@ -8,6 +8,15 @@ import {
   LoadTransaction,
 } from '../models';
 import { AuthService } from './auth.service';
+import { BusinessDayService } from './business-day.service';
+import { CreditorService } from './creditor.service';
+import { OfflineQueueService, QueuedLoad } from './offline-queue.service';
+import {
+  OFFLINE_REPLAY_HEADER,
+  createWithOfflineFallback,
+  newClientRef,
+} from './offline-mutation.util';
+import { SettingsService } from './settings.service';
 
 /**
  * Thin HTTP layer for the load feature. Tiers are fetched fresh per
@@ -19,6 +28,10 @@ import { AuthService } from './auth.service';
 export class LoadService {
   private readonly http = inject(HttpClient);
   private readonly authService = inject(AuthService);
+  private readonly offlineQueue = inject(OfflineQueueService);
+  private readonly settingsService = inject(SettingsService);
+  private readonly businessDayService = inject(BusinessDayService);
+  private readonly creditorService = inject(CreditorService);
 
   private readonly _transactions = signal<LoadTransaction[]>([]);
   private readonly _loading = signal<boolean>(false);
@@ -84,10 +97,106 @@ export class LoadService {
     });
   }
 
+  /**
+   * Record a load. Like a plain POST online; when offline mode is enabled and
+   * the device is offline (or the POST fails with a network error) the load is
+   * queued and an optimistic row is returned so the cashier still gets a
+   * receipt. A clientRef is always attached for idempotent replay.
+   */
   create(req: CreateLoadTransactionRequest): Observable<LoadTransaction> {
+    const clientRef = req.clientRef ?? newClientRef('L');
+    const payload: CreateLoadTransactionRequest = { ...req, clientRef };
+    const offlineEnabled = this.settingsService.settings().offlineModeEnabled;
+
+    return createWithOfflineFallback<LoadTransaction>({
+      offlineEnabled,
+      post: () =>
+        this.http
+          .post<LoadTransaction>('/api/load-transactions', payload)
+          .pipe(tap((row) => this._transactions.update((list) => [row, ...list]))),
+      enqueue: (reason) => this.enqueueOffline(payload, clientRef, reason),
+    });
+  }
+
+  /**
+   * Replay a queued load. The offline-replay header makes the backend skip
+   * the open-day + tier-fee checks; on success the optimistic row is swapped
+   * for the canonical one.
+   */
+  replayQueued(entry: QueuedLoad): Observable<LoadTransaction> {
     return this.http
-      .post<LoadTransaction>('/api/load-transactions', req)
-      .pipe(tap((row) => this._transactions.update((list) => [row, ...list])));
+      .post<LoadTransaction>('/api/load-transactions', entry.request, {
+        headers: OFFLINE_REPLAY_HEADER,
+      })
+      .pipe(
+        tap((row) =>
+          this._transactions.update((list) => {
+            const idx = list.findIndex((t) => t.id === entry.optimistic.id);
+            if (idx < 0) return [row, ...list];
+            const next = list.slice();
+            next[idx] = row;
+            return next;
+          }),
+        ),
+      );
+  }
+
+  private enqueueOffline(
+    payload: CreateLoadTransactionRequest,
+    clientRef: string,
+    reason: string,
+  ): LoadTransaction {
+    const optimistic = this.buildOptimistic(payload, clientRef);
+    this.offlineQueue.enqueue({
+      kind: 'load',
+      clientRef,
+      request: payload,
+      optimistic,
+      enqueuedAt: new Date().toISOString(),
+      attempts: 0,
+      lastError: reason,
+    });
+    this._transactions.update((list) => [optimistic, ...list]);
+    return optimistic;
+  }
+
+  /** Synthesize a LoadTransaction locally for the receipt + My Transactions
+   *  while the real row is pending. Loads always start PENDING (admin still
+   *  has to send from their phone). */
+  private buildOptimistic(
+    payload: CreateLoadTransactionRequest,
+    clientRef: string,
+  ): LoadTransaction {
+    const user = this.authService.user();
+    const now = new Date().toISOString();
+    const creditorId = payload.creditorId ?? null;
+    const creditorName = creditorId
+      ? (this.creditorService.active().find((c) => c.id === creditorId)?.fullName ?? null)
+      : null;
+    return {
+      id: clientRef,
+      status: 'PENDING',
+      amount: payload.amount,
+      fee: payload.fee,
+      promo: payload.promo ?? null,
+      customerPhone: payload.customerPhone,
+      paymentMethod: payload.paymentMethod,
+      creditorId,
+      creditorName,
+      cashierId: user?.id ?? '',
+      cashierName: user?.name ?? '',
+      businessDayId: this.businessDayService.current()?.id ?? null,
+      date: now,
+      reference: clientRef,
+      notes: payload.notes ?? null,
+      completedAt: null,
+      completedById: null,
+      completedByName: null,
+      voidedAt: null,
+      voidedById: null,
+      voidedByName: null,
+      pendingSync: true,
+    };
   }
 
   listMine(): Observable<LoadTransaction[]> {
