@@ -18,6 +18,7 @@ import { SaleService } from '../../../core/services/sale.service';
 import { SettingsService } from '../../../core/services/settings.service';
 import { ThemeService } from '../../../core/services/theme.service';
 import { PaperSize, PrinterService } from '../../../core/services/printer.service';
+import { BackupCard } from './backup-card';
 
 @Component({
   selector: 'app-settings-page',
@@ -33,6 +34,7 @@ import { PaperSize, PrinterService } from '../../../core/services/printer.servic
     MatProgressBarModule,
     MatSelectModule,
     MatSlideToggleModule,
+    BackupCard,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './settings.page.html',

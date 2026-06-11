@@ -1,7 +1,10 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { MAT_DIALOG_DATA, MatDialogModule } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
+import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
+import { MatInputModule } from '@angular/material/input';
 
 export interface ConfirmDialogData {
   readonly title: string;
@@ -10,11 +13,24 @@ export interface ConfirmDialogData {
   readonly cancelLabel?: string;
   readonly destructive?: boolean;
   readonly icon?: string;
+  /**
+   * When set, the confirm button stays disabled until the user types this
+   * exact phrase — a deliberate friction gate for irreversible actions
+   * (e.g. "RESTORE" before wiping the database).
+   */
+  readonly requireText?: string;
 }
 
 @Component({
   selector: 'app-confirm-dialog',
-  imports: [MatDialogModule, MatButtonModule, MatIconModule],
+  imports: [
+    FormsModule,
+    MatDialogModule,
+    MatButtonModule,
+    MatFormFieldModule,
+    MatIconModule,
+    MatInputModule,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <h2 mat-dialog-title class="confirm__title">
@@ -27,6 +43,19 @@ export interface ConfirmDialogData {
     </h2>
     <mat-dialog-content>
       <p class="confirm__message">{{ data.message }}</p>
+      @if (data.requireText) {
+        <mat-form-field appearance="outline" class="confirm__field">
+          <mat-label>Type "{{ data.requireText }}" to confirm</mat-label>
+          <input
+            matInput
+            [ngModel]="typed()"
+            (ngModelChange)="typed.set($event)"
+            autocomplete="off"
+            autocapitalize="off"
+            spellcheck="false"
+          />
+        </mat-form-field>
+      }
     </mat-dialog-content>
     <mat-dialog-actions align="end">
       <button mat-stroked-button mat-dialog-close>
@@ -36,6 +65,7 @@ export interface ConfirmDialogData {
         mat-flat-button
         [color]="data.destructive ? 'warn' : 'primary'"
         [mat-dialog-close]="true"
+        [disabled]="!confirmEnabled()"
       >
         {{ data.confirmLabel ?? 'Confirm' }}
       </button>
@@ -57,9 +87,19 @@ export interface ConfirmDialogData {
         color: var(--mat-sys-on-surface-variant);
         line-height: 1.5;
       }
+      .confirm__field {
+        width: 100%;
+        margin-top: 1rem;
+      }
     `,
   ],
 })
 export class ConfirmDialog {
   protected readonly data = inject<ConfirmDialogData>(MAT_DIALOG_DATA);
+  protected readonly typed = signal('');
+
+  /** Confirm is enabled unless a phrase is required and not yet matched. */
+  protected confirmEnabled(): boolean {
+    return !this.data.requireText || this.typed().trim() === this.data.requireText;
+  }
 }

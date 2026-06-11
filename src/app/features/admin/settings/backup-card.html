@@ -1,0 +1,60 @@
+<mat-card appearance="outlined">
+  <mat-card-header>
+    <mat-card-title>Backup &amp; Restore</mat-card-title>
+    <mat-card-subtitle>Export all store data to a file, or restore from one</mat-card-subtitle>
+  </mat-card-header>
+
+  @if (busy()) {
+    <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+  }
+
+  <mat-card-content class="backup">
+    <div class="backup__row">
+      <div class="backup__text">
+        <strong>Export database</strong>
+        <small>
+          Downloads a JSON file containing every record — products, sales, GCash
+          &amp; load, creditors, finances, users and settings. Keep it somewhere safe.
+        </small>
+      </div>
+      <button
+        mat-flat-button
+        color="primary"
+        type="button"
+        (click)="exportDatabase()"
+        [disabled]="busy()"
+      >
+        <mat-icon>{{ exporting() ? 'hourglass_empty' : 'download' }}</mat-icon>
+        {{ exporting() ? 'Exporting…' : 'Export' }}
+      </button>
+    </div>
+
+    <div class="backup__row">
+      <div class="backup__text">
+        <strong>Restore database</strong>
+        <small class="backup__warning">
+          <mat-icon>warning</mat-icon>
+          Replaces ALL current data with the backup file. This cannot be undone —
+          you’ll be signed out and must log in again.
+        </small>
+      </div>
+      <button
+        mat-stroked-button
+        color="warn"
+        type="button"
+        (click)="fileInput.click()"
+        [disabled]="busy()"
+      >
+        <mat-icon>{{ importing() ? 'hourglass_empty' : 'upload' }}</mat-icon>
+        {{ importing() ? 'Restoring…' : 'Restore from file' }}
+      </button>
+      <input
+        #fileInput
+        type="file"
+        accept="application/json,.json"
+        hidden
+        (change)="onFileSelected($event)"
+      />
+    </div>
+  </mat-card-content>
+</mat-card>

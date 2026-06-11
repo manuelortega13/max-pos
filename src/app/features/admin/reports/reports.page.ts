@@ -25,6 +25,7 @@ import { SaleService } from '../../../core/services/sale.service';
 import { SettingsService } from '../../../core/services/settings.service';
 import { ConfirmDialog } from '../../../shared/dialogs/confirm-dialog';
 import { MoneyPipe } from '../../../shared/pipes/currency-symbol.pipe';
+import { downloadBlob } from '../../../shared/utils/download';
 import { ExpenseFormDialog, ExpenseFormData } from './expense-form-dialog';
 
 type RangePreset = 'today' | 'week' | 'month' | 'year' | 'custom';
@@ -445,16 +446,4 @@ function csvCell(value: string): string {
   const needsQuote = /[",\n\r]/.test(value);
   const escaped = value.replace(/"/g, '""');
   return needsQuote ? `"${escaped}"` : escaped;
-}
-
-function downloadBlob(blob: Blob, filename: string): void {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.rel = 'noopener';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
