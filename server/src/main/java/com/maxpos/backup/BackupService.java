@@ -49,11 +49,13 @@ public class BackupService {
     static final int FILE_VERSION = 1;
 
     private final JdbcTemplate jdbc;
-    private final ObjectMapper mapper;
+    // Self-contained mapper: backup (de)serialization is plain maps/strings and
+    // needs no app-specific Jackson config, and this app doesn't expose an
+    // ObjectMapper bean to inject (so constructor-injecting one fails startup).
+    private final ObjectMapper mapper = new ObjectMapper();
 
-    public BackupService(JdbcTemplate jdbc, ObjectMapper mapper) {
+    public BackupService(JdbcTemplate jdbc) {
         this.jdbc = jdbc;
-        this.mapper = mapper;
     }
 
     // ─────────────────────────────── export ────────────────────────────────
