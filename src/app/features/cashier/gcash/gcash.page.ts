@@ -161,11 +161,18 @@ export class GcashPage implements OnInit {
   // ─────────────────────── tier resolution ─────────────────────
 
   /** The matched tier, or `null` when no active tier covers the
-   *  current amount (manual-fee mode). */
+   *  current amount (manual-fee mode). Resolved synchronously from the
+   *  service's cached tier table — no network flicker. */
   protected readonly matchedTier = signal<GcashFeeTier | null>(null);
-  /** `true` while a lookup is in flight — avoids flicker between
-   *  the prior tier result and the new one. */
-  protected readonly lookingUp = signal<boolean>(false);
+  /** Only true on a cold start: an amount is entered but no tier table is
+   *  cached yet, so the field shows "Looking up fee…" rather than a wrong
+   *  value. Once tiers are cached, resolution is instant and this stays false. */
+  protected readonly lookingUp = computed(
+    () =>
+      this.amount() > 0 &&
+      this.matchedTier() === null &&
+      !this.gcashService.tiersLoaded(),
+  );
 
   /** Auto-locked when a tier matched. Cashier never gets to lower
    *  the fee in that case — admin's schedule wins. */
@@ -201,55 +208,64 @@ export class GcashPage implements OnInit {
   private lastTypedAmount = -1;
 
   constructor() {
-    // Debounced lookup. Each amount change schedules a 250ms
-    // timer; if the amount changes again before it fires, the
-    // previous timer is canceled. effect() naturally re-runs on
-    // signal change so we get cancellation via onCleanup.
-    effect((onCleanup) => {
+    // Resolve the fee synchronously from the cached tier table. No network in
+    // the hot path, so the fee never flashes the previous (smaller) amount's
+    // value while a lookup is in flight — it's correct the instant the amount
+    // changes, and it works offline. Re-runs when the cached tiers refresh
+    // (the reconcile effect below), silently correcting the fee if a match
+    // actually changed.
+    effect(() => {
       const typed = this.amount();
       const a = this.tierLookupAmount();
 
-      // Reset iteration counter on a user-driven amount change.
-      // Feedback re-runs (from fee changes) keep the counter going.
+      // Reset the oscillation counter on a real user-driven amount change;
+      // feedback re-runs (cash-out fee-included, where feeText feeds the
+      // lookup amount) keep it climbing.
       if (typed !== this.lastTypedAmount) {
         this.lastTypedAmount = typed;
         this.tierLookupIterations = 0;
       }
-
       if (a <= 0) {
-        this.matchedTier.set(null);
+        this.applyTier(null);
         return;
       }
-      if (this.tierLookupIterations >= 5) {
-        // Tier-boundary oscillation — accept the last-known fee
-        // rather than spinning HTTP requests forever.
-        return;
-      }
+      // Cap the cash-out fee-included feedback loop at a tier boundary.
+      if (this.tierLookupIterations >= 5) return;
       this.tierLookupIterations++;
-      this.lookingUp.set(true);
-      const handle = window.setTimeout(() => {
-        this.gcashService.lookupTier(a).subscribe({
-          next: (tier) => {
-            this.matchedTier.set(tier);
-            this.lookingUp.set(false);
-            if (tier) {
-              // Tier matched → enforce the configured fee. We
-              // overwrite whatever the cashier typed: the fee field
-              // is locked when a tier matches, so any pre-existing
-              // value was from a prior, no-longer-matching amount.
-              this.feeText.set(tier.fee.toFixed(2));
-            }
-          },
-          error: () => {
-            // Lookup failed — fall back to manual entry rather
-            // than blocking the cashier. Server still re-validates.
-            this.matchedTier.set(null);
-            this.lookingUp.set(false);
-          },
-        });
-      }, 250);
+      this.applyTier(this.gcashService.resolveTier(a));
+    });
+
+    // Reconcile the cached tier table with the server (debounced) so an admin
+    // edit mid-shift is picked up. Cheap (a handful of rows); the resolve
+    // effect above re-runs when the cache updates.
+    effect((onCleanup) => {
+      if (this.amount() <= 0) return;
+      const handle = window.setTimeout(() => this.gcashService.loadTiers(), 250);
       onCleanup(() => window.clearTimeout(handle));
     });
+  }
+
+  /** Tracks whether the current feeText was auto-filled from a tier (vs typed
+   *  by the cashier) so we clear it only when leaving all tiers. */
+  private wasAutoFee = false;
+
+  /**
+   * Apply a resolved tier: lock + auto-fill the fee when one matches; when
+   * none matches, drop a previously auto-filled fee so a stale tier value
+   * doesn't linger, but keep a fee the cashier typed manually.
+   */
+  private applyTier(tier: GcashFeeTier | null): void {
+    if (tier) {
+      this.matchedTier.set(tier);
+      this.feeText.set(tier.fee.toFixed(2));
+      this.wasAutoFee = true;
+    } else {
+      this.matchedTier.set(null);
+      if (this.wasAutoFee) {
+        this.feeText.set('');
+        this.wasAutoFee = false;
+      }
+    }
   }
 
   // ─────────────────────────── submit ──────────────────────────
@@ -338,6 +354,7 @@ export class GcashPage implements OnInit {
     this.feeIncludedInGcashSend.set(true);
     this.tierLookupIterations = 0;
     this.lastTypedAmount = -1;
+    this.wasAutoFee = false;
   }
 
   protected normalizeAmount(): void {
@@ -353,5 +370,8 @@ export class GcashPage implements OnInit {
 
   ngOnInit(): void {
     this.businessDayService.refreshCurrent().subscribe();
+    // Warm/refresh the cached tier table for this visit. Resolution itself is
+    // synchronous off the cache; this just keeps the cache current.
+    this.gcashService.loadTiers();
   }
 }

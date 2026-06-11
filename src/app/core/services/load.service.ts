@@ -18,6 +18,9 @@ import {
 } from './offline-mutation.util';
 import { SettingsService } from './settings.service';
 
+/** localStorage key for the cached fee-tier table (see loadTiers/resolveTier). */
+const LOAD_TIERS_KEY = 'maxpos.load.tiers.v1';
+
 /**
  * Thin HTTP layer for the load feature. Tiers are fetched fresh per
  * navigation (same rationale as GCash). Transactions are cached in
@@ -37,6 +40,17 @@ export class LoadService {
   private readonly _loading = signal<boolean>(false);
   private readonly _error = signal<string | null>(null);
 
+  /**
+   * Cached full tier table — seeded from localStorage for an instant (and
+   * offline) first paint, refreshed from the API by {@link loadTiers}. The
+   * cashier page reads {@link resolveTier} for the displayed fee.
+   */
+  private readonly _tiers = signal<LoadFeeTier[]>(this.readCachedTiers());
+  private readonly _tiersLoaded = signal<boolean>(this._tiers().length > 0);
+  readonly tiers = this._tiers.asReadonly();
+  /** True once a tier table is available (from cache or a successful fetch). */
+  readonly tiersLoaded = this._tiersLoaded.asReadonly();
+
   readonly transactions = this._transactions.asReadonly();
   readonly loading = this._loading.asReadonly();
   readonly error = this._error.asReadonly();
@@ -54,6 +68,57 @@ export class LoadService {
 
   listTiers(): Observable<LoadFeeTier[]> {
     return this.http.get<LoadFeeTier[]>('/api/load/fee-tiers');
+  }
+
+  /**
+   * Refresh the cached tier table from the server (memory + localStorage).
+   * On failure the previous cache is kept (offline-friendly).
+   */
+  loadTiers(): void {
+    this.listTiers().subscribe({
+      next: (tiers) => {
+        this._tiers.set(tiers);
+        this._tiersLoaded.set(true);
+        this.writeCachedTiers(tiers);
+      },
+      error: () => {
+        /* keep last-known cache */
+      },
+    });
+  }
+
+  /**
+   * Resolve the active tier covering {@code amount} from the cached table,
+   * mirroring the server match (active, minAmount ≤ amount ≤ maxAmount, lowest
+   * minAmount wins). Synchronous — no flicker, no network.
+   */
+  resolveTier(amount: number): LoadFeeTier | null {
+    if (!(amount > 0)) return null;
+    let best: LoadFeeTier | null = null;
+    for (const t of this._tiers()) {
+      if (t.active && t.minAmount <= amount && amount <= t.maxAmount) {
+        if (!best || t.minAmount < best.minAmount) best = t;
+      }
+    }
+    return best;
+  }
+
+  private readCachedTiers(): LoadFeeTier[] {
+    try {
+      const raw = localStorage.getItem(LOAD_TIERS_KEY);
+      const parsed = raw ? JSON.parse(raw) : null;
+      return Array.isArray(parsed) ? (parsed as LoadFeeTier[]) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  private writeCachedTiers(tiers: LoadFeeTier[]): void {
+    try {
+      localStorage.setItem(LOAD_TIERS_KEY, JSON.stringify(tiers));
+    } catch {
+      /* quota / private mode — cache stays memory-only */
+    }
   }
 
   /** Active tier matching an amount. 204 No Content → null via EMPTY. */

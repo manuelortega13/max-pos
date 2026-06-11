@@ -152,7 +152,15 @@ export class LoadPage implements OnInit {
   // ─────────────────────── tier resolution ─────────────────────
 
   protected readonly matchedTier = signal<LoadFeeTier | null>(null);
-  protected readonly lookingUp = signal<boolean>(false);
+  /** Only true on a cold start: an amount is entered but no tier table is
+   *  cached yet. Once tiers are cached, resolution is instant and this is
+   *  false (so the field never shows a stale/wrong fee while fetching). */
+  protected readonly lookingUp = computed(
+    () =>
+      this.amount() > 0 &&
+      this.matchedTier() === null &&
+      !this.loadService.tiersLoaded(),
+  );
   protected readonly feeLocked = computed(() => this.matchedTier() !== null);
 
   constructor() {
@@ -160,30 +168,38 @@ export class LoadPage implements OnInit {
     // cashier flips to Credit. Cashier endpoint — no admin role needed.
     this.creditorService.loadActive();
 
-    // Debounced lookup. Each amount change schedules a 250ms timer;
-    // signal re-runs the effect and onCleanup cancels the prior timer.
-    effect((onCleanup) => {
+    // Resolve the fee synchronously from the cached tier table — instant, no
+    // network flicker, works offline. Re-runs when the cache refreshes.
+    effect(() => {
       const a = this.amount();
-      if (a <= 0) {
-        this.matchedTier.set(null);
-        return;
-      }
-      this.lookingUp.set(true);
-      const handle = window.setTimeout(() => {
-        this.loadService.lookupTier(a).subscribe({
-          next: (tier) => {
-            this.matchedTier.set(tier);
-            this.lookingUp.set(false);
-            if (tier) this.feeText.set(tier.fee.toFixed(2));
-          },
-          error: () => {
-            this.matchedTier.set(null);
-            this.lookingUp.set(false);
-          },
-        });
-      }, 250);
+      this.applyTier(a > 0 ? this.loadService.resolveTier(a) : null);
+    });
+
+    // Reconcile the cached tier table with the server (debounced) so an admin
+    // edit mid-shift is picked up; the resolve effect above re-runs on update.
+    effect((onCleanup) => {
+      if (this.amount() <= 0) return;
+      const handle = window.setTimeout(() => this.loadService.loadTiers(), 250);
       onCleanup(() => window.clearTimeout(handle));
     });
+  }
+
+  /** Tracks whether feeText was auto-filled from a tier (vs typed manually)
+   *  so we clear it only when leaving all tiers. */
+  private wasAutoFee = false;
+
+  private applyTier(tier: LoadFeeTier | null): void {
+    if (tier) {
+      this.matchedTier.set(tier);
+      this.feeText.set(tier.fee.toFixed(2));
+      this.wasAutoFee = true;
+    } else {
+      this.matchedTier.set(null);
+      if (this.wasAutoFee) {
+        this.feeText.set('');
+        this.wasAutoFee = false;
+      }
+    }
   }
 
   // ─────────────────────────── submit ──────────────────────────
@@ -292,6 +308,7 @@ export class LoadPage implements OnInit {
     this.customerPhone.set('');
     this.notes.set('');
     this.matchedTier.set(null);
+    this.wasAutoFee = false;
     this.paymentMethod.set('CASH');
     this.selectedCreditor.set(null);
     this.creditorQuery.set('');
@@ -306,5 +323,8 @@ export class LoadPage implements OnInit {
 
   ngOnInit(): void {
     this.businessDayService.refreshCurrent().subscribe();
+    // Warm/refresh the cached tier table for this visit. Resolution itself is
+    // synchronous off the cache; this just keeps the cache current.
+    this.loadService.loadTiers();
   }
 }
