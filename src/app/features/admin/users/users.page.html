@@ -66,6 +66,9 @@
                   @if (u.id === currentUserId()) {
                     <span class="user-cell__you">(you)</span>
                   }
+                  @if (u.systemAccount) {
+                    <span class="user-cell__you">(system)</span>
+                  }
                 </strong>
               </div>
             </td>
@@ -94,7 +97,7 @@
             <td mat-cell *matCellDef="let u">
               <mat-slide-toggle
                 [checked]="u.active"
-                [disabled]="u.id === currentUserId()"
+                [disabled]="u.id === currentUserId() || u.systemAccount"
                 (change)="toggleActive(u)"
               ></mat-slide-toggle>
             </td>
@@ -116,7 +119,7 @@
                 </button>
                 <button
                   mat-menu-item
-                  [disabled]="u.id === currentUserId()"
+                  [disabled]="u.id === currentUserId() || u.systemAccount"
                   (click)="confirmDelete(u)"
                 >
                   <mat-icon>person_remove</mat-icon>

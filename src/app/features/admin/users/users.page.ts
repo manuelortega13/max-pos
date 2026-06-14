@@ -117,6 +117,12 @@ export class UsersPage {
       this.snackBar.open("You can't deactivate yourself.", 'Dismiss', { duration: 3000 });
       return;
     }
+    if (user.systemAccount) {
+      this.snackBar.open("The system administrator can't be deactivated.", 'Dismiss', {
+        duration: 3000,
+      });
+      return;
+    }
     this.userService
       .update(user.id, {
         name: user.name,
@@ -138,6 +144,12 @@ export class UsersPage {
   protected confirmDelete(user: User): void {
     if (user.id === this.currentUserId()) {
       this.snackBar.open("You can't delete yourself.", 'Dismiss', { duration: 3000 });
+      return;
+    }
+    if (user.systemAccount) {
+      this.snackBar.open("The system administrator can't be deleted.", 'Dismiss', {
+        duration: 3000,
+      });
       return;
     }
     const ref = this.dialog.open(ConfirmDialog, {

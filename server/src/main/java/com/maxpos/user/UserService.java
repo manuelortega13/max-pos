@@ -56,6 +56,18 @@ public class UserService {
             throw new ConflictException("Email already in use");
         }
 
+        // The system administrator must remain a usable admin — block demotion
+        // and deactivation so it can never be locked out. (Name, email, and
+        // password may still be changed.)
+        if (u.isSystemAccount()) {
+            if (req.role() != UserRole.ADMIN) {
+                throw new ConflictException("The system administrator must remain an admin.");
+            }
+            if (!req.active()) {
+                throw new ConflictException("The system administrator can't be deactivated.");
+            }
+        }
+
         u.setName(req.name());
         u.setEmail(req.email().toLowerCase());
         u.setRole(req.role());
@@ -68,7 +80,11 @@ public class UserService {
 
     @Transactional
     public void delete(UUID id) {
-        if (!users.existsById(id)) throw new NotFoundException("User not found");
-        users.deleteById(id);
+        User u = users.findById(id)
+                .orElseThrow(() -> new NotFoundException("User not found"));
+        if (u.isSystemAccount()) {
+            throw new ConflictException("The system administrator account can't be deleted.");
+        }
+        users.delete(u);
     }
 }

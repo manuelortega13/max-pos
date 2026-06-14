@@ -6,6 +6,8 @@ export interface User {
   email: string;
   role: UserRole;
   active: boolean;
+  /** Built-in system administrator: can't be deleted, demoted, or deactivated. */
+  readonly systemAccount: boolean;
   readonly createdAt: string;
 }
 

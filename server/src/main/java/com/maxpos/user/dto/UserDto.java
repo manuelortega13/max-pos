@@ -12,9 +12,11 @@ public record UserDto(
         String email,
         UserRole role,
         boolean active,
+        boolean systemAccount,
         Instant createdAt
 ) {
     public static UserDto from(User u) {
-        return new UserDto(u.getId(), u.getName(), u.getEmail(), u.getRole(), u.isActive(), u.getCreatedAt());
+        return new UserDto(u.getId(), u.getName(), u.getEmail(), u.getRole(),
+                u.isActive(), u.isSystemAccount(), u.getCreatedAt());
     }
 }

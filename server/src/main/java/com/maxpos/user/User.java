@@ -29,6 +29,12 @@ public class User {
     @Column(nullable = false)
     private boolean active = true;
 
+    /** True for the built-in system administrator. Protected: can't be
+     *  deleted, demoted from ADMIN, or deactivated. Set once for the seed
+     *  admin (V29); regular accounts are always false. */
+    @Column(name = "system_account", nullable = false)
+    private boolean systemAccount = false;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -50,5 +56,7 @@ public class User {
     public void setRole(UserRole role) { this.role = role; }
     public boolean isActive() { return active; }
     public void setActive(boolean active) { this.active = active; }
+    public boolean isSystemAccount() { return systemAccount; }
+    public void setSystemAccount(boolean systemAccount) { this.systemAccount = systemAccount; }
     public Instant getCreatedAt() { return createdAt; }
 }
