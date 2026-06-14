@@ -16,6 +16,7 @@ const SETTINGS_FALLBACK: StoreSettings = {
   phone: '',
   allowNegativeStock: false,
   offlineModeEnabled: false,
+  autoBackupEnabled: false,
   cardAccountId: null,
   transferAccountId: null,
 };

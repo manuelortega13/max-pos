@@ -11,6 +11,46 @@
   <mat-card-content class="backup">
     <div class="backup__row">
       <div class="backup__text">
+        <strong>Daily automatic backup</strong>
+        <small>
+          When on, the server saves a backup once a day (kept for ~2 weeks,
+          listed below to download) and this device downloads one to your
+          computer once a day while you’re signed in.
+        </small>
+      </div>
+      <mat-slide-toggle
+        [checked]="autoBackupEnabled()"
+        [disabled]="savingToggle()"
+        (change)="toggleAutoBackup($event.checked)"
+      >
+        {{ autoBackupEnabled() ? 'On' : 'Off' }}
+      </mat-slide-toggle>
+    </div>
+
+    @if (backups().length > 0) {
+      <div class="backup__files">
+        <small class="backup__file-meta">Backups saved on the server:</small>
+        @for (f of backups(); track f.name) {
+          <div class="backup__file">
+            <span>
+              {{ f.name }}
+              <span class="backup__file-meta">· {{ formatSize(f.size) }}</span>
+            </span>
+            <button mat-button type="button" (click)="downloadServerBackup(f.name)">
+              <mat-icon>download</mat-icon>
+              Download
+            </button>
+          </div>
+        }
+      </div>
+    } @else if (autoBackupEnabled()) {
+      <p class="backup__empty">No server backups yet — the first one runs within the hour.</p>
+    }
+
+    <hr class="backup__divider" />
+
+    <div class="backup__row">
+      <div class="backup__text">
         <strong>Export database</strong>
         <small>
           Downloads a JSON file containing every record — products, sales, GCash

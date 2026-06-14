@@ -1,26 +1,38 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  OnInit,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
 import { Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
-import { MatDialogModule } from '@angular/material/dialog';
-import { MatDialog } from '@angular/material/dialog';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { firstValueFrom } from 'rxjs';
 import { AuthService } from '../../../core/services/auth.service';
-import { BackupService } from '../../../core/services/backup.service';
+import { BackupFileInfo, BackupService } from '../../../core/services/backup.service';
+import { SettingsService } from '../../../core/services/settings.service';
 import { ConfirmDialog, ConfirmDialogData } from '../../../shared/dialogs/confirm-dialog';
 import { downloadBlob } from '../../../shared/utils/download';
 
 /**
- * Settings card: export the whole database to a JSON file and restore from one.
+ * Settings card: export the whole database to a JSON file, restore from one,
+ * and toggle daily automatic backups.
  *
  * Restore is a full replace (wipe + reload) gated behind a typed "RESTORE"
- * confirmation. Because it rewrites the users table, the current session's
- * token no longer maps to a known user afterwards, so we sign the admin out
- * and bounce them to /login on success.
+ * confirmation; it rewrites the users table, so the current session is no
+ * longer valid afterwards and we sign the admin out.
+ *
+ * Auto-backup is a store-wide setting: when on, the backend writes a daily
+ * backup to disk (listed here for download) and this app downloads one to the
+ * browser once a day.
  */
 @Component({
   selector: 'app-backup-card',
@@ -30,6 +42,7 @@ import { downloadBlob } from '../../../shared/utils/download';
     MatDialogModule,
     MatIconModule,
     MatProgressBarModule,
+    MatSlideToggleModule,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './backup-card.html',
@@ -69,11 +82,37 @@ import { downloadBlob } from '../../../shared/utils/download';
         height: 1.1rem;
         width: 1.1rem;
       }
+      .backup__divider {
+        border: none;
+        border-top: 1px solid var(--mat-sys-outline-variant);
+        margin: 0;
+      }
+      .backup__files {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+      }
+      .backup__file {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        padding: 0.35rem 0;
+      }
+      .backup__file-meta {
+        color: var(--mat-sys-on-surface-variant);
+        font-size: 0.85rem;
+      }
+      .backup__empty {
+        color: var(--mat-sys-on-surface-variant);
+        font-size: 0.85rem;
+      }
     `,
   ],
 })
-export class BackupCard {
+export class BackupCard implements OnInit {
   private readonly backupService = inject(BackupService);
+  private readonly settingsService = inject(SettingsService);
   private readonly authService = inject(AuthService);
   private readonly router = inject(Router);
   private readonly dialog = inject(MatDialog);
@@ -81,7 +120,68 @@ export class BackupCard {
 
   protected readonly exporting = signal(false);
   protected readonly importing = signal(false);
-  protected readonly busy = signal(false); // true while either op runs (disables both)
+  protected readonly busy = signal(false); // export/import in flight — disables both
+  protected readonly savingToggle = signal(false);
+  protected readonly backups = signal<BackupFileInfo[]>([]);
+
+  /** Reflects the store-wide auto-backup setting. */
+  protected readonly autoBackupEnabled = computed(
+    () => this.settingsService.settings().autoBackupEnabled,
+  );
+
+  ngOnInit(): void {
+    this.refreshFiles();
+  }
+
+  // ───────────────────────────── auto-backup ─────────────────────────────
+
+  protected toggleAutoBackup(on: boolean): void {
+    if (this.savingToggle()) return;
+    this.savingToggle.set(true);
+    // Save the full settings object with the flag flipped (PUT replaces the
+    // row); other fields carry their current values unchanged.
+    this.settingsService.save({ ...this.settingsService.settings(), autoBackupEnabled: on }).subscribe({
+      next: () => {
+        this.savingToggle.set(false);
+        this.snackBar.open(
+          on ? 'Daily auto-backup enabled.' : 'Daily auto-backup disabled.',
+          'Dismiss',
+          { duration: 2500 },
+        );
+      },
+      error: (err: HttpErrorResponse) => {
+        this.savingToggle.set(false);
+        this.snackBar.open(
+          err.error?.message ?? 'Could not update the auto-backup setting.',
+          'Dismiss',
+          { duration: 4000 },
+        );
+      },
+    });
+  }
+
+  private refreshFiles(): void {
+    this.backupService.listBackups().subscribe({
+      next: (files) => this.backups.set(files),
+      error: () => this.backups.set([]), // endpoint admin-only / dir missing — quiet
+    });
+  }
+
+  protected downloadServerBackup(name: string): void {
+    this.backupService.downloadBackupFile(name).subscribe({
+      next: (blob) => downloadBlob(blob, name),
+      error: (err: HttpErrorResponse) =>
+        this.snackBar.open(this.describe(err, 'download'), 'Dismiss', { duration: 4000 }),
+    });
+  }
+
+  protected formatSize(bytes: number): string {
+    if (bytes >= 1_048_576) return `${(bytes / 1_048_576).toFixed(1)} MB`;
+    if (bytes >= 1024) return `${Math.round(bytes / 1024)} KB`;
+    return `${bytes} B`;
+  }
+
+  // ─────────────────────────────── export ────────────────────────────────
 
   protected exportDatabase(): void {
     if (this.busy()) return;
@@ -103,15 +203,14 @@ export class BackupCard {
     });
   }
 
-  /** Hidden file input change handler. */
+  // ─────────────────────────────── restore ───────────────────────────────
+
   protected async onFileSelected(event: Event): Promise<void> {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
     input.value = ''; // allow re-selecting the same file later
     if (!file || this.busy()) return;
 
-    // Read + sanity-check the file before the destructive confirm, so a wrong
-    // file fails fast with a clear message instead of after "RESTORE".
     let text: string;
     try {
       text = await file.text();
@@ -149,8 +248,6 @@ export class BackupCard {
           'Dismiss',
           { duration: 5000 },
         );
-        // The restored users table invalidates the current session — sign out
-        // and send to login.
         this.authService.logout();
         void this.router.navigate(['/login']);
         this.importing.set(false);
@@ -164,7 +261,7 @@ export class BackupCard {
     });
   }
 
-  private describe(err: HttpErrorResponse, op: 'export' | 'restore'): string {
+  private describe(err: HttpErrorResponse, op: 'export' | 'restore' | 'download'): string {
     if (err.status === 0) return 'Cannot reach the server.';
     if (err.status === 403) return 'Only admins can back up or restore the database.';
     const apiMessage =

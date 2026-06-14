@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, effect, inject, signal } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { MatBadgeModule } from '@angular/material/badge';
 import { MatSidenavModule } from '@angular/material/sidenav';
@@ -15,13 +15,16 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { map } from 'rxjs';
 import { ExpiringBatch } from '../../core/models';
 import { AuthService } from '../../core/services/auth.service';
+import { BackupService } from '../../core/services/backup.service';
 import { BusinessDayService } from '../../core/services/business-day.service';
 import { NotificationService } from '../../core/services/notification.service';
+import { SettingsService } from '../../core/services/settings.service';
 import { PushService } from '../../core/services/push.service';
 import { RealtimeService } from '../../core/services/realtime.service';
 import { RefreshService } from '../../core/services/refresh.service';
 import { PlaybookPanel } from '../../shared/components/playbook-panel/playbook-panel';
 import { PullToRefreshDirective } from '../../shared/directives/pull-to-refresh.directive';
+import { downloadBlob } from '../../shared/utils/download';
 
 interface NavItem {
   readonly path: string;
@@ -77,7 +80,56 @@ export class AdminLayout implements OnInit, OnDestroy {
   private readonly snackBar = inject(MatSnackBar);
   private readonly refreshService = inject(RefreshService);
   private readonly businessDayService = inject(BusinessDayService);
+  private readonly settingsService = inject(SettingsService);
+  private readonly backupService = inject(BackupService);
   protected readonly refreshing = signal(false);
+  /** Session latch so the daily client-side auto-download fires at most once
+   *  per app load (the effect re-runs whenever settings change). */
+  private clientBackupAttempted = false;
+
+  constructor() {
+    // Client-side half of daily auto-backup: when the store has auto-backup
+    // enabled and this device hasn't downloaded one today, fetch a backup and
+    // save it to the admin's computer. Runs once settings have loaded (the
+    // effect re-runs when the settings signal resolves from its fallback).
+    effect(() => {
+      if (!this.settingsService.settings().autoBackupEnabled) return;
+      this.maybeClientAutoBackup();
+    });
+  }
+
+  private maybeClientAutoBackup(): void {
+    if (this.clientBackupAttempted) return;
+    const today = new Date().toISOString().slice(0, 10);
+    const key = 'maxpos.autobackup.lastClientDate';
+    let last: string | null = null;
+    try {
+      last = localStorage.getItem(key);
+    } catch {
+      /* storage unavailable — fall through and attempt once */
+    }
+    if (last === today) {
+      this.clientBackupAttempted = true;
+      return;
+    }
+    // Latch before the request so a settings re-emit can't double-trigger.
+    this.clientBackupAttempted = true;
+    this.backupService.exportDatabase().subscribe({
+      next: (blob) => {
+        downloadBlob(blob, `maxpos-backup-${today}.json`);
+        try {
+          localStorage.setItem(key, today);
+        } catch {
+          /* ignore */
+        }
+      },
+      // Leave the date unset on failure so the next app load retries; unlatch
+      // so a later settings change this session can try again too.
+      error: () => {
+        this.clientBackupAttempted = false;
+      },
+    });
+  }
 
   /** Floating playbook panel state. Persists for the session via the
    *  signal; user can flip it open/closed without re-mounting the

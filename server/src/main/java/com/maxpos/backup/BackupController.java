@@ -5,6 +5,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.util.List;
 
 /**
  * Admin-only whole-database backup / restore. Both endpoints are gated to
@@ -46,5 +48,23 @@ public class BackupController {
     @PreAuthorize("hasRole('ADMIN')")
     public BackupService.RestoreSummary importBackup(@RequestBody String json) {
         return service.restoreAll(json);
+    }
+
+    /** List the daily auto-backups saved on the server, newest first. */
+    @GetMapping("/files")
+    @PreAuthorize("hasRole('ADMIN')")
+    public List<BackupService.BackupFileInfo> listFiles() {
+        return service.listAutoBackups();
+    }
+
+    /** Download one saved auto-backup by name. */
+    @GetMapping(value = "/files/{name}", produces = MediaType.APPLICATION_JSON_VALUE)
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<String> downloadFile(@PathVariable String name) {
+        String json = service.readAutoBackup(name);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + name + "\"")
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(json);
     }
 }

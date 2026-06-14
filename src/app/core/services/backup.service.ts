@@ -9,6 +9,13 @@ export interface RestoreSummary {
   readonly rows: number;
 }
 
+/** One daily auto-backup file saved on the server. */
+export interface BackupFileInfo {
+  readonly name: string;
+  readonly size: number;
+  readonly modifiedAt: string | null;
+}
+
 /**
  * Thin HTTP layer for the admin whole-database backup/restore feature.
  * Endpoints are admin-only on the server; the auth + base-url interceptors
@@ -31,6 +38,18 @@ export class BackupService {
   importDatabase(backupJson: string): Observable<RestoreSummary> {
     return this.http.post<RestoreSummary>('/api/admin/backup/import', backupJson, {
       headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  /** List the daily auto-backups saved on the server (newest first). */
+  listBackups(): Observable<BackupFileInfo[]> {
+    return this.http.get<BackupFileInfo[]>('/api/admin/backup/files');
+  }
+
+  /** Download one saved server backup by name. */
+  downloadBackupFile(name: string): Observable<Blob> {
+    return this.http.get(`/api/admin/backup/files/${encodeURIComponent(name)}`, {
+      responseType: 'blob',
     });
   }
 }

@@ -228,6 +228,9 @@ export class SettingsPage implements OnInit {
         phone: value.phone,
         allowNegativeStock: value.allowNegativeStock,
         offlineModeEnabled: value.offlineModeEnabled,
+        // Not edited by this form (it lives in the Backup card); carry the
+        // current value through so a settings save doesn't reset it.
+        autoBackupEnabled: this.settingsService.settings().autoBackupEnabled,
         cardAccountId: value.cardAccountId === '' ? null : value.cardAccountId,
         transferAccountId:
           value.transferAccountId === '' ? null : value.transferAccountId,

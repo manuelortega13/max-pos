@@ -15,6 +15,7 @@ public record StoreSettingsUpdateRequest(
         @Size(max = 64) String phone,
         boolean allowNegativeStock,
         boolean offlineModeEnabled,
+        boolean autoBackupEnabled,
         UUID cardAccountId,
         UUID transferAccountId
 ) {}

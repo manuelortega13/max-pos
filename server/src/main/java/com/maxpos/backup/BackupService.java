@@ -3,12 +3,22 @@ package com.maxpos.backup;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.maxpos.common.ConflictException;
+import com.maxpos.common.NotFoundException;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -16,6 +26,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 /**
  * Whole-database backup / restore for the admin Settings screen.
@@ -48,14 +60,24 @@ public class BackupService {
     /** Backup envelope version — bump if the file structure changes. */
     static final int FILE_VERSION = 1;
 
+    /** How many daily auto-backups to keep on disk before pruning oldest. */
+    private static final int RETENTION = 14;
+    /** Naming for scheduled backups; the date makes "already done today" a
+     *  filename check and keeps the list chronologically sortable. */
+    private static final Pattern AUTO_FILE =
+            Pattern.compile("maxpos-auto-\\d{4}-\\d{2}-\\d{2}\\.json");
+
     private final JdbcTemplate jdbc;
+    private final Path backupDir;
     // Self-contained mapper: backup (de)serialization is plain maps/strings and
     // needs no app-specific Jackson config, and this app doesn't expose an
     // ObjectMapper bean to inject (so constructor-injecting one fails startup).
     private final ObjectMapper mapper = new ObjectMapper();
 
-    public BackupService(JdbcTemplate jdbc) {
+    public BackupService(JdbcTemplate jdbc,
+                         @Value("${maxpos.backup.dir:backups}") String backupDir) {
         this.jdbc = jdbc;
+        this.backupDir = Paths.get(backupDir);
     }
 
     // ─────────────────────────────── export ────────────────────────────────
@@ -83,6 +105,83 @@ public class BackupService {
             return mapper.writeValueAsString(root);
         } catch (Exception e) {
             throw new IllegalStateException("Failed to serialize backup", e);
+        }
+    }
+
+    // ───────────────────────── scheduled on-disk backups ──────────────────
+
+    /** One file in the backup directory. */
+    public record BackupFileInfo(String name, long size, String modifiedAt) {}
+
+    /**
+     * Write today's backup to the backup directory if it isn't there yet, then
+     * prune to the retention limit. Invoked by {@link BackupScheduler} once an
+     * hour; the date-stamped filename makes "already backed up today" a cheap
+     * existence check, so a server restart mid-day doesn't double up.
+     * Read-only transaction so {@link #exportAll} runs against a snapshot.
+     */
+    @Transactional(readOnly = true)
+    public void runAutoBackupIfDue() {
+        String name = "maxpos-auto-" + LocalDate.now(ZoneOffset.UTC) + ".json";
+        try {
+            Files.createDirectories(backupDir);
+            Path target = backupDir.resolve(name);
+            if (Files.exists(target)) return; // already done today
+            Files.writeString(target, exportAll(), StandardCharsets.UTF_8);
+            prune();
+        } catch (IOException e) {
+            throw new IllegalStateException("Auto-backup failed: " + e.getMessage(), e);
+        }
+    }
+
+    /** Saved auto-backups, newest first. */
+    public List<BackupFileInfo> listAutoBackups() {
+        if (!Files.isDirectory(backupDir)) return List.of();
+        try (Stream<Path> stream = Files.list(backupDir)) {
+            return stream
+                    .filter(p -> AUTO_FILE.matcher(p.getFileName().toString()).matches())
+                    .sorted(Comparator.comparing((Path p) -> p.getFileName().toString()).reversed())
+                    .map(this::toInfo)
+                    .toList();
+        } catch (IOException e) {
+            return List.of();
+        }
+    }
+
+    /** Contents of one saved auto-backup; name is validated to block traversal. */
+    public String readAutoBackup(String name) {
+        if (!AUTO_FILE.matcher(name).matches()) {
+            throw new ConflictException("Invalid backup file name.");
+        }
+        Path p = backupDir.resolve(name);
+        if (!Files.exists(p)) throw new NotFoundException("Backup file not found.");
+        try {
+            return Files.readString(p, StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new IllegalStateException("Could not read backup: " + e.getMessage(), e);
+        }
+    }
+
+    private BackupFileInfo toInfo(Path p) {
+        try {
+            return new BackupFileInfo(p.getFileName().toString(), Files.size(p),
+                    Files.getLastModifiedTime(p).toInstant().toString());
+        } catch (IOException e) {
+            return new BackupFileInfo(p.getFileName().toString(), 0, null);
+        }
+    }
+
+    /** Delete the oldest files beyond {@link #RETENTION}. */
+    private void prune() throws IOException {
+        if (!Files.isDirectory(backupDir)) return;
+        try (Stream<Path> stream = Files.list(backupDir)) {
+            List<Path> files = stream
+                    .filter(p -> AUTO_FILE.matcher(p.getFileName().toString()).matches())
+                    .sorted(Comparator.comparing((Path p) -> p.getFileName().toString()).reversed())
+                    .toList();
+            for (int i = RETENTION; i < files.size(); i++) {
+                Files.deleteIfExists(files.get(i));
+            }
         }
     }
 

@@ -15,6 +15,7 @@ public record StoreSettingsDto(
         String phone,
         boolean allowNegativeStock,
         boolean offlineModeEnabled,
+        boolean autoBackupEnabled,
         UUID cardAccountId,
         UUID transferAccountId
 ) {
@@ -29,6 +30,7 @@ public record StoreSettingsDto(
                 s.getPhone(),
                 s.isAllowNegativeStock(),
                 s.isOfflineModeEnabled(),
+                s.isAutoBackupEnabled(),
                 s.getCardAccountId(),
                 s.getTransferAccountId()
         );

@@ -46,6 +46,7 @@ public class SettingsService {
         s.setPhone(req.phone());
         s.setAllowNegativeStock(req.allowNegativeStock());
         s.setOfflineModeEnabled(req.offlineModeEnabled());
+        s.setAutoBackupEnabled(req.autoBackupEnabled());
         s.setCardAccountId(req.cardAccountId());
         s.setTransferAccountId(req.transferAccountId());
         return StoreSettingsDto.from(s);

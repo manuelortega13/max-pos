@@ -40,6 +40,11 @@ public class StoreSettings {
     @Column(name = "offline_mode_enabled", nullable = false)
     private boolean offlineModeEnabled = false;
 
+    /** When true, the backend's scheduled job writes a daily database backup
+     *  to disk and the admin web app downloads one daily. */
+    @Column(name = "auto_backup_enabled", nullable = false)
+    private boolean autoBackupEnabled = false;
+
     /** Default destination account for card sales / card credit
      *  payments. Picked once in Settings; the auto-tracker reads it
      *  to know which account to credit. Null disables auto-tracking
@@ -72,6 +77,8 @@ public class StoreSettings {
     public void setAllowNegativeStock(boolean allowNegativeStock) { this.allowNegativeStock = allowNegativeStock; }
     public boolean isOfflineModeEnabled() { return offlineModeEnabled; }
     public void setOfflineModeEnabled(boolean offlineModeEnabled) { this.offlineModeEnabled = offlineModeEnabled; }
+    public boolean isAutoBackupEnabled() { return autoBackupEnabled; }
+    public void setAutoBackupEnabled(boolean autoBackupEnabled) { this.autoBackupEnabled = autoBackupEnabled; }
     public UUID getCardAccountId() { return cardAccountId; }
     public void setCardAccountId(UUID cardAccountId) { this.cardAccountId = cardAccountId; }
     public UUID getTransferAccountId() { return transferAccountId; }

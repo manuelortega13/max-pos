@@ -19,6 +19,11 @@ export interface StoreSettings {
    */
   offlineModeEnabled: boolean;
   /**
+   * When true, the backend runs a daily database backup to disk and the admin
+   * web app downloads a backup to the browser once a day.
+   */
+  autoBackupEnabled: boolean;
+  /**
    * Finance account that card sales credit by default. Picked once
    * in Settings — the auto-tracker reads this when writing the IN
    * movement for a card sale or card credit payment.
