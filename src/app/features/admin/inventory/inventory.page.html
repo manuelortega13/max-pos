@@ -7,6 +7,15 @@
     <div class="page__actions">
       <button
         mat-stroked-button
+        [disabled]="rows().length === 0"
+        (click)="printInventory()"
+        [matTooltip]="hasActiveFilters() ? 'Prints the filtered rows shown below' : 'Prints the full catalog'"
+      >
+        <mat-icon>print</mat-icon>
+        Print inventory
+      </button>
+      <button
+        mat-stroked-button
         [disabled]="totals().lowStock === 0 && totals().outOfStock === 0"
         (click)="printLowStock()"
       >

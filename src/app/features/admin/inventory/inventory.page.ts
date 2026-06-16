@@ -17,7 +17,7 @@ import { Product } from '../../../core/models';
 import { AuthService } from '../../../core/services/auth.service';
 import { BarcodeScannerService } from '../../../core/services/barcode-scanner.service';
 import { CategoryService } from '../../../core/services/category.service';
-import { PrinterService, LowStockRow } from '../../../core/services/printer.service';
+import { PrinterService, LowStockRow, InventoryRow } from '../../../core/services/printer.service';
 import { ProductService } from '../../../core/services/product.service';
 import { SettingsService } from '../../../core/services/settings.service';
 import { MarkupDialog, MarkupDialogData } from '../../../shared/dialogs/markup-dialog';
@@ -275,5 +275,60 @@ export class InventoryPage implements OnInit {
       outOfStock,
       lowStock,
     });
+  }
+
+  /**
+   * Print the inventory sheet. Prints exactly what the table currently shows
+   * (the filtered rows), sorted by name for easy scanning, with a note of any
+   * active filters and totals at the bottom.
+   */
+  protected printInventory(): void {
+    const rows: InventoryRow[] = this.rows()
+      .slice()
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map((p) => ({
+        name: p.name,
+        sku: p.sku,
+        category: this.categoryName(p.categoryId),
+        stock: p.stock,
+        cost: p.cost,
+        price: p.price,
+      }));
+
+    if (rows.length === 0) {
+      this.snackBar.open('No products to print for the current filters.', 'Dismiss', {
+        duration: 2500,
+      });
+      return;
+    }
+
+    const s = this.settings.settings();
+    void this.printer.printInventoryReport({
+      storeName: s.storeName,
+      address: s.address,
+      phone: s.phone,
+      footer: s.receiptFooter,
+      currencySymbol: s.currencySymbol,
+      generatedAt: new Date().toISOString(),
+      generatedByName: this.authService.user()?.name ?? '—',
+      filterNote: this.filterNote(),
+      rows,
+    });
+  }
+
+  /** Human-readable summary of the active filters for the printout header. */
+  private filterNote(): string {
+    const parts: string[] = [];
+    const stock = this.filter();
+    if (stock !== 'all') {
+      const label = { low: 'low stock', out: 'out of stock', ok: 'in stock' }[stock];
+      parts.push(label);
+    }
+    if (this.categoryFilter() !== 'all') {
+      parts.push(`category "${this.categoryName(this.categoryFilter())}"`);
+    }
+    const term = this.search().trim();
+    if (term) parts.push(`search "${term}"`);
+    return parts.join(', ');
   }
 }

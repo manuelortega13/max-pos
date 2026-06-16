@@ -80,6 +80,34 @@ export interface LowStockReportPayload {
   lowStock: ReadonlyArray<LowStockRow>;
 }
 
+/** One product line on the inventory printout. */
+export interface InventoryRow {
+  name: string;
+  sku: string;
+  category: string;
+  stock: number;
+  cost: number;
+  price: number;
+}
+
+/** Full inventory sheet — the products currently shown on the Inventory page
+ *  (so it respects the active search / category / stock filters). Built
+ *  client-side from the loaded product signals; no new backend endpoint. */
+export interface InventoryReportPayload {
+  storeName: string;
+  address: string;
+  phone: string;
+  footer: string;
+  currencySymbol: string;
+  /** ISO timestamp at which the snapshot was taken. */
+  generatedAt: string;
+  /** Admin who pressed print — surfaces on the paper for audit. */
+  generatedByName: string;
+  /** Human-readable description of any active filters, or '' for the full catalog. */
+  filterNote: string;
+  rows: ReadonlyArray<InventoryRow>;
+}
+
 /** Structured receipt sent to the local print helper. The helper turns
  *  this into ESC/POS bytes; the browser fallback ignores it (uses the
  *  rendered .print-receipt DOM instead). */
@@ -625,6 +653,106 @@ export class PrinterService {
       <hr/>
       <div>Restocked by: ____________________</div>
       ${p.footer ? `<footer class="receipt__footer">${esc(p.footer).replace(/\n/g, '<br/>')}</footer>` : ''}
+    `;
+  }
+
+  /**
+   * Print a full inventory sheet. Helper-first (ESC/POS) with a browser
+   * fallback, exactly like the low-stock report.
+   */
+  async printInventoryReport(payload: InventoryReportPayload): Promise<void> {
+    if (this._helperEnabled() && this._helperUrl()) {
+      const ok = await this.postToHelper('/print-inventory', payload);
+      if (ok) return;
+      console.warn('[printer] helper unreachable for inventory — falling back to browser');
+    }
+    this.printInventoryBrowser(payload);
+  }
+
+  private printInventoryBrowser(payload: InventoryReportPayload): void {
+    const win = this.document.defaultView;
+    if (!win) return;
+    const container = this.document.createElement('section');
+    container.className = 'print-document';
+    container.innerHTML = this.renderInventoryHtml(payload);
+    this.document.body.appendChild(container);
+    // Force A4 for the inventory sheet regardless of the thermal paper-size
+    // setting; remove it afterwards so receipts keep their configured size.
+    const pageOverride = this.document.createElement('style');
+    pageOverride.textContent = '@page { size: A4 portrait; margin: 12mm; }';
+    this.document.head?.appendChild(pageOverride);
+    try {
+      win.print();
+    } finally {
+      container.remove();
+      pageOverride.remove();
+    }
+  }
+
+  private renderInventoryHtml(p: InventoryReportPayload): string {
+    const money = (v: number | null | undefined) =>
+      `${p.currencySymbol}${Number(v ?? 0).toFixed(2)}`;
+    const esc = (s: string | null | undefined) =>
+      String(s ?? '').replace(/[&<>]/g, (c) =>
+        c === '&' ? '&amp;' : c === '<' ? '&lt;' : '&gt;',
+      );
+    const date = new Date(p.generatedAt).toLocaleString();
+
+    const totalUnits = p.rows.reduce((sum, r) => sum + r.stock, 0);
+    const totalValue = p.rows.reduce((sum, r) => sum + r.stock * r.cost, 0);
+
+    const body = p.rows
+      .map(
+        (r, i) =>
+          `<tr>
+             <td class="inv-num">${i + 1}</td>
+             <td>${esc(r.name)}</td>
+             <td>${esc(r.sku)}</td>
+             <td>${esc(r.category)}</td>
+             <td class="inv-right">${money(r.cost)}</td>
+             <td class="inv-right">${money(r.price)}</td>
+             <td class="inv-right">${r.stock}</td>
+             <td class="inv-actual"></td>
+           </tr>`,
+      )
+      .join('');
+
+    return `
+      <h1>${esc(p.storeName)}</h1>
+      ${p.address ? `<small>${esc(p.address)}</small><br/>` : ''}
+      ${p.phone ? `<small>${esc(p.phone)}</small>` : ''}
+      <h2>Inventory Report</h2>
+      <div class="inv-meta">
+        <span>Date: ${esc(date)}</span>
+        <span>By: ${esc(p.generatedByName)}</span>
+        <span>Products: ${p.rows.length}</span>
+        ${p.filterNote ? `<span>Filter: ${esc(p.filterNote)}</span>` : ''}
+      </div>
+      <table class="inv-table">
+        <thead>
+          <tr>
+            <th class="inv-num">#</th>
+            <th>Product</th>
+            <th>SKU</th>
+            <th>Category</th>
+            <th class="inv-right">Cost</th>
+            <th class="inv-right">Price</th>
+            <th class="inv-right">Stock Left</th>
+            <th class="inv-actual">Actual Stocks Left</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${body}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="6" class="inv-right">Totals — value ${money(totalValue)}</td>
+            <td class="inv-right">${totalUnits}</td>
+            <td class="inv-actual"></td>
+          </tr>
+        </tfoot>
+      </table>
+      ${p.footer ? `<div class="inv-footer">${esc(p.footer).replace(/\n/g, '<br/>')}</div>` : ''}
     `;
   }
 

@@ -93,6 +93,86 @@
     margin: 3px 0 !important;
     height: 0 !important;
   }
+
+  /* Full-page document print (e.g. the inventory sheet). Distinct from the
+     thermal .print-receipt: a real A4 table, proportional font, ruled cells.
+     printInventoryBrowser swaps the @page to A4 while this prints. */
+  .print-document,
+  .print-document * {
+    visibility: visible !important;
+  }
+  .print-document {
+    position: absolute !important;
+    inset: 0 auto auto 0 !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-family: Arial, Helvetica, sans-serif !important;
+    font-size: 11px !important;
+  }
+  .print-document h1 {
+    font-size: 16px !important;
+    margin: 0 0 2px !important;
+  }
+  .print-document h2 {
+    font-size: 13px !important;
+    margin: 8px 0 4px !important;
+  }
+  .print-document small {
+    font-size: 10px !important;
+    color: #000 !important;
+  }
+  .print-document .inv-meta {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 4px 18px !important;
+    font-size: 10px !important;
+    margin-bottom: 8px !important;
+  }
+  .print-document table.inv-table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+  }
+  .print-document table.inv-table th,
+  .print-document table.inv-table td {
+    border: 1px solid #000 !important;
+    padding: 3px 6px !important;
+    font-size: 10px !important;
+    text-align: left !important;
+    vertical-align: top !important;
+    color: #000 !important;
+  }
+  .print-document table.inv-table thead th {
+    background: #eaeaea !important;
+    font-weight: 700 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  /* Repeat the header row at the top of each printed page. */
+  .print-document table.inv-table thead {
+    display: table-header-group !important;
+  }
+  .print-document table.inv-table tr {
+    page-break-inside: avoid !important;
+  }
+  .print-document .inv-num,
+  .print-document .inv-right {
+    text-align: right !important;
+  }
+  /* The write-in physical-count column — kept wide and blank. */
+  .print-document .inv-actual {
+    width: 96px !important;
+  }
+  .print-document tfoot td {
+    font-weight: 700 !important;
+  }
+  .print-document .inv-footer {
+    margin-top: 10px !important;
+    font-size: 10px !important;
+  }
   /* The Material dialog surface and CDK overlay still exist in the
      DOM during print; flatten them so they don't add visible chrome. */
   .cdk-overlay-container,
