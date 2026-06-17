@@ -22,6 +22,10 @@ export interface BusinessDay {
   readonly cashRefunds: number | null;
   readonly cardSales: number | null;
   readonly transferSales: number | null;
+  /** E-wallet / bank sales. Like card/transfer, off-drawer. */
+  readonly gcashSales: number | null;
+  readonly mayaSales: number | null;
+  readonly bankSales: number | null;
   /** Charge-on-account total. Doesn't touch the cash drawer. */
   readonly creditSales: number | null;
   readonly cashCreditPayments: number | null;

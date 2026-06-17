@@ -68,6 +68,17 @@ public class BusinessDay {
     @Column(name = "transfer_sales", precision = 12, scale = 2)
     private BigDecimal transferSales;
 
+    /** E-wallet / bank sales. Like card/transfer, they don't touch the
+     *  cash drawer — kept as separate Z-report buckets. */
+    @Column(name = "gcash_sales", precision = 12, scale = 2)
+    private BigDecimal gcashSales;
+
+    @Column(name = "maya_sales", precision = 12, scale = 2)
+    private BigDecimal mayaSales;
+
+    @Column(name = "bank_sales", precision = 12, scale = 2)
+    private BigDecimal bankSales;
+
     /** Charge-on-account sales — no money in the till, but the
      *  day's credit volume still belongs on the Z-report. */
     @Column(name = "credit_sales", precision = 12, scale = 2)
@@ -144,6 +155,12 @@ public class BusinessDay {
     public void setCashSales(BigDecimal cashSales) { this.cashSales = cashSales; }
     public BigDecimal getCashRefunds() { return cashRefunds; }
     public void setCashRefunds(BigDecimal cashRefunds) { this.cashRefunds = cashRefunds; }
+    public BigDecimal getGcashSales() { return gcashSales; }
+    public void setGcashSales(BigDecimal gcashSales) { this.gcashSales = gcashSales; }
+    public BigDecimal getMayaSales() { return mayaSales; }
+    public void setMayaSales(BigDecimal mayaSales) { this.mayaSales = mayaSales; }
+    public BigDecimal getBankSales() { return bankSales; }
+    public void setBankSales(BigDecimal bankSales) { this.bankSales = bankSales; }
     public BigDecimal getCardSales() { return cardSales; }
     public void setCardSales(BigDecimal cardSales) { this.cardSales = cardSales; }
     public BigDecimal getTransferSales() { return transferSales; }

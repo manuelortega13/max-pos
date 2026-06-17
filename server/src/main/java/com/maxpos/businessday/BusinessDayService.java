@@ -199,6 +199,9 @@ public class BusinessDayService {
         BigDecimal cashRefunds = BigDecimal.ZERO;
         BigDecimal cardSales = BigDecimal.ZERO;
         BigDecimal transferSales = BigDecimal.ZERO;
+        BigDecimal gcashSales = BigDecimal.ZERO;
+        BigDecimal mayaSales = BigDecimal.ZERO;
+        BigDecimal bankSales = BigDecimal.ZERO;
         BigDecimal creditSales = BigDecimal.ZERO;
         BigDecimal cashCreditPayments = BigDecimal.ZERO;
         BigDecimal gcashCashInAmount = BigDecimal.ZERO;
@@ -231,6 +234,9 @@ public class BusinessDayService {
                 case CASH -> cashSales = cashSales.add(t);
                 case CARD -> cardSales = cardSales.add(t);
                 case TRANSFER -> transferSales = transferSales.add(t);
+                case GCASH -> gcashSales = gcashSales.add(t);
+                case MAYA -> mayaSales = mayaSales.add(t);
+                case BANK -> bankSales = bankSales.add(t);
                 case CREDIT -> creditSales = creditSales.add(t);
             }
             if (refunded) {
@@ -315,6 +321,9 @@ public class BusinessDayService {
         d.setCashRefunds(cashRefunds);
         d.setCardSales(cardSales);
         d.setTransferSales(transferSales);
+        d.setGcashSales(gcashSales);
+        d.setMayaSales(mayaSales);
+        d.setBankSales(bankSales);
         d.setCreditSales(creditSales);
         d.setCashCreditPayments(cashCreditPayments);
         d.setGcashCashInAmount(gcashCashInAmount);

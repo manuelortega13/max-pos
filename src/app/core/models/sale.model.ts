@@ -1,4 +1,4 @@
-export type PaymentMethod = 'CASH' | 'CARD' | 'TRANSFER' | 'CREDIT';
+export type PaymentMethod = 'CASH' | 'CARD' | 'TRANSFER' | 'GCASH' | 'MAYA' | 'BANK' | 'CREDIT';
 export type SaleStatus = 'COMPLETED' | 'REFUNDED' | 'PENDING';
 
 /** % off (value is 0-100) or a flat money amount off. */

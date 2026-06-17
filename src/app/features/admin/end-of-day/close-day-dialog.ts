@@ -22,6 +22,9 @@ export interface CloseDayDialogData {
   readonly cashRefunds: number;
   readonly cardSales: number;
   readonly transferSales: number;
+  readonly gcashSales: number;
+  readonly mayaSales: number;
+  readonly bankSales: number;
   readonly creditSales: number;
   /** Cash collected as credit payments — adds to expected cash. */
   readonly cashCreditPayments: number;
@@ -83,6 +86,15 @@ export interface CloseDayDialogResult {
           <div><dt>Cash</dt><dd>{{ data.cashSales | money }}</dd></div>
           <div><dt>Card</dt><dd>{{ data.cardSales | money }}</dd></div>
           <div><dt>Transfer</dt><dd>{{ data.transferSales | money }}</dd></div>
+          @if (data.gcashSales > 0) {
+            <div><dt>GCash</dt><dd>{{ data.gcashSales | money }}</dd></div>
+          }
+          @if (data.mayaSales > 0) {
+            <div><dt>Maya</dt><dd>{{ data.mayaSales | money }}</dd></div>
+          }
+          @if (data.bankSales > 0) {
+            <div><dt>Bank</dt><dd>{{ data.bankSales | money }}</dd></div>
+          }
           @if (data.creditSales > 0) {
             <div><dt>Credit</dt><dd>{{ data.creditSales | money }}</dd></div>
           }

@@ -108,6 +108,9 @@ export class EndOfDayPage implements OnInit {
       cashRefunds: 0,
       cardSales: 0,
       transferSales: 0,
+      gcashSales: 0,
+      mayaSales: 0,
+      bankSales: 0,
       creditSales: 0,
       /** Cash credit payments collected today — added to expected cash. */
       cashCreditPayments: 0,
@@ -132,6 +135,9 @@ export class EndOfDayPage implements OnInit {
       cashRefunds = 0,
       cardSales = 0,
       transferSales = 0,
+      gcashSales = 0,
+      mayaSales = 0,
+      bankSales = 0,
       creditSales = 0,
       totalSales = 0,
       totalRefunds = 0,
@@ -166,6 +172,15 @@ export class EndOfDayPage implements OnInit {
           break;
         case 'TRANSFER':
           transferSales += s.total;
+          break;
+        case 'GCASH':
+          gcashSales += s.total;
+          break;
+        case 'MAYA':
+          mayaSales += s.total;
+          break;
+        case 'BANK':
+          bankSales += s.total;
           break;
         case 'CREDIT':
           creditSales += s.total;
@@ -233,6 +248,9 @@ export class EndOfDayPage implements OnInit {
       cashRefunds,
       cardSales,
       transferSales,
+      gcashSales,
+      mayaSales,
+      bankSales,
       creditSales,
       cashCreditPayments,
       totalCreditPayments,

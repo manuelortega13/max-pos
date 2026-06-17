@@ -527,6 +527,18 @@ public class AccountMovementService {
                 if (s == null || s.getTransferAccountId() == null) return null;
                 return accounts.findById(s.getTransferAccountId()).orElse(null);
             }
+            // E-wallet / bank methods route to the first active account of the
+            // matching kind (the GCash/Maya/Bank accounts seeded in V24),
+            // mirroring how CASH and CREDIT resolve by kind.
+            case GCASH:
+                return accounts.findFirstByKindAndActiveTrueOrderBySortOrderAsc(AccountKind.GCASH)
+                        .orElse(null);
+            case MAYA:
+                return accounts.findFirstByKindAndActiveTrueOrderBySortOrderAsc(AccountKind.MAYA)
+                        .orElse(null);
+            case BANK:
+                return accounts.findFirstByKindAndActiveTrueOrderBySortOrderAsc(AccountKind.BANK)
+                        .orElse(null);
             case CREDIT:
                 return accounts.findFirstByKindAndActiveTrueOrderBySortOrderAsc(AccountKind.RECEIVABLES)
                         .orElse(null);
@@ -545,6 +557,9 @@ public class AccountMovementService {
             case CASH     -> MovementCategory.CASH_SALE;
             case CARD     -> MovementCategory.CARD_SALE;
             case TRANSFER -> MovementCategory.TRANSFER_SALE;
+            case GCASH    -> MovementCategory.GCASH_SALE;
+            case MAYA     -> MovementCategory.MAYA_SALE;
+            case BANK     -> MovementCategory.BANK_SALE;
             case CREDIT   -> MovementCategory.CREDIT_SALE;
         };
     }
@@ -554,6 +569,9 @@ public class AccountMovementService {
             case CASH     -> MovementCategory.CASH_REFUND;
             case CARD     -> MovementCategory.CARD_REFUND;
             case TRANSFER -> MovementCategory.TRANSFER_REFUND;
+            case GCASH    -> MovementCategory.GCASH_REFUND;
+            case MAYA     -> MovementCategory.MAYA_REFUND;
+            case BANK     -> MovementCategory.BANK_REFUND;
             case CREDIT   -> MovementCategory.CREDIT_REFUND;
         };
     }
