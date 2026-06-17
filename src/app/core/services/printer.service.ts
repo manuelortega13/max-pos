@@ -590,17 +590,7 @@ export class PrinterService {
   }
 
   private printLowStockBrowser(payload: LowStockReportPayload): void {
-    const win = this.document.defaultView;
-    if (!win) return;
-    const container = this.document.createElement('section');
-    container.className = 'print-receipt';
-    container.innerHTML = this.renderLowStockHtml(payload);
-    this.document.body.appendChild(container);
-    try {
-      win.print();
-    } finally {
-      container.remove();
-    }
+    this.printDocumentBrowser(this.renderLowStockHtml(payload));
   }
 
   private renderLowStockHtml(p: LowStockReportPayload): string {
@@ -611,48 +601,60 @@ export class PrinterService {
         c === '&' ? '&amp;' : c === '<' ? '&lt;' : '&gt;',
       );
     const date = new Date(p.generatedAt).toLocaleString();
-    const renderSection = (title: string, rows: ReadonlyArray<LowStockRow>) => {
-      if (rows.length === 0) return '';
-      // Per row: name + stock, then cost right-aligned, then an
-      // <hr/> separator between rows. Matches the ESC/POS layout.
-      const lines = rows
-        .map(
-          (r) =>
-            `<div class="receipt__row">
-               <span>${esc(r.name)}</span>
-               <span>${r.stock}</span>
-             </div>
-             <div class="receipt__row receipt__row--sub">
-               <span></span>
-               <span>${money(r.cost)}</span>
-             </div>
-             <hr/>`,
-        )
-        .join('');
-      return `<div class="receipt__section"><strong>${title} (${rows.length})</strong></div>${lines}`;
-    };
+    const total = p.outOfStock.length + p.lowStock.length;
+
+    // Out-of-stock first, then low — each row tagged with its status. The blank
+    // "Qty to Order" column is the table equivalent of the old write-in line.
+    let i = 0;
+    const renderRow = (r: LowStockRow, status: string) =>
+      `<tr>
+         <td class="inv-num">${++i}</td>
+         <td>${esc(r.name)}</td>
+         <td>${esc(status)}</td>
+         <td class="inv-right">${r.stock}</td>
+         <td class="inv-right">${money(r.cost)}</td>
+         <td class="inv-actual"></td>
+       </tr>`;
+    const body =
+      p.outOfStock.map((r) => renderRow(r, 'Out of stock')).join('') +
+      p.lowStock.map((r) => renderRow(r, 'Low')).join('');
+
     return `
-      <header class="receipt__header">
-        <strong>${esc(p.storeName)}</strong>
-        ${p.address ? `<small>${esc(p.address)}</small>` : ''}
-        ${p.phone ? `<small>${esc(p.phone)}</small>` : ''}
-        <strong>LOW STOCK REPORT</strong>
-      </header>
-      <hr/>
-      <div class="receipt__meta">
-        <div>Date    : ${esc(date)}</div>
-        <div>By      : ${esc(p.generatedByName)}</div>
+      <h1>${esc(p.storeName)}</h1>
+      ${p.address ? `<small>${esc(p.address)}</small><br/>` : ''}
+      ${p.phone ? `<small>${esc(p.phone)}</small>` : ''}
+      <h2>Low Stock Report</h2>
+      <div class="inv-meta">
+        <span>Date: ${esc(date)}</span>
+        <span>By: ${esc(p.generatedByName)}</span>
+        <span>Out of stock: ${p.outOfStock.length}</span>
+        <span>Low: ${p.lowStock.length}</span>
       </div>
-      <hr/>
-      ${renderSection('OUT OF STOCK', p.outOfStock)}
-      ${renderSection('LOW STOCK', p.lowStock)}
-      <div class="receipt__row receipt__row--grand">
-        <span>Total items</span>
-        <span>${p.outOfStock.length + p.lowStock.length}</span>
-      </div>
-      <hr/>
-      <div>Restocked by: ____________________</div>
-      ${p.footer ? `<footer class="receipt__footer">${esc(p.footer).replace(/\n/g, '<br/>')}</footer>` : ''}
+      <table class="inv-table">
+        <thead>
+          <tr>
+            <th class="inv-num">#</th>
+            <th>Product</th>
+            <th>Status</th>
+            <th class="inv-right">Stock Left</th>
+            <th class="inv-right">Cost</th>
+            <th class="inv-actual">Qty to Order</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${body}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="3" class="inv-right">Total items to restock</td>
+            <td class="inv-right">${total}</td>
+            <td></td>
+            <td class="inv-actual"></td>
+          </tr>
+        </tfoot>
+      </table>
+      <div class="inv-footer">Restocked by: ____________________</div>
+      ${p.footer ? `<div class="inv-footer">${esc(p.footer).replace(/\n/g, '<br/>')}</div>` : ''}
     `;
   }
 
@@ -670,14 +672,22 @@ export class PrinterService {
   }
 
   private printInventoryBrowser(payload: InventoryReportPayload): void {
+    this.printDocumentBrowser(this.renderInventoryHtml(payload));
+  }
+
+  /**
+   * Render a full-page A4 document (inventory / low-stock tables) via the
+   * browser. Distinct from the thermal receipt path: uses the .print-document
+   * style and forces A4 for the duration, restoring the configured thermal
+   * paper size afterwards so receipts are unaffected.
+   */
+  private printDocumentBrowser(innerHtml: string): void {
     const win = this.document.defaultView;
     if (!win) return;
     const container = this.document.createElement('section');
     container.className = 'print-document';
-    container.innerHTML = this.renderInventoryHtml(payload);
+    container.innerHTML = innerHtml;
     this.document.body.appendChild(container);
-    // Force A4 for the inventory sheet regardless of the thermal paper-size
-    // setting; remove it afterwards so receipts keep their configured size.
     const pageOverride = this.document.createElement('style');
     pageOverride.textContent = '@page { size: A4 portrait; margin: 12mm; }';
     this.document.head?.appendChild(pageOverride);
