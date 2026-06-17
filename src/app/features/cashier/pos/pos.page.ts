@@ -372,6 +372,12 @@ export class PosPage implements AfterViewInit, OnDestroy {
    * keyboard-triggered add so a keyboard-wedge scanner can fire the next
    * barcode without concatenating it onto the previous one.
    */
+  /** Clear the search field (clear button / Esc affordance), returning
+   *  focus to the input so the cashier can keep scanning/typing. */
+  protected clearSearch(): void {
+    this.clearSearchAndRefocus();
+  }
+
   private clearSearchAndRefocus(): void {
     this.search.set('');
     this.activeIndex.set(-1);
