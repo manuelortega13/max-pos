@@ -39,6 +39,21 @@
           }
         </mat-form-field>
 
+        <!-- Date picker — drives which day's sales the table shows. -->
+        <mat-form-field appearance="outline" class="filters__date" subscriptSizing="dynamic">
+          <mat-icon matPrefix>event</mat-icon>
+          <input
+            matInput
+            [matDatepicker]="datePicker"
+            [max]="today"
+            placeholder="Date"
+            [ngModel]="selectedDate()"
+            (ngModelChange)="onDateChange($event)"
+          />
+          <mat-datepicker-toggle matIconSuffix [for]="datePicker"></mat-datepicker-toggle>
+          <mat-datepicker #datePicker></mat-datepicker>
+        </mat-form-field>
+
         <!-- Status pill -->
         <button
           type="button"
@@ -75,6 +90,73 @@
             <span class="status-dot status-dot--refunded"></span>
             <span>Refunded</span>
           </button>
+        </mat-menu>
+
+        <!-- Product pill -->
+        <button
+          type="button"
+          mat-stroked-button
+          class="pill"
+          [class.pill--active]="hasProductFilter()"
+          [matMenuTriggerFor]="productMenu"
+        >
+          <mat-icon class="pill__icon">inventory_2</mat-icon>
+          <span>{{ hasProductFilter() ? productLabel() : 'Product' }}</span>
+          <span
+            class="pill__trailing"
+            [class.pill__trailing--remove]="hasProductFilter()"
+            role="button"
+            [attr.aria-label]="hasProductFilter() ? 'Clear product filter' : null"
+            (click)="hasProductFilter() && clearProducts($event)"
+          >
+            <mat-icon>{{ hasProductFilter() ? 'close' : 'expand_more' }}</mat-icon>
+          </span>
+        </button>
+        <mat-menu #productMenu="matMenu" class="filter-menu">
+          <div class="product-panel" (click)="$event.stopPropagation()">
+            @if (productOptions().length === 0) {
+              <p class="product-panel__empty">No products sold on this day.</p>
+            } @else {
+              <div class="product-panel__search">
+                <mat-icon>search</mat-icon>
+                <input
+                  type="text"
+                  placeholder="Search products"
+                  aria-label="Search products"
+                  [ngModel]="productSearch()"
+                  (ngModelChange)="productSearch.set($event)"
+                  (keydown)="$event.stopPropagation()"
+                />
+                @if (productSearch()) {
+                  <button
+                    type="button"
+                    class="product-panel__search-clear"
+                    aria-label="Clear product search"
+                    (click)="productSearch.set('')"
+                  >
+                    <mat-icon>close</mat-icon>
+                  </button>
+                }
+              </div>
+              <div class="product-panel__list">
+                @for (p of visibleProductOptions(); track p.id) {
+                  <button type="button" class="product-option" (click)="toggleProduct(p.id)">
+                    <mat-icon class="product-option__check">
+                      {{ isProductSelected(p.id) ? 'check_box' : 'check_box_outline_blank' }}
+                    </mat-icon>
+                    <span class="product-option__name">{{ p.name }}</span>
+                  </button>
+                } @empty {
+                  <p class="product-panel__empty">No products match.</p>
+                }
+              </div>
+              @if (hasProductFilter()) {
+                <div class="range-panel__actions">
+                  <button type="button" mat-button (click)="clearProducts()">Reset</button>
+                </div>
+              }
+            }
+          </div>
         </mat-menu>
 
         <!-- Time pill -->
