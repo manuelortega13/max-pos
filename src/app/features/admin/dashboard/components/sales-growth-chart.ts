@@ -75,7 +75,7 @@ const MS_PER_DAY = 86_400_000;
           <div #chartHost class="growth__chart"></div>
         } @else {
           <div class="growth__empty">
-            <mat-icon>show_chart</mat-icon>
+            <mat-icon>bar_chart</mat-icon>
             <p>No sales in this period yet — ring up a sale to start the trend.</p>
           </div>
         }
@@ -292,7 +292,7 @@ export class SalesGrowthChart {
 
     return {
       chart: {
-        type: 'area',
+        type: 'bar',
         height: 260,
         fontFamily: 'inherit',
         foreColor: axis,
@@ -305,17 +305,26 @@ export class SalesGrowthChart {
       series: [{ name: 'Revenue', data }],
       colors: [primary],
       dataLabels: { enabled: false },
-      stroke: { curve: 'smooth', width: 3, lineCap: 'round' },
+      plotOptions: {
+        bar: {
+          columnWidth: '60%',
+          borderRadius: 4,
+          borderRadiusApplication: 'end',
+        },
+      },
+      stroke: { show: false },
       fill: {
         type: 'gradient',
         gradient: {
-          shadeIntensity: 1,
-          opacityFrom: 0.45,
-          opacityTo: 0.04,
-          stops: [0, 95, 100],
+          shade: 'light',
+          type: 'vertical',
+          shadeIntensity: 0.25,
+          opacityFrom: 1,
+          opacityTo: 0.85,
+          stops: [0, 100],
         },
       },
-      markers: { size: 0, hover: { size: 5 }, strokeWidth: 0 },
+      states: { hover: { filter: { type: 'darken' } } },
       grid: {
         borderColor: grid,
         strokeDashArray: 4,
