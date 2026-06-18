@@ -1,5 +1,13 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  OnInit,
+  computed,
+  effect,
+  inject,
+  signal,
+} from '@angular/core';
 import { DatePipe, TitleCasePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -11,6 +19,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatMenuModule } from '@angular/material/menu';
+import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
 import { CreditorPayment, Sale, SaleStatus } from '../../../core/models';
@@ -40,6 +49,7 @@ type StatusFilter = SaleStatus | 'all';
     MatIconModule,
     MatInputModule,
     MatMenuModule,
+    MatPaginatorModule,
     MatTableModule,
     MoneyPipe,
   ],
@@ -95,14 +105,7 @@ export class TransactionsPage implements OnInit {
     'status',
   ] as const;
 
-  protected readonly gcashColumns = [
-    'ref',
-    'date',
-    'type',
-    'amount',
-    'fee',
-    'status',
-  ] as const;
+  protected readonly gcashColumns = ['ref', 'date', 'type', 'amount', 'fee', 'status'] as const;
 
   protected readonly loadColumns = [
     'ref',
@@ -252,6 +255,45 @@ export class TransactionsPage implements OnInit {
     };
   });
 
+  // ─── Pagination (client-side, main sales table only) ────────────
+  // This table is one cashier's sales for a single day — a bounded set —
+  // so paging is done in-memory over the already-filtered list. The
+  // summary cards / totals above intentionally keep aggregating the FULL
+  // filtered set, not just the visible page.
+  protected readonly pageSizeOptions = [10, 25, 50, 100];
+  protected readonly pageSize = signal(10);
+  protected readonly pageIndex = signal(0);
+
+  /** Page index capped to the available range, so a shrinking filter
+   *  result never strands the view on an empty page. */
+  protected readonly clampedPageIndex = computed(() => {
+    const lastPage = Math.max(0, Math.ceil(this.filteredSales().length / this.pageSize()) - 1);
+    return Math.min(this.pageIndex(), lastPage);
+  });
+
+  /** The slice of filtered sales visible on the current page. */
+  protected readonly pagedSales = computed(() => {
+    const start = this.clampedPageIndex() * this.pageSize();
+    return this.filteredSales().slice(start, start + this.pageSize());
+  });
+
+  /**
+   * Jump back to the first page whenever the filtered result set changes
+   * — a filter edit, a date switch, or a data refresh. Paging itself
+   * doesn't touch filteredSales(), so clicking through pages never
+   * triggers this; there's no feedback loop (pageIndex isn't read by
+   * filteredSales).
+   */
+  private readonly resetPageOnFilterChange = effect(() => {
+    this.filteredSales();
+    this.pageIndex.set(0);
+  });
+
+  protected onPage(event: PageEvent): void {
+    this.pageIndex.set(event.pageIndex);
+    this.pageSize.set(event.pageSize);
+  }
+
   protected readonly hasProductFilter = computed(() => this.selectedProductIds().size > 0);
 
   protected readonly productLabel = computed(() => {
@@ -305,7 +347,15 @@ export class TransactionsPage implements OnInit {
     return '';
   });
 
-  protected readonly columns = ['id', 'date', 'items', 'payment', 'total', 'status', 'actions'] as const;
+  protected readonly columns = [
+    'id',
+    'date',
+    'items',
+    'payment',
+    'total',
+    'status',
+    'actions',
+  ] as const;
 
   protected pad2(n: number): string {
     return n.toString().padStart(2, '0');
@@ -400,15 +450,15 @@ export class TransactionsPage implements OnInit {
       itemCount: sale.items.length,
       totalLabel: `${this.currencySymbol()}${sale.total.toFixed(2)}`,
     };
-    const ref = this.dialog.open<RefundDialog, RefundDialogData, RefundDialogResult>(
-      RefundDialog,
-      { width: '480px', panelClass: 'dialog-fullscreen-mobile', data },
-    );
+    const ref = this.dialog.open<RefundDialog, RefundDialogData, RefundDialogResult>(RefundDialog, {
+      width: '480px',
+      panelClass: 'dialog-fullscreen-mobile',
+      data,
+    });
     ref.afterClosed().subscribe((result) => {
       if (!result) return;
       this.saleService.refund(sale.id, result.reason).subscribe({
-        next: () =>
-          this.snackBar.open(`Refunded ${sale.reference}`, 'Dismiss', { duration: 2500 }),
+        next: () => this.snackBar.open(`Refunded ${sale.reference}`, 'Dismiss', { duration: 2500 }),
         error: (err: HttpErrorResponse) => {
           this.snackBar.open(err.error?.message ?? 'Refund failed.', 'Dismiss', { duration: 4000 });
         },
