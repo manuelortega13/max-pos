@@ -1,7 +1,7 @@
 import { HttpClient, HttpErrorResponse, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Injectable, computed, effect, inject, signal } from '@angular/core';
 import { Observable, tap } from 'rxjs';
-import { ExpiringBatch, Product, ProductBatch, ProductUpsertRequest } from '../models';
+import { ExpiringBatch, Page, Product, ProductBatch, ProductUpsertRequest } from '../models';
 import { RealtimeService } from './realtime.service';
 
 /**
@@ -31,6 +31,14 @@ export interface RestockPayload {
   readonly note?: string | null;
 }
 
+/** Filter + paging inputs for the admin Products table's server query. */
+export interface ProductPageQuery {
+  readonly search?: string;
+  readonly categoryId?: string;
+  readonly page: number;
+  readonly size: number;
+}
+
 @Injectable({ providedIn: 'root' })
 export class ProductService {
   private readonly http = inject(HttpClient);
@@ -40,6 +48,17 @@ export class ProductService {
   private readonly _loading = signal<boolean>(false);
   private readonly _error = signal<string | null>(null);
   private loaded = false;
+
+  /**
+   * Bumped on every change to the catalogue (full reload or any
+   * create/update/delete/restock). The admin Products table — which now
+   * pages server-side instead of reading {@link products} directly —
+   * watches this to know when to re-fetch its current page, so it stays
+   * in sync with mutations and SSE-driven reloads just like the old
+   * signal-backed table did.
+   */
+  private readonly _revision = signal(0);
+  readonly revision = this._revision.asReadonly();
 
   readonly products = this._products.asReadonly();
   readonly loading = this._loading.asReadonly();
@@ -86,6 +105,7 @@ export class ProductService {
         this._products.set(products);
         this._loading.set(false);
         this.loaded = true;
+        this.bumpRevision();
       },
       error: (err: HttpErrorResponse) => {
         this._error.set(this.describe(err));
@@ -106,34 +126,61 @@ export class ProductService {
     return this._products().filter((p) => p.categoryId === categoryId);
   }
 
+  /** One filtered page for the admin Products table. Separate from
+   *  {@link load} (which keeps the full catalogue cached for the POS) so
+   *  paging the management view doesn't disturb the rest of the app. */
+  page(query: ProductPageQuery): Observable<Page<Product>> {
+    let params = new HttpParams().set('page', query.page).set('size', query.size);
+    if (query.search?.trim()) params = params.set('search', query.search.trim());
+    if (query.categoryId && query.categoryId !== 'all') {
+      params = params.set('categoryId', query.categoryId);
+    }
+    return this.http.get<Page<Product>>('/api/products/page', {
+      params,
+      headers: NO_CACHE_HEADERS,
+    });
+  }
+
   create(request: ProductUpsertRequest): Observable<Product> {
     return this.http.post<Product>('/api/products', request).pipe(
       // Prepend so the freshly-created product shows up at the top of the list
       // (the backend also orders newest-first, so this matches a fresh GET).
-      tap((product) => this._products.update((list) => [product, ...list])),
+      tap((product) => {
+        this._products.update((list) => [product, ...list]);
+        this.bumpRevision();
+      }),
     );
   }
 
   update(id: string, request: ProductUpsertRequest): Observable<Product> {
     return this.http.put<Product>(`/api/products/${id}`, request).pipe(
-      tap((updated) =>
-        this._products.update((list) => list.map((p) => (p.id === id ? updated : p))),
-      ),
+      tap((updated) => {
+        this._products.update((list) => list.map((p) => (p.id === id ? updated : p)));
+        this.bumpRevision();
+      }),
     );
   }
 
   delete(id: string): Observable<void> {
     return this.http.delete<void>(`/api/products/${id}`).pipe(
-      tap(() => this._products.update((list) => list.filter((p) => p.id !== id))),
+      tap(() => {
+        this._products.update((list) => list.filter((p) => p.id !== id));
+        this.bumpRevision();
+      }),
     );
   }
 
   restock(id: string, payload: RestockPayload): Observable<Product> {
     return this.http.post<Product>(`/api/products/${id}/restock`, payload).pipe(
-      tap((updated) =>
-        this._products.update((list) => list.map((p) => (p.id === id ? updated : p))),
-      ),
+      tap((updated) => {
+        this._products.update((list) => list.map((p) => (p.id === id ? updated : p)));
+        this.bumpRevision();
+      }),
     );
+  }
+
+  private bumpRevision(): void {
+    this._revision.update((n) => n + 1);
   }
 
   listBatches(productId: string): Observable<ProductBatch[]> {

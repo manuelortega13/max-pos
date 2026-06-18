@@ -1,5 +1,6 @@
 package com.maxpos.product;
 
+import com.maxpos.common.PageResponse;
 import com.maxpos.product.dto.ProductBatchDto;
 import com.maxpos.product.dto.ProductDto;
 import com.maxpos.product.dto.ProductUpsertRequest;
@@ -29,6 +30,19 @@ public class ProductController {
             @RequestParam(defaultValue = "false") boolean activeOnly
     ) {
         return service.list(categoryId, Optional.of(activeOnly));
+    }
+
+    /** Paged + filtered view backing the admin Products table. Admin-only;
+     *  the full {@code list} above still serves the POS and other callers. */
+    @GetMapping("/page")
+    @PreAuthorize("hasRole('ADMIN')")
+    public PageResponse<ProductDto> page(
+            @RequestParam Optional<UUID> categoryId,
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size
+    ) {
+        return service.page(categoryId, search, page, size);
     }
 
     @GetMapping("/{id}")

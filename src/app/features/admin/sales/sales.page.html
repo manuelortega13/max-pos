@@ -39,14 +39,14 @@
             matInput
             placeholder="Reference or cashier"
             [ngModel]="search()"
-            (ngModelChange)="search.set($event)"
+            (ngModelChange)="setSearch($event)"
           />
           <mat-icon matPrefix>search</mat-icon>
         </mat-form-field>
 
         <mat-form-field appearance="outline" class="filters__field">
           <mat-label>Type</mat-label>
-          <mat-select [ngModel]="source()" (ngModelChange)="source.set($event)">
+          <mat-select [ngModel]="source()" (ngModelChange)="setSource($event)">
             <mat-option value="all">All types</mat-option>
             <mat-option value="SALE">Product sales</mat-option>
             <mat-option value="GCASH">GCash</mat-option>
@@ -56,7 +56,7 @@
 
         <mat-form-field appearance="outline" class="filters__field">
           <mat-label>Status</mat-label>
-          <mat-select [ngModel]="status()" (ngModelChange)="status.set($event)">
+          <mat-select [ngModel]="status()" (ngModelChange)="setStatus($event)">
             <mat-option value="all">All statuses</mat-option>
             <mat-option value="COMPLETED">Completed</mat-option>
             <mat-option value="PENDING">Pending</mat-option>
@@ -67,7 +67,7 @@
 
         <mat-form-field appearance="outline" class="filters__field">
           <mat-label>Cashier</mat-label>
-          <mat-select [ngModel]="cashier()" (ngModelChange)="cashier.set($event)">
+          <mat-select [ngModel]="cashier()" (ngModelChange)="setCashier($event)">
             <mat-option value="all">All cashiers</mat-option>
             @for (c of cashiers(); track c.id) {
               <mat-option [value]="c.id">{{ c.name }}</mat-option>
@@ -184,6 +184,16 @@
           </tr>
         </table>
       </div>
+
+      <mat-paginator
+        [length]="total()"
+        [pageSize]="pageSize()"
+        [pageIndex]="pageIndex()"
+        [pageSizeOptions]="pageSizeOptions"
+        showFirstLastButtons
+        aria-label="Select page of transactions"
+        (page)="onPage($event)"
+      ></mat-paginator>
     </mat-card-content>
   </mat-card>
 </section>

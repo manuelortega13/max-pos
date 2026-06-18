@@ -11,8 +11,12 @@ import com.maxpos.product.dto.ProductBatchDto;
 import com.maxpos.product.dto.ProductDto;
 import com.maxpos.product.dto.ProductUpsertRequest;
 import com.maxpos.product.dto.RestockRequest;
+import com.maxpos.common.PageResponse;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,6 +37,9 @@ public class ProductService {
             Sort.Order.desc("createdAt"),
             Sort.Order.asc("name")
     );
+
+    /** Page-size ceiling so a crafted request can't pull the whole catalogue. */
+    private static final int MAX_PAGE_SIZE = 200;
 
     private final ProductRepository products;
     private final ProductBatchRepository batches;
@@ -77,6 +84,25 @@ public class ProductService {
                         ? products.findAllByActiveTrue(NEWEST_FIRST)
                         : products.findAll(NEWEST_FIRST));
         return rows.stream().map(ProductDto::from).toList();
+    }
+
+    /**
+     * One page of products for the admin table, filtered by optional
+     * category + free-text search (name / SKU / barcode). Kept separate
+     * from {@link #list} (which still serves the full catalogue to the
+     * POS and other callers) so paging the management view doesn't change
+     * how the rest of the app loads products. Sorted newest-first to match
+     * the existing list ordering.
+     */
+    public PageResponse<ProductDto> page(Optional<UUID> categoryId, String search, int page, int size) {
+        // Empty string (never null) means "no search" — a null term inside
+        // the query's like/concat would be bound as bytea and fail.
+        String term = (search == null || search.isBlank()) ? "" : search.trim().toLowerCase();
+        int safeSize = Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
+        int safePage = Math.max(page, 0);
+        Pageable pageable = PageRequest.of(safePage, safeSize, NEWEST_FIRST);
+        Page<Product> result = products.search(categoryId.orElse(null), term, pageable);
+        return PageResponse.of(result, ProductDto::from);
     }
 
     public ProductDto get(UUID id) {

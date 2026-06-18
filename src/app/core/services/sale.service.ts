@@ -104,6 +104,14 @@ export class SaleService {
     return this._sales().filter((s) => s.cashierId === cashierId);
   }
 
+  /** Fetch a single sale (with its line items) by id. Used where the
+   *  full sale isn't already in the local cache — e.g. the admin Sales
+   *  page, which now pages over a lightweight server feed and pulls the
+   *  detail on demand when the cashier opens the items dialog. */
+  get(id: string): Observable<Sale> {
+    return this.http.get<Sale>(`/api/sales/${id}`);
+  }
+
   /**
    * Ring up a sale. Behaves exactly like the online flow when the network
    * cooperates. When the device is offline (`navigator.onLine === false`)

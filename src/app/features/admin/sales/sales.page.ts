@@ -1,5 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { DatePipe, TitleCasePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -9,21 +10,25 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
+import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { catchError, debounceTime, of, switchMap, tap } from 'rxjs';
 import {
-  GcashTransaction,
-  LoadTransaction,
-  Sale,
+  Page,
   SaleStatus,
+  TransactionKind,
+  TransactionRow,
 } from '../../../core/models';
-import { GcashService } from '../../../core/services/gcash.service';
-import { LoadService } from '../../../core/services/load.service';
 import { SaleService } from '../../../core/services/sale.service';
+import {
+  TransactionFeedQuery,
+  TransactionFeedService,
+} from '../../../core/services/transaction-feed.service';
 import { UserService } from '../../../core/services/user.service';
 import { ConfirmDialog } from '../../../shared/dialogs/confirm-dialog';
 import { SaleItemsDialog } from '../../../shared/dialogs/sale-items-dialog';
@@ -32,31 +37,19 @@ import { MoneyPipe } from '../../../shared/pipes/currency-symbol.pipe';
 type StatusFilter = SaleStatus | 'all' | 'VOIDED';
 type SourceFilter = 'all' | 'SALE' | 'GCASH' | 'LOAD';
 
-/**
- * One row in the unified transactions table. Wraps a Sale,
- * GcashTransaction, or LoadTransaction so the template renders
- * them uniformly while keeping the source object available for
- * row actions.
- */
-interface TxnRow {
-  readonly kind: 'SALE' | 'GCASH_IN' | 'GCASH_OUT' | 'LOAD';
-  readonly id: string;
-  readonly reference: string;
-  readonly date: string;
-  readonly cashierId: string;
-  readonly cashierName: string;
-  readonly itemsCount: number | null;
+/** Per-kind display label + icon, derived client-side so the feed DTO
+ *  stays presentation-free. */
+const KIND_META: Readonly<Record<TransactionKind, { label: string; icon: string }>> = {
+  SALE: { label: 'Sale', icon: 'point_of_sale' },
+  GCASH_IN: { label: 'GCash cash-in', icon: 'smartphone' },
+  GCASH_OUT: { label: 'GCash cash-out', icon: 'smartphone' },
+  LOAD: { label: 'Load', icon: 'sim_card' },
+};
+
+/** A feed row enriched with its display label/icon for the template. */
+interface DisplayRow extends TransactionRow {
   readonly typeLabel: string;
   readonly typeIcon: string;
-  readonly paymentLabel: string;
-  /** Principal cash that changed hands (excludes service fee). */
-  readonly principal: number;
-  /** Service-fee revenue for GCash / Load rows; null for sales. */
-  readonly fee: number | null;
-  readonly status: 'COMPLETED' | 'PENDING' | 'REFUNDED' | 'VOIDED';
-  readonly sale?: Sale;
-  readonly gcash?: GcashTransaction;
-  readonly load?: LoadTransaction;
 }
 
 @Component({
@@ -71,6 +64,7 @@ interface TxnRow {
     MatFormFieldModule,
     MatIconModule,
     MatInputModule,
+    MatPaginatorModule,
     MatProgressBarModule,
     MatSelectModule,
     MatTableModule,
@@ -83,58 +77,86 @@ interface TxnRow {
   styleUrl: './sales.page.scss',
 })
 export class SalesPage {
+  private readonly feed = inject(TransactionFeedService);
   private readonly saleService = inject(SaleService);
-  private readonly gcashService = inject(GcashService);
-  private readonly loadService = inject(LoadService);
   private readonly userService = inject(UserService);
   private readonly dialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
 
   protected readonly cashiers = this.userService.cashiers;
-  protected readonly loading = computed(
-    () =>
-      this.saleService.loading() ||
-      this.gcashService.loading() ||
-      this.loadService.loading(),
-  );
-  protected readonly error = computed(
-    () => this.saleService.error() ?? this.gcashService.error() ?? this.loadService.error(),
-  );
+
   protected readonly search = signal('');
   protected readonly status = signal<StatusFilter>('all');
   protected readonly source = signal<SourceFilter>('all');
   protected readonly cashier = signal<string>('all');
 
-  /** Unified row stream — sales + gcash + load merged and date-sorted desc. */
-  private readonly allRows = computed<TxnRow[]>(() => {
-    const sales = this.saleService.sales().map((s) => this.fromSale(s));
-    const gcash = this.gcashService.transactions().map((g) => this.fromGcash(g));
-    const load = this.loadService.transactions().map((l) => this.fromLoad(l));
-    return [...sales, ...gcash, ...load].sort(
-      (a, b) => Date.parse(b.date) - Date.parse(a.date),
-    );
-  });
+  // ─── Pagination ───────────────────────────────────────────────
+  protected readonly pageSizeOptions = [10, 25, 50, 100];
+  protected readonly pageSize = signal(10);
+  protected readonly pageIndex = signal(0);
 
-  protected readonly rows = computed(() => {
-    const term = this.search().trim().toLowerCase();
-    const status = this.status();
-    const source = this.source();
-    const cashier = this.cashier();
-    return this.allRows().filter((row) => {
-      if (source !== 'all') {
-        if (source === 'SALE' && row.kind !== 'SALE') return false;
-        if (source === 'GCASH' && row.kind !== 'GCASH_IN' && row.kind !== 'GCASH_OUT') return false;
-        if (source === 'LOAD' && row.kind !== 'LOAD') return false;
-      }
-      if (status !== 'all' && row.status !== status) return false;
-      if (cashier !== 'all' && row.cashierId !== cashier) return false;
-      if (!term) return true;
-      return (
-        row.reference.toLowerCase().includes(term) ||
-        row.cashierName.toLowerCase().includes(term)
-      );
-    });
-  });
+  private readonly fetching = signal(false);
+  private readonly _error = signal<string | null>(null);
+  protected readonly loading = this.fetching.asReadonly();
+  protected readonly error = this._error.asReadonly();
+
+  /** Bumped to force a re-fetch of the current page (refund / retry)
+   *  without changing any filter. */
+  private readonly reloadTick = signal(0);
+
+  private readonly emptyPage: Page<TransactionRow> = {
+    content: [],
+    page: 0,
+    size: 10,
+    totalElements: 0,
+    totalPages: 0,
+  };
+
+  /** All inputs that should trigger a fetch, collapsed into one value. */
+  private readonly queryParams = computed<TransactionFeedQuery & { tick: number }>(() => ({
+    search: this.search().trim(),
+    status: this.status(),
+    source: this.source(),
+    cashierId: this.cashier(),
+    page: this.pageIndex(),
+    size: this.pageSize(),
+    tick: this.reloadTick(),
+  }));
+
+  /**
+   * The current page, fetched server-side. Debounced so typing in the
+   * search box (or a fast burst of filter changes) collapses into a
+   * single request; `switchMap` cancels any in-flight request when a
+   * newer one supersedes it. Errors fall back to an empty page and
+   * surface via {@link error}.
+   */
+  private readonly pageData = toSignal(
+    toObservable(this.queryParams).pipe(
+      debounceTime(200),
+      switchMap((q) => {
+        this.fetching.set(true);
+        this._error.set(null);
+        return this.feed.query(q).pipe(
+          catchError((err: HttpErrorResponse) => {
+            this._error.set(this.describe(err));
+            return of(this.emptyPage);
+          }),
+        );
+      }),
+      tap(() => this.fetching.set(false)),
+    ),
+    { initialValue: this.emptyPage },
+  );
+
+  protected readonly rows = computed<DisplayRow[]>(() =>
+    this.pageData().content.map((r) => ({
+      ...r,
+      typeLabel: KIND_META[r.kind].label,
+      typeIcon: KIND_META[r.kind].icon,
+    })),
+  );
+
+  protected readonly total = computed(() => this.pageData().totalElements);
 
   protected readonly columns = [
     'id',
@@ -147,35 +169,75 @@ export class SalesPage {
     'actions',
   ] as const;
 
-  protected retry(): void {
-    this.saleService.load();
-    this.gcashService.load();
-    this.loadService.load();
+  protected onPage(event: PageEvent): void {
+    this.pageIndex.set(event.pageIndex);
+    this.pageSize.set(event.pageSize);
   }
 
-  protected viewItems(row: TxnRow): void {
-    if (row.kind !== 'SALE' || !row.sale) return;
-    this.dialog.open(SaleItemsDialog, {
-      width: '560px',
-      maxWidth: '95vw',
-      panelClass: ['sale-items-panel', 'dialog-fullscreen-mobile'],
-      autoFocus: false,
-      data: row.sale,
+  /** Filter mutators reset to the first page — a narrower filter could
+   *  otherwise leave the view past the new last page. */
+  protected setSearch(value: string): void {
+    this.search.set(value);
+    this.pageIndex.set(0);
+  }
+
+  protected setStatus(value: StatusFilter): void {
+    this.status.set(value);
+    this.pageIndex.set(0);
+  }
+
+  protected setSource(value: SourceFilter): void {
+    this.source.set(value);
+    this.pageIndex.set(0);
+  }
+
+  protected setCashier(value: string): void {
+    this.cashier.set(value);
+    this.pageIndex.set(0);
+  }
+
+  protected retry(): void {
+    this.reload();
+  }
+
+  private reload(): void {
+    this.reloadTick.update((t) => t + 1);
+  }
+
+  protected viewItems(row: DisplayRow): void {
+    if (row.kind !== 'SALE') return;
+    // The feed row is lightweight (no line items); fetch the full sale
+    // on demand so the items dialog has what it needs.
+    this.saleService.get(row.id).subscribe({
+      next: (sale) =>
+        this.dialog.open(SaleItemsDialog, {
+          width: '560px',
+          maxWidth: '95vw',
+          panelClass: ['sale-items-panel', 'dialog-fullscreen-mobile'],
+          autoFocus: false,
+          data: sale,
+        }),
+      error: (err: HttpErrorResponse) =>
+        this.snackBar.open(
+          err.error?.message ?? 'Could not load sale items.',
+          'Dismiss',
+          { duration: 3000 },
+        ),
     });
   }
 
-  protected confirmRefund(row: TxnRow): void {
-    const sale = row.sale;
-    if (!sale) return;
-    if (sale.status === 'REFUNDED') {
+  protected confirmRefund(row: DisplayRow): void {
+    if (row.kind !== 'SALE') return;
+    if (row.status === 'REFUNDED') {
       this.snackBar.open('Already refunded.', 'Dismiss', { duration: 2500 });
       return;
     }
+    const itemCount = row.itemsCount ?? 0;
     const ref = this.dialog.open(ConfirmDialog, {
       width: '460px',
       data: {
         title: 'Refund sale',
-        message: `Refund sale ${sale.reference} (${sale.items.length} items)? Stock returns to inventory as a new batch.`,
+        message: `Refund sale ${row.reference} (${itemCount} items)? Stock returns to inventory as a new batch.`,
         confirmLabel: 'Refund',
         destructive: true,
         icon: 'undo',
@@ -183,8 +245,11 @@ export class SalesPage {
     });
     ref.afterClosed().subscribe((confirmed) => {
       if (!confirmed) return;
-      this.saleService.refund(sale.id).subscribe({
-        next: () => this.snackBar.open(`Refunded ${sale.reference}`, 'Dismiss', { duration: 2500 }),
+      this.saleService.refund(row.id).subscribe({
+        next: () => {
+          this.snackBar.open(`Refunded ${row.reference}`, 'Dismiss', { duration: 2500 });
+          this.reload();
+        },
         error: (err: HttpErrorResponse) => {
           this.snackBar.open(err.error?.message ?? 'Refund failed.', 'Dismiss', { duration: 4000 });
         },
@@ -192,77 +257,15 @@ export class SalesPage {
     });
   }
 
-  /** Service-feature rows can only be voided from their own pages
-   *  (GCash / Load admin tabs) so the same admin sees the void
-   *  reason flow there. We surface a link instead. */
-  protected isServiceRow(row: TxnRow): boolean {
+  /** Service-feature rows (GCash / Load) can only be voided from their
+   *  own admin tabs, so the row menu only offers actions for sales. */
+  protected isServiceRow(row: DisplayRow): boolean {
     return row.kind !== 'SALE';
   }
 
-  private fromSale(s: Sale): TxnRow {
-    return {
-      kind: 'SALE',
-      id: s.id,
-      reference: s.reference,
-      date: s.date,
-      cashierId: s.cashierId,
-      cashierName: s.cashierName,
-      itemsCount: s.items.length,
-      typeLabel: 'Sale',
-      typeIcon: 'point_of_sale',
-      paymentLabel: s.paymentMethod,
-      principal: s.total,
-      fee: null,
-      status: s.status,
-      sale: s,
-    };
-  }
-
-  private fromGcash(g: GcashTransaction): TxnRow {
-    const status: TxnRow['status'] = g.voidedAt
-      ? 'VOIDED'
-      : g.status === 'COMPLETED'
-        ? 'COMPLETED'
-        : 'PENDING';
-    return {
-      kind: g.type === 'CASH_IN' ? 'GCASH_IN' : 'GCASH_OUT',
-      id: g.id,
-      reference: g.reference,
-      date: g.date,
-      cashierId: g.cashierId,
-      cashierName: g.cashierName,
-      itemsCount: null,
-      typeLabel: g.type === 'CASH_IN' ? 'GCash cash-in' : 'GCash cash-out',
-      typeIcon: 'smartphone',
-      paymentLabel: 'CASH',
-      principal: g.amount,
-      fee: g.fee,
-      status,
-      gcash: g,
-    };
-  }
-
-  private fromLoad(l: LoadTransaction): TxnRow {
-    const status: TxnRow['status'] = l.voidedAt
-      ? 'VOIDED'
-      : l.status === 'COMPLETED'
-        ? 'COMPLETED'
-        : 'PENDING';
-    return {
-      kind: 'LOAD',
-      id: l.id,
-      reference: l.reference,
-      date: l.date,
-      cashierId: l.cashierId,
-      cashierName: l.cashierName,
-      itemsCount: null,
-      typeLabel: 'Load',
-      typeIcon: 'sim_card',
-      paymentLabel: 'CASH',
-      principal: l.amount,
-      fee: l.fee,
-      status,
-      load: l,
-    };
+  private describe(err: HttpErrorResponse): string {
+    if (err.status === 0) return 'Cannot reach the server.';
+    if (err.status === 403) return 'Admin access required.';
+    return err.error?.message ?? `Request failed (${err.status})`;
   }
 }
