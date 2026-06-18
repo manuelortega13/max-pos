@@ -1,5 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
@@ -9,24 +10,37 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
+import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
+import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { Product } from '../../../core/models';
+import { catchError, debounceTime, of, switchMap, tap } from 'rxjs';
+import { Page, Product } from '../../../core/models';
 import { AuthService } from '../../../core/services/auth.service';
 import { BarcodeScannerService } from '../../../core/services/barcode-scanner.service';
 import { CategoryService } from '../../../core/services/category.service';
 import { PrinterService, LowStockRow, InventoryRow } from '../../../core/services/printer.service';
-import { ProductService } from '../../../core/services/product.service';
+import {
+  InventoryStats,
+  ProductService,
+  RestockPayload,
+  StockFilter,
+} from '../../../core/services/product.service';
 import { SettingsService } from '../../../core/services/settings.service';
 import { MarkupDialog, MarkupDialogData } from '../../../shared/dialogs/markup-dialog';
 import { MoneyPipe } from '../../../shared/pipes/currency-symbol.pipe';
-import { RestockPayload } from '../../../core/services/product.service';
 import { BatchesDialog } from './batches-dialog';
 import { RestockDialog } from './restock-dialog';
 
-type StockFilter = 'all' | 'low' | 'out' | 'ok';
+const EMPTY_STATS: InventoryStats = {
+  totalProducts: 0,
+  totalUnits: 0,
+  totalValue: 0,
+  lowStock: 0,
+  outOfStock: 0,
+};
 
 @Component({
   selector: 'app-inventory-page',
@@ -39,6 +53,8 @@ type StockFilter = 'all' | 'low' | 'out' | 'ok';
     MatFormFieldModule,
     MatIconModule,
     MatInputModule,
+    MatPaginatorModule,
+    MatProgressBarModule,
     MatSelectModule,
     MatTableModule,
     MatTooltipModule,
@@ -48,7 +64,7 @@ type StockFilter = 'all' | 'low' | 'out' | 'ok';
   templateUrl: './inventory.page.html',
   styleUrl: './inventory.page.scss',
 })
-export class InventoryPage implements OnInit {
+export class InventoryPage {
   private readonly productService = inject(ProductService);
   private readonly categoryService = inject(CategoryService);
   private readonly dialog = inject(MatDialog);
@@ -60,74 +76,123 @@ export class InventoryPage implements OnInit {
 
   protected readonly cameraSupported = this.scanner.isSupported;
 
-  /** Force a fresh fetch every time the page is opened. ProductService
-   *  caches the list in a signal across the app, and realtime events
-   *  don't always make it through (backgrounded tab, dropped SSE) —
-   *  refreshing on navigation keeps the inventory view authoritative
-   *  without depending on those side channels. */
-  ngOnInit(): void {
-    this.productService.load();
-  }
-
   protected readonly filter = signal<StockFilter>('all');
   protected readonly search = signal<string>('');
   protected readonly categoryFilter = signal<string>('all');
 
   protected readonly categories = this.categoryService.categories;
 
+  // ─── Pagination ───────────────────────────────────────────────
+  protected readonly pageSizeOptions = [10, 25, 50, 100];
+  protected readonly pageSize = signal(10);
+  protected readonly pageIndex = signal(0);
+
+  private readonly fetching = signal(false);
+  private readonly _error = signal<string | null>(null);
+  protected readonly loading = this.fetching.asReadonly();
+  protected readonly error = this._error.asReadonly();
+
+  private readonly emptyPage: Page<Product> = {
+    content: [],
+    page: 0,
+    size: 10,
+    totalElements: 0,
+    totalPages: 0,
+  };
+
   /**
-   * Summary cards describe the whole catalog, not the filtered subset —
-   * otherwise "low stock" and "out of stock" counts collapse to 0 the moment
-   * the cashier searches for something, which defeats the at-a-glance purpose.
+   * Inputs that drive a table re-fetch. `productService.revision()` is
+   * included so a restock (which bumps it) refreshes the current page and
+   * the summary automatically.
    */
-  protected readonly totals = computed(() => {
-    const products = this.productService.products();
-    const totalUnits = products.reduce((sum, p) => sum + p.stock, 0);
-    const totalValue = products.reduce((sum, p) => sum + p.stock * p.cost, 0);
-    return {
-      totalProducts: products.length,
-      totalUnits,
-      totalValue,
-      lowStock: products.filter((p) => p.stock > 0 && p.stock <= 5).length,
-      // "Out of stock" tile includes negatives so oversold products aren't
-      // silently dropped from the count.
-      outOfStock: products.filter((p) => p.stock <= 0).length,
-    };
-  });
+  private readonly queryParams = computed(() => ({
+    search: this.search().trim(),
+    categoryId: this.categoryFilter(),
+    stock: this.filter(),
+    page: this.pageIndex(),
+    size: this.pageSize(),
+    revision: this.productService.revision(),
+  }));
 
-  protected readonly rows = computed(() => {
-    const products = this.productService.products();
-    const term = this.search().trim().toLowerCase();
-    const cat = this.categoryFilter();
-    const stock = this.filter();
-
-    return products.filter((p) => {
-      if (cat !== 'all' && p.categoryId !== cat) return false;
-      if (term) {
-        const hit =
-          p.name.toLowerCase().includes(term) ||
-          p.sku.toLowerCase().includes(term) ||
-          p.barcodes.some((b) => b.toLowerCase().includes(term));
-        if (!hit) return false;
-      }
-      switch (stock) {
-        case 'low': return p.stock > 0 && p.stock <= 5;
-        case 'out': return p.stock <= 0; // includes oversold / negative
-        case 'ok':  return p.stock > 5;
-        case 'all':
-        default:    return true;
-      }
-    });
-  });
-
-  protected readonly hasActiveFilters = computed(
-    () =>
-      this.search() !== '' ||
-      this.categoryFilter() !== 'all' ||
-      this.filter() !== 'all',
+  private readonly pageData = toSignal(
+    toObservable(this.queryParams).pipe(
+      debounceTime(200),
+      switchMap((q) => {
+        this.fetching.set(true);
+        this._error.set(null);
+        return this.productService.inventoryPage(q).pipe(
+          catchError((err: HttpErrorResponse) => {
+            this._error.set(this.describe(err));
+            return of(this.emptyPage);
+          }),
+        );
+      }),
+      tap(() => this.fetching.set(false)),
+    ),
+    { initialValue: this.emptyPage },
   );
 
-  protected readonly columns = ['image', 'name', 'category', 'stock', 'cost', 'price', 'markup', 'value', 'actions'] as const;
+  protected readonly rows = computed(() => this.pageData().content);
+  protected readonly total = computed(() => this.pageData().totalElements);
+
+  /** Page index capped to the available range so a shrinking filter
+   *  result never strands the view on an empty page. */
+  protected readonly clampedPageIndex = computed(() => {
+    const lastPage = Math.max(0, Math.ceil(this.total() / this.pageSize()) - 1);
+    return Math.min(this.pageIndex(), lastPage);
+  });
+
+  /**
+   * Summary cards: whole-catalog totals from a dedicated endpoint
+   * (deliberately independent of the table's filters). Re-fetched when the
+   * catalogue changes (revision bump on restock / other mutations).
+   */
+  protected readonly totals = toSignal(
+    toObservable(computed(() => this.productService.revision())).pipe(
+      switchMap(() =>
+        this.productService.inventorySummary().pipe(catchError(() => of(EMPTY_STATS))),
+      ),
+    ),
+    { initialValue: EMPTY_STATS },
+  );
+
+  protected readonly hasActiveFilters = computed(
+    () => this.search() !== '' || this.categoryFilter() !== 'all' || this.filter() !== 'all',
+  );
+
+  protected readonly columns = [
+    'image',
+    'name',
+    'category',
+    'stock',
+    'cost',
+    'price',
+    'markup',
+    'value',
+    'actions',
+  ] as const;
+
+  protected onPage(event: PageEvent): void {
+    this.pageIndex.set(event.pageIndex);
+    this.pageSize.set(event.pageSize);
+  }
+
+  // Filter mutators reset to the first page so a narrower filter doesn't
+  // leave the view past the new last page.
+  protected setSearch(value: string): void {
+    this.search.set(value);
+    this.pageIndex.set(0);
+  }
+
+  protected setCategory(value: string): void {
+    this.categoryFilter.set(value);
+    this.pageIndex.set(0);
+  }
+
+  protected setStock(value: StockFilter): void {
+    this.filter.set(value);
+    this.pageIndex.set(0);
+  }
 
   /** Current markup % for a product. Returns 0 when cost is missing. */
   protected markupPercent(product: Product): number {
@@ -198,6 +263,8 @@ export class InventoryPage implements OnInit {
             'Dismiss',
             { duration: 2500 },
           );
+          // restock() bumps productService.revision(), which re-fetches
+          // the current page and the summary — no manual reload needed.
         },
         error: (err: HttpErrorResponse) => {
           const msg =
@@ -222,98 +289,113 @@ export class InventoryPage implements OnInit {
   /** Push the scanned barcode straight into the filter search. */
   protected async scanBarcodeIntoSearch(): Promise<void> {
     const code = await this.scanner.scan();
-    if (code) this.search.set(code);
+    if (code) this.setSearch(code);
   }
 
   protected clearFilters(): void {
     this.search.set('');
     this.categoryFilter.set('all');
     this.filter.set('all');
+    this.pageIndex.set(0);
   }
 
   /**
-   * Print the restocking sheet: out-of-stock first (alphabetical),
-   * then low-stock (urgent first — sorted by remaining stock ascending).
-   * Only active products are eligible — inactive SKUs shouldn't show
-   * up on a restocking run.
-   *
-   * Disabled in the UI when both buckets are empty, but we re-check
-   * here to keep the method safe if it's ever called from elsewhere.
+   * Print the restocking sheet: out-of-stock first (alphabetical), then
+   * low-stock (urgent first — by remaining stock ascending). Only active
+   * products are eligible. Fetches the full active set from the server
+   * (the printout covers the whole catalog, not the visible page).
    */
   protected printLowStock(): void {
-    const active = this.productService.products().filter((p) => p.active);
-    const toRow = (p: Product): LowStockRow => ({
-      name: p.name,
-      stock: p.stock,
-      cost: p.cost,
-    });
-    const outOfStock = active
-      .filter((p) => p.stock <= 0)
-      .sort((a, b) => a.name.localeCompare(b.name))
-      .map(toRow);
-    const lowStock = active
-      .filter((p) => p.stock > 0 && p.stock <= 5)
-      .sort((a, b) => a.stock - b.stock || a.name.localeCompare(b.name))
-      .map(toRow);
+    this.productService.inventoryExport({ activeOnly: true }).subscribe({
+      next: (active) => {
+        const toRow = (p: Product): LowStockRow => ({
+          name: p.name,
+          stock: p.stock,
+          cost: p.cost,
+        });
+        const outOfStock = active
+          .filter((p) => p.stock <= 0)
+          .sort((a, b) => a.name.localeCompare(b.name))
+          .map(toRow);
+        const lowStock = active
+          .filter((p) => p.stock > 0 && p.stock <= 5)
+          .sort((a, b) => a.stock - b.stock || a.name.localeCompare(b.name))
+          .map(toRow);
 
-    if (outOfStock.length === 0 && lowStock.length === 0) {
-      this.snackBar.open('Nothing to restock — stock looks healthy.', 'Dismiss', {
-        duration: 2500,
-      });
-      return;
-    }
+        if (outOfStock.length === 0 && lowStock.length === 0) {
+          this.snackBar.open('Nothing to restock — stock looks healthy.', 'Dismiss', {
+            duration: 2500,
+          });
+          return;
+        }
 
-    const s = this.settings.settings();
-    void this.printer.printLowStockReport({
-      storeName: s.storeName,
-      address: s.address,
-      phone: s.phone,
-      footer: s.receiptFooter,
-      currencySymbol: s.currencySymbol,
-      generatedAt: new Date().toISOString(),
-      generatedByName: this.authService.user()?.name ?? '—',
-      outOfStock,
-      lowStock,
+        const s = this.settings.settings();
+        void this.printer.printLowStockReport({
+          storeName: s.storeName,
+          address: s.address,
+          phone: s.phone,
+          footer: s.receiptFooter,
+          currencySymbol: s.currencySymbol,
+          generatedAt: new Date().toISOString(),
+          generatedByName: this.authService.user()?.name ?? '—',
+          outOfStock,
+          lowStock,
+        });
+      },
+      error: () =>
+        this.snackBar.open('Could not load products to print.', 'Dismiss', { duration: 3000 }),
     });
   }
 
   /**
-   * Print the inventory sheet. Prints exactly what the table currently shows
-   * (the filtered rows), sorted by name for easy scanning, with a note of any
-   * active filters and totals at the bottom.
+   * Print the inventory sheet — exactly the rows matching the current
+   * filters (the whole matching set, not just the visible page), sorted by
+   * name, with a note of any active filters.
    */
   protected printInventory(): void {
-    const rows: InventoryRow[] = this.rows()
-      .slice()
-      .sort((a, b) => a.name.localeCompare(b.name))
-      .map((p) => ({
-        name: p.name,
-        sku: p.sku,
-        category: this.categoryName(p.categoryId),
-        stock: p.stock,
-        cost: p.cost,
-        price: p.price,
-      }));
+    this.productService
+      .inventoryExport({
+        search: this.search().trim(),
+        categoryId: this.categoryFilter(),
+        stock: this.filter(),
+      })
+      .subscribe({
+        next: (products) => {
+          const rows: InventoryRow[] = products
+            .slice()
+            .sort((a, b) => a.name.localeCompare(b.name))
+            .map((p) => ({
+              name: p.name,
+              sku: p.sku,
+              category: this.categoryName(p.categoryId),
+              stock: p.stock,
+              cost: p.cost,
+              price: p.price,
+            }));
 
-    if (rows.length === 0) {
-      this.snackBar.open('No products to print for the current filters.', 'Dismiss', {
-        duration: 2500,
+          if (rows.length === 0) {
+            this.snackBar.open('No products to print for the current filters.', 'Dismiss', {
+              duration: 2500,
+            });
+            return;
+          }
+
+          const s = this.settings.settings();
+          void this.printer.printInventoryReport({
+            storeName: s.storeName,
+            address: s.address,
+            phone: s.phone,
+            footer: s.receiptFooter,
+            currencySymbol: s.currencySymbol,
+            generatedAt: new Date().toISOString(),
+            generatedByName: this.authService.user()?.name ?? '—',
+            filterNote: this.filterNote(),
+            rows,
+          });
+        },
+        error: () =>
+          this.snackBar.open('Could not load products to print.', 'Dismiss', { duration: 3000 }),
       });
-      return;
-    }
-
-    const s = this.settings.settings();
-    void this.printer.printInventoryReport({
-      storeName: s.storeName,
-      address: s.address,
-      phone: s.phone,
-      footer: s.receiptFooter,
-      currencySymbol: s.currencySymbol,
-      generatedAt: new Date().toISOString(),
-      generatedByName: this.authService.user()?.name ?? '—',
-      filterNote: this.filterNote(),
-      rows,
-    });
   }
 
   /** Human-readable summary of the active filters for the printout header. */
@@ -330,5 +412,11 @@ export class InventoryPage implements OnInit {
     const term = this.search().trim();
     if (term) parts.push(`search "${term}"`);
     return parts.join(', ');
+  }
+
+  private describe(err: HttpErrorResponse): string {
+    if (err.status === 0) return 'Cannot reach the server.';
+    if (err.status === 403) return 'Admin access required.';
+    return err.error?.message ?? `Request failed (${err.status})`;
   }
 }

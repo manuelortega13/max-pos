@@ -12,6 +12,7 @@ import com.maxpos.product.dto.ProductDto;
 import com.maxpos.product.dto.ProductUpsertRequest;
 import com.maxpos.product.dto.RestockRequest;
 import com.maxpos.common.PageResponse;
+import com.maxpos.product.dto.InventoryStatsDto;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import org.springframework.data.domain.Page;
@@ -103,6 +104,73 @@ public class ProductService {
         Pageable pageable = PageRequest.of(safePage, safeSize, NEWEST_FIRST);
         Page<Product> result = products.search(categoryId.orElse(null), term, pageable);
         return PageResponse.of(result, ProductDto::from);
+    }
+
+    /**
+     * One page for the admin Inventory table: category + search + stock-
+     * status filter, newest-first. {@code stock} is normalized to one of
+     * ALL/LOW/OUT/OK (anything else → ALL).
+     */
+    public PageResponse<ProductDto> inventoryPage(Optional<UUID> categoryId, String search,
+                                                  String stock, int page, int size) {
+        String term = normalizeTerm(search);
+        String stockFilter = normalizeStock(stock);
+        int safeSize = Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
+        int safePage = Math.max(page, 0);
+        Pageable pageable = PageRequest.of(safePage, safeSize, NEWEST_FIRST);
+        Page<Product> result = products.searchInventory(categoryId.orElse(null), term, stockFilter, pageable);
+        return PageResponse.of(result, ProductDto::from);
+    }
+
+    /**
+     * Whole-catalog inventory summary for the page's top cards. Computed
+     * over every product (the cards intentionally ignore the table's
+     * filters); returns a tiny DTO rather than shipping the full list to
+     * the client.
+     */
+    public InventoryStatsDto inventorySummary() {
+        long totalProducts = 0, totalUnits = 0, lowStock = 0, outOfStock = 0;
+        BigDecimal totalValue = BigDecimal.ZERO;
+        for (Product p : products.findAll()) {
+            int s = p.getStock();
+            totalProducts++;
+            totalUnits += s;
+            totalValue = totalValue.add(p.getCost().multiply(BigDecimal.valueOf(s)));
+            if (s > 0 && s <= 5) lowStock++;
+            if (s <= 0) outOfStock++;
+        }
+        return new InventoryStatsDto(totalProducts, totalUnits, totalValue, lowStock, outOfStock);
+    }
+
+    /**
+     * Full (non-paged) filtered set for the printable inventory / low-stock
+     * sheets, which print the whole matching set rather than one page.
+     */
+    public List<ProductDto> inventoryExport(Optional<UUID> categoryId, String search,
+                                            String stock, boolean activeOnly) {
+        String term = normalizeTerm(search);
+        String stockFilter = normalizeStock(stock);
+        return products
+                .findInventoryForExport(categoryId.orElse(null), term, stockFilter, activeOnly, NEWEST_FIRST)
+                .stream()
+                .map(ProductDto::from)
+                .toList();
+    }
+
+    /** "" (never null) means "no search" — a null term inside the query's
+     *  like/concat would be bound as bytea and fail. */
+    private static String normalizeTerm(String search) {
+        return (search == null || search.isBlank()) ? "" : search.trim().toLowerCase();
+    }
+
+    private static String normalizeStock(String stock) {
+        if (stock == null) return "ALL";
+        return switch (stock.trim().toUpperCase()) {
+            case "LOW" -> "LOW";
+            case "OUT" -> "OUT";
+            case "OK" -> "OK";
+            default -> "ALL";
+        };
     }
 
     public ProductDto get(UUID id) {

@@ -1,6 +1,7 @@
 package com.maxpos.product;
 
 import com.maxpos.common.PageResponse;
+import com.maxpos.product.dto.InventoryStatsDto;
 import com.maxpos.product.dto.ProductBatchDto;
 import com.maxpos.product.dto.ProductDto;
 import com.maxpos.product.dto.ProductUpsertRequest;
@@ -43,6 +44,40 @@ public class ProductController {
             @RequestParam(defaultValue = "10") int size
     ) {
         return service.page(categoryId, search, page, size);
+    }
+
+    /** Paged + filtered view for the admin Inventory table (adds a stock-
+     *  status filter). Admin-only. */
+    @GetMapping("/inventory")
+    @PreAuthorize("hasRole('ADMIN')")
+    public PageResponse<ProductDto> inventory(
+            @RequestParam Optional<UUID> categoryId,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String stock,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size
+    ) {
+        return service.inventoryPage(categoryId, search, stock, page, size);
+    }
+
+    /** Whole-catalog inventory summary for the page's top cards. Admin-only. */
+    @GetMapping("/inventory/summary")
+    @PreAuthorize("hasRole('ADMIN')")
+    public InventoryStatsDto inventorySummary() {
+        return service.inventorySummary();
+    }
+
+    /** Full (non-paged) filtered set for the printable inventory / low-stock
+     *  sheets. Admin-only. */
+    @GetMapping("/inventory/export")
+    @PreAuthorize("hasRole('ADMIN')")
+    public List<ProductDto> inventoryExport(
+            @RequestParam Optional<UUID> categoryId,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String stock,
+            @RequestParam(defaultValue = "false") boolean activeOnly
+    ) {
+        return service.inventoryExport(categoryId, search, stock, activeOnly);
     }
 
     @GetMapping("/{id}")

@@ -21,7 +21,7 @@ import { RealtimeService } from './realtime.service';
 const NO_CACHE_HEADERS = new HttpHeaders({
   'ngsw-bypass': 'true',
   'Cache-Control': 'no-cache',
-  'Pragma': 'no-cache',
+  Pragma: 'no-cache',
 });
 
 export interface RestockPayload {
@@ -37,6 +37,27 @@ export interface ProductPageQuery {
   readonly categoryId?: string;
   readonly page: number;
   readonly size: number;
+}
+
+/** Stock-status filter for the Inventory table. */
+export type StockFilter = 'all' | 'low' | 'out' | 'ok';
+
+/** Filter + paging inputs for the admin Inventory table's server query. */
+export interface InventoryPageQuery {
+  readonly search?: string;
+  readonly categoryId?: string;
+  readonly stock?: StockFilter;
+  readonly page: number;
+  readonly size: number;
+}
+
+/** Whole-catalog inventory summary for the Inventory page's top cards. */
+export interface InventoryStats {
+  readonly totalProducts: number;
+  readonly totalUnits: number;
+  readonly totalValue: number;
+  readonly lowStock: number;
+  readonly outOfStock: number;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -141,6 +162,50 @@ export class ProductService {
     });
   }
 
+  /** One page for the admin Inventory table (category + search + stock
+   *  status). Separate from {@link page} so the two management tables
+   *  stay independent. */
+  inventoryPage(query: InventoryPageQuery): Observable<Page<Product>> {
+    let params = new HttpParams().set('page', query.page).set('size', query.size);
+    if (query.search?.trim()) params = params.set('search', query.search.trim());
+    if (query.categoryId && query.categoryId !== 'all') {
+      params = params.set('categoryId', query.categoryId);
+    }
+    if (query.stock && query.stock !== 'all') params = params.set('stock', query.stock);
+    return this.http.get<Page<Product>>('/api/products/inventory', {
+      params,
+      headers: NO_CACHE_HEADERS,
+    });
+  }
+
+  /** Whole-catalog inventory summary for the Inventory page's top cards. */
+  inventorySummary(): Observable<InventoryStats> {
+    return this.http.get<InventoryStats>('/api/products/inventory/summary', {
+      headers: NO_CACHE_HEADERS,
+    });
+  }
+
+  /** Full (non-paged) filtered set for the printable inventory / low-stock
+   *  sheets, which print the whole matching set rather than one page. */
+  inventoryExport(query: {
+    search?: string;
+    categoryId?: string;
+    stock?: StockFilter;
+    activeOnly?: boolean;
+  }): Observable<Product[]> {
+    let params = new HttpParams();
+    if (query.search?.trim()) params = params.set('search', query.search.trim());
+    if (query.categoryId && query.categoryId !== 'all') {
+      params = params.set('categoryId', query.categoryId);
+    }
+    if (query.stock && query.stock !== 'all') params = params.set('stock', query.stock);
+    if (query.activeOnly) params = params.set('activeOnly', true);
+    return this.http.get<Product[]>('/api/products/inventory/export', {
+      params,
+      headers: NO_CACHE_HEADERS,
+    });
+  }
+
   create(request: ProductUpsertRequest): Observable<Product> {
     return this.http.post<Product>('/api/products', request).pipe(
       // Prepend so the freshly-created product shows up at the top of the list
@@ -205,9 +270,10 @@ export class ProductService {
     if (err.status === 0) return 'Cannot reach the server. Is the backend running?';
     if (err.status === 401) return 'Not authenticated.';
     if (err.status === 403) return 'Not authorized to view products.';
-    const apiMessage = (err.error && typeof err.error === 'object' && 'message' in err.error)
-      ? String((err.error as { message?: unknown }).message)
-      : null;
+    const apiMessage =
+      err.error && typeof err.error === 'object' && 'message' in err.error
+        ? String((err.error as { message?: unknown }).message)
+        : null;
     return apiMessage ?? `Request failed (${err.status})`;
   }
 }
