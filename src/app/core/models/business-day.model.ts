@@ -48,6 +48,42 @@ export interface BusinessDay {
   readonly itemsSold: number | null;
 }
 
+/**
+ * Live aggregated totals for the open day, computed server-side. Mirrors
+ * the snapshot the close will freeze, plus `totalCreditPayments` (display-
+ * only — the snapshot persists just the cash slice).
+ */
+export interface DayPreviewTotals {
+  readonly cashSales: number;
+  readonly cashRefunds: number;
+  readonly cardSales: number;
+  readonly transferSales: number;
+  readonly gcashSales: number;
+  readonly mayaSales: number;
+  readonly bankSales: number;
+  readonly creditSales: number;
+  readonly cashCreditPayments: number;
+  readonly totalCreditPayments: number;
+  readonly gcashCashInAmount: number;
+  readonly gcashCashInFees: number;
+  readonly gcashCashOutAmount: number;
+  readonly gcashCashOutFees: number;
+  readonly loadAmount: number;
+  readonly loadFees: number;
+  readonly floatAdditions: number;
+  readonly totalSales: number;
+  readonly totalRefunds: number;
+  readonly salesCount: number;
+  readonly itemsSold: number;
+}
+
+/** Everything the Close Day screen needs in one fetch. */
+export interface ClosePreview {
+  readonly day: BusinessDay;
+  readonly totals: DayPreviewTotals;
+  readonly expectedCash: number;
+}
+
 /** One audit-log entry for a mid-day cash float top-up. */
 export interface FloatAddition {
   readonly id: string;

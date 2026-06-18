@@ -1,6 +1,7 @@
 package com.maxpos.businessday;
 
 import com.maxpos.businessday.dto.BusinessDayDto;
+import com.maxpos.businessday.dto.ClosePreviewDto;
 import com.maxpos.businessday.dto.CloseDayRequest;
 import com.maxpos.businessday.dto.OpenDayRequest;
 import com.maxpos.security.AppUserDetails;
@@ -38,6 +39,27 @@ public class BusinessDayController {
     @PreAuthorize("hasRole('ADMIN')")
     public List<BusinessDayDto> list() {
         return service.list();
+    }
+
+    /**
+     * Dedicated Close Day data: the open day plus its live aggregated
+     * totals and expected cash, computed server-side in one call. 204 when
+     * no day is open. Replaces the page pulling the whole sales / GCash /
+     * load / payment history to aggregate in the browser.
+     */
+    @GetMapping("/current/preview")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ClosePreviewDto> currentPreview() {
+        return service.previewCurrent()
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.noContent().build());
+    }
+
+    /** Dedicated business-day history feed for the End-of-Day page. */
+    @GetMapping("/history")
+    @PreAuthorize("hasRole('ADMIN')")
+    public List<BusinessDayDto> history() {
+        return service.history();
     }
 
     @GetMapping("/{id}")

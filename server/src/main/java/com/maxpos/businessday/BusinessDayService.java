@@ -1,7 +1,9 @@
 package com.maxpos.businessday;
 
 import com.maxpos.businessday.dto.BusinessDayDto;
+import com.maxpos.businessday.dto.ClosePreviewDto;
 import com.maxpos.businessday.dto.CloseDayRequest;
+import com.maxpos.businessday.dto.DayTotalsDto;
 import com.maxpos.businessday.dto.OpenDayRequest;
 import com.maxpos.common.ConflictException;
 import com.maxpos.common.NotFoundException;
@@ -190,9 +192,79 @@ public class BusinessDayService {
         }
 
         // Aggregate by FK — picks up everything explicitly attached
-        // to this day, including the orphans we just claimed.
-        List<Sale> windowSales = sales.findAllByBusinessDayId(d.getId());
+        // to this day, including the orphans we just claimed. Same
+        // arithmetic the live preview runs, so the frozen snapshot
+        // matches what the admin saw before counting the drawer.
+        DayTotalsDto t = aggregate(sales.findAllByBusinessDayId(d.getId()), d.getId());
+        BigDecimal expectedCash = computeExpectedCash(t, d.getOpeningFloat());
+        BigDecimal variance = req.countedCash().subtract(expectedCash);
 
+        d.setClosedAt(closedAt);
+        d.setClosedBy(closer);
+        d.setCountedCash(req.countedCash());
+        d.setNotes(req.notes() == null || req.notes().isBlank() ? null : req.notes().trim());
+        d.setExpectedCash(expectedCash);
+        d.setVariance(variance);
+        d.setTotalSales(t.totalSales());
+        d.setTotalRefunds(t.totalRefunds());
+        d.setCashSales(t.cashSales());
+        d.setCashRefunds(t.cashRefunds());
+        d.setCardSales(t.cardSales());
+        d.setTransferSales(t.transferSales());
+        d.setGcashSales(t.gcashSales());
+        d.setMayaSales(t.mayaSales());
+        d.setBankSales(t.bankSales());
+        d.setCreditSales(t.creditSales());
+        d.setCashCreditPayments(t.cashCreditPayments());
+        d.setGcashCashInAmount(t.gcashCashInAmount());
+        d.setGcashCashInFees(t.gcashCashInFees());
+        d.setGcashCashOutAmount(t.gcashCashOutAmount());
+        d.setGcashCashOutFees(t.gcashCashOutFees());
+        d.setLoadAmount(t.loadAmount());
+        d.setLoadFees(t.loadFees());
+        d.setFloatAdditions(t.floatAdditions());
+        d.setSalesCount(t.salesCount());
+        d.setItemsSold(t.itemsSold());
+        return BusinessDayDto.from(d);
+    }
+
+    /**
+     * Live Close Day preview for the currently-open day. Read-only twin
+     * of {@link #close} — runs the same {@link #aggregate} arithmetic so
+     * the numbers match the eventual snapshot, but instead of claiming
+     * orphan sales by mutating their FK (a write), it folds them into the
+     * aggregation set directly: every sale already attached to the day,
+     * plus any orphan (NULL business_day_id) whose timestamp falls in the
+     * day's window — exactly the set {@code close} will sweep in.
+     * Empty when no day is open.
+     */
+    public Optional<ClosePreviewDto> previewCurrent() {
+        return days.findFirstByClosedAtIsNull().map(d -> {
+            List<Sale> windowSales = new java.util.ArrayList<>(sales.findAllByBusinessDayId(d.getId()));
+            windowSales.addAll(sales.findAllByBusinessDayIsNullAndDateBetween(d.getOpenedAt(), Instant.now()));
+            DayTotalsDto totals = aggregate(windowSales, d.getId());
+            BigDecimal expectedCash = computeExpectedCash(totals, d.getOpeningFloat());
+            return new ClosePreviewDto(BusinessDayDto.from(d), totals, expectedCash);
+        });
+    }
+
+    /** Business-day history for the End-of-Day page, newest first. */
+    public List<BusinessDayDto> history() {
+        return days.findAllByOrderByOpenedAtDesc().stream().map(BusinessDayDto::from).toList();
+    }
+
+    /**
+     * Shared day aggregation used by both {@link #close} (freezes the
+     * result onto the snapshot) and {@link #previewCurrent} (live, read-
+     * only). Centralized so the two can never drift. Gross accounting:
+     * every sale counts toward sales totals, refunds are a separate
+     * offsetting line — mirrors the cash-drawer flow (cash IN when the
+     * sale rings, OUT when refunded), and avoids a negative expectedCash
+     * when same-day refunds exceed same-day cash sales. Voided service
+     * rows / float additions and credit loads are excluded from the cash
+     * buckets (they don't move the till).
+     */
+    private DayTotalsDto aggregate(List<Sale> windowSales, UUID dayId) {
         BigDecimal totalSales = BigDecimal.ZERO;
         BigDecimal totalRefunds = BigDecimal.ZERO;
         BigDecimal cashSales = BigDecimal.ZERO;
@@ -204,6 +276,7 @@ public class BusinessDayService {
         BigDecimal bankSales = BigDecimal.ZERO;
         BigDecimal creditSales = BigDecimal.ZERO;
         BigDecimal cashCreditPayments = BigDecimal.ZERO;
+        BigDecimal totalCreditPayments = BigDecimal.ZERO;
         BigDecimal gcashCashInAmount = BigDecimal.ZERO;
         BigDecimal gcashCashInFees = BigDecimal.ZERO;
         BigDecimal gcashCashOutAmount = BigDecimal.ZERO;
@@ -214,15 +287,6 @@ public class BusinessDayService {
         int salesCount = 0;
         int itemsSold = 0;
 
-        // Gross accounting: every sale that rang up during the day
-        // counts toward the sales totals — refunds are reported as a
-        // separate offsetting line. This matches the physical cash-
-        // drawer flow: cash came IN when the sale rang, then went OUT
-        // when the refund was issued, so both events must be counted.
-        // Earlier draft skipped refunded sales from cashSales but still
-        // added their amount to cashRefunds, producing a negative
-        // expectedCash whenever refunds exceeded same-day completed
-        // cash sales (e.g. 3 cash sales, 2 refunded later that day).
         for (Sale s : windowSales) {
             BigDecimal t = s.getTotal();
             boolean refunded = s.getStatus() == SaleStatus.REFUNDED;
@@ -242,30 +306,29 @@ public class BusinessDayService {
             if (refunded) {
                 totalRefunds = totalRefunds.add(t);
                 // Card / transfer refunds don't touch the cash drawer
-                // (the customer's bank pulls the money back out of the
-                // settlement account), so they don't enter the cash
-                // reconciliation math.
+                // (the customer's bank pulls the money back), so they
+                // don't enter the cash reconciliation math.
                 if (s.getPaymentMethod() == PaymentMethod.CASH) {
                     cashRefunds = cashRefunds.add(t);
                 }
             }
         }
 
-        // Cash credit payments add to the till — sum the day's
-        // non-voided payments. Card / transfer payments don't enter
-        // the cash drawer math, only the snapshot total per method.
-        for (CreditorPayment p : creditorPayments.findAllByBusinessDayId(d.getId())) {
+        // Credit payments. Cash ones add to the till; all non-voided
+        // ones (any method) are reported as the day's collected total.
+        for (CreditorPayment p : creditorPayments.findAllByBusinessDayId(dayId)) {
             if (p.getVoidedAt() != null) continue;
+            totalCreditPayments = totalCreditPayments.add(p.getAmount());
             if (p.getPaymentMethod() == PaymentMethod.CASH) {
                 cashCreditPayments = cashCreditPayments.add(p.getAmount());
             }
         }
 
-        // GCash service transactions. Cash-in: customer hands cash,
-        // we send GCash → drawer gains amount + fee. Cash-out:
-        // customer sends GCash, we hand cash → drawer loses amount,
-        // keeps fee. Voided rows are excluded — they didn't happen.
-        for (GcashTransaction g : gcashTransactions.findAllByBusinessDayId(d.getId())) {
+        // GCash service transactions. Cash-in: customer hands cash, we
+        // send GCash → drawer gains amount + fee. Cash-out: customer
+        // sends GCash, we hand cash → drawer loses amount, keeps fee.
+        // Voided rows are excluded — they didn't happen.
+        for (GcashTransaction g : gcashTransactions.findAllByBusinessDayId(dayId)) {
             if (g.getVoidedAt() != null) continue;
             if (g.getType() == GcashTransactionType.CASH_IN) {
                 gcashCashInAmount = gcashCashInAmount.add(g.getAmount());
@@ -276,13 +339,11 @@ public class BusinessDayService {
             }
         }
 
-        // Cash loads are cash-in for the till: customer hands cash,
-        // store sends mobile load. Drawer gains amount + fee. Voided
-        // rows excluded (same rule as GCash). Credit loads charge the
+        // Cash loads are cash-in for the till. Credit loads charge the
         // creditor's tab — no cash hits the drawer, so they're excluded
-        // from these cash-reconciliation buckets (they surface in the
-        // creditor's outstanding balance instead, like credit sales).
-        for (LoadTransaction l : loadTransactions.findAllByBusinessDayId(d.getId())) {
+        // (they surface in the creditor's balance instead). Voided rows
+        // excluded (same rule as GCash).
+        for (LoadTransaction l : loadTransactions.findAllByBusinessDayId(dayId)) {
             if (l.getVoidedAt() != null) continue;
             if (l.getPaymentMethod() == PaymentMethod.CREDIT) continue;
             loadAmount = loadAmount.add(l.getAmount());
@@ -291,50 +352,36 @@ public class BusinessDayService {
 
         // Mid-day float top-ups. Voided additions excluded — they're
         // accounting reversals, not actual cash movement.
-        for (FloatAddition a : floatAdditions.findAllByBusinessDayId(d.getId())) {
+        for (FloatAddition a : floatAdditions.findAllByBusinessDayId(dayId)) {
             if (a.getVoidedAt() != null) continue;
             floatAdditionsTotal = floatAdditionsTotal.add(a.getAmount());
         }
 
-        BigDecimal expectedCash = d.getOpeningFloat()
-                .add(floatAdditionsTotal)
-                .add(cashSales)
-                .add(cashCreditPayments)
-                .add(gcashCashInAmount)
-                .add(gcashCashInFees)
-                .add(gcashCashOutFees)
-                .add(loadAmount)
-                .add(loadFees)
-                .subtract(cashRefunds)
-                .subtract(gcashCashOutAmount);
-        BigDecimal variance = req.countedCash().subtract(expectedCash);
+        return new DayTotalsDto(
+                cashSales, cashRefunds, cardSales, transferSales, gcashSales, mayaSales,
+                bankSales, creditSales, cashCreditPayments, totalCreditPayments,
+                gcashCashInAmount, gcashCashInFees, gcashCashOutAmount, gcashCashOutFees,
+                loadAmount, loadFees, floatAdditionsTotal, totalSales, totalRefunds,
+                salesCount, itemsSold);
+    }
 
-        d.setClosedAt(closedAt);
-        d.setClosedBy(closer);
-        d.setCountedCash(req.countedCash());
-        d.setNotes(req.notes() == null || req.notes().isBlank() ? null : req.notes().trim());
-        d.setExpectedCash(expectedCash);
-        d.setVariance(variance);
-        d.setTotalSales(totalSales);
-        d.setTotalRefunds(totalRefunds);
-        d.setCashSales(cashSales);
-        d.setCashRefunds(cashRefunds);
-        d.setCardSales(cardSales);
-        d.setTransferSales(transferSales);
-        d.setGcashSales(gcashSales);
-        d.setMayaSales(mayaSales);
-        d.setBankSales(bankSales);
-        d.setCreditSales(creditSales);
-        d.setCashCreditPayments(cashCreditPayments);
-        d.setGcashCashInAmount(gcashCashInAmount);
-        d.setGcashCashInFees(gcashCashInFees);
-        d.setGcashCashOutAmount(gcashCashOutAmount);
-        d.setGcashCashOutFees(gcashCashOutFees);
-        d.setLoadAmount(loadAmount);
-        d.setLoadFees(loadFees);
-        d.setFloatAdditions(floatAdditionsTotal);
-        d.setSalesCount(salesCount);
-        d.setItemsSold(itemsSold);
-        return BusinessDayDto.from(d);
+    /**
+     * Expected cash in the drawer = opening float + mid-day top-ups +
+     * cash IN (cash sales, cash credit payments, GCash cash-ins and all
+     * GCash fees, load amount + fees) − cash OUT (cash refunds, GCash
+     * cash-out principal). Card / transfer never touch the drawer.
+     */
+    private BigDecimal computeExpectedCash(DayTotalsDto t, BigDecimal openingFloat) {
+        return openingFloat
+                .add(t.floatAdditions())
+                .add(t.cashSales())
+                .add(t.cashCreditPayments())
+                .add(t.gcashCashInAmount())
+                .add(t.gcashCashInFees())
+                .add(t.gcashCashOutFees())
+                .add(t.loadAmount())
+                .add(t.loadFees())
+                .subtract(t.cashRefunds())
+                .subtract(t.gcashCashOutAmount());
     }
 }

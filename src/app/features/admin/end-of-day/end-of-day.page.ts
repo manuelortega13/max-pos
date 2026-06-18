@@ -1,6 +1,13 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { DatePipe } from '@angular/common';
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  OnInit,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatChipsModule } from '@angular/material/chips';
@@ -11,7 +18,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { BusinessDay, CreditorPayment, FloatAddition, GcashTransaction, LoadTransaction } from '../../../core/models';
+import { BusinessDay, ClosePreview, DayPreviewTotals, FloatAddition } from '../../../core/models';
 import { AddToFloatDialog, AddToFloatDialogData } from './add-to-float-dialog';
 import {
   HistoryDetailsDialog,
@@ -20,15 +27,36 @@ import {
 } from './history-details-dialog';
 import { ConfirmDialog } from '../../../shared/dialogs/confirm-dialog';
 import { BusinessDayService } from '../../../core/services/business-day.service';
-import { CreditorPaymentService } from '../../../core/services/creditor-payment.service';
-import { GcashService } from '../../../core/services/gcash.service';
-import { LoadService } from '../../../core/services/load.service';
 import { PrinterService } from '../../../core/services/printer.service';
-import { SaleService } from '../../../core/services/sale.service';
 import { SettingsService } from '../../../core/services/settings.service';
 import { MoneyPipe } from '../../../shared/pipes/currency-symbol.pipe';
 import { CloseDayDialog, CloseDayDialogData, CloseDayDialogResult } from './close-day-dialog';
 import { OpenDayDialog, OpenDayDialogResult } from './open-day-dialog';
+
+/** Zeroed totals shown before the preview lands (or when no day is open). */
+const EMPTY_TOTALS: DayPreviewTotals = {
+  cashSales: 0,
+  cashRefunds: 0,
+  cardSales: 0,
+  transferSales: 0,
+  gcashSales: 0,
+  mayaSales: 0,
+  bankSales: 0,
+  creditSales: 0,
+  cashCreditPayments: 0,
+  totalCreditPayments: 0,
+  gcashCashInAmount: 0,
+  gcashCashInFees: 0,
+  gcashCashOutAmount: 0,
+  gcashCashOutFees: 0,
+  loadAmount: 0,
+  loadFees: 0,
+  floatAdditions: 0,
+  totalSales: 0,
+  totalRefunds: 0,
+  salesCount: 0,
+  itemsSold: 0,
+};
 
 @Component({
   selector: 'app-end-of-day-page',
@@ -50,34 +78,20 @@ import { OpenDayDialog, OpenDayDialogResult } from './open-day-dialog';
 })
 export class EndOfDayPage implements OnInit {
   private readonly businessDayService = inject(BusinessDayService);
-  private readonly saleService = inject(SaleService);
-  private readonly paymentService = inject(CreditorPaymentService);
-  private readonly gcashService = inject(GcashService);
-  private readonly loadService = inject(LoadService);
   private readonly settingsService = inject(SettingsService);
   private readonly printer = inject(PrinterService);
   private readonly dialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
 
-  /**
-   * Credit payments loaded for the live preview. Filtered against
-   * the current open day's businessDayId so we don't accidentally
-   * count yesterday's payments when an open day rolls over.
-   */
-  protected readonly allPayments = signal<CreditorPayment[]>([]);
-  /** GCash transactions loaded for the live preview. Same scoping
-   *  rule as credit payments — filter against the current day's id. */
-  protected readonly allGcash = signal<GcashTransaction[]>([]);
-
-  /** Load transactions loaded for the live preview. */
-  protected readonly allLoad = signal<LoadTransaction[]>([]);
-
   /** Mid-day float top-ups for the currently-open day. Newest first
-   *  so the EoD log reads chronologically downward. */
+   *  so the EoD log reads chronologically downward. Kept as a separate
+   *  scoped fetch — it drives the void-able float log and the AddToFloat
+   *  dialog's "Float so far" pill. */
   protected readonly floatAdditions = signal<FloatAddition[]>([]);
 
-  /** Total of active (non-voided) float additions. Feeds the live
-   *  preview + the AddToFloat dialog's "Float so far" pill. */
+  /** Total of active (non-voided) float additions. Feeds the AddToFloat
+   *  dialog's "Float so far" pill. (The preview's own float total comes
+   *  from the server and drives the cash math.) */
   protected readonly activeFloatAdditionsTotal = computed(() =>
     this.floatAdditions()
       .filter((a) => a.voidedAt === null)
@@ -96,229 +110,47 @@ export class EndOfDayPage implements OnInit {
   );
 
   /**
-   * Live preview of the totals that will land on the snapshot when the
-   * day is closed. Computed from the admin's `sales` list filtered to
-   * the open day's window. Backend recomputes canonical values on close;
-   * any tiny drift from a late sale lands on the printed Z-report.
+   * Live Close Day data, fetched server-side. The backend aggregates the
+   * open day's sales / GCash / load / credit payments / float in one
+   * query (see /api/business-days/current/preview), so the page no longer
+   * downloads the full history to total it in the browser. Null until the
+   * first fetch resolves or when no day is open.
    */
-  protected readonly preview = computed(() => {
-    const day = this.currentDay();
-    const empty = {
-      cashSales: 0,
-      cashRefunds: 0,
-      cardSales: 0,
-      transferSales: 0,
-      gcashSales: 0,
-      mayaSales: 0,
-      bankSales: 0,
-      creditSales: 0,
-      /** Cash credit payments collected today — added to expected cash. */
-      cashCreditPayments: 0,
-      /** Total credit payments (cash + card + transfer) — shown on
-       *  the report. Card/transfer payments don't enter the till. */
-      totalCreditPayments: 0,
-      gcashCashInAmount: 0,
-      gcashCashInFees: 0,
-      gcashCashOutAmount: 0,
-      gcashCashOutFees: 0,
-      loadAmount: 0,
-      loadFees: 0,
-      floatAdditions: 0,
-      totalSales: 0,
-      totalRefunds: 0,
-      salesCount: 0,
-      itemsSold: 0,
-    };
-    if (!day) return empty;
-    const openedAt = Date.parse(day.openedAt);
-    let cashSales = 0,
-      cashRefunds = 0,
-      cardSales = 0,
-      transferSales = 0,
-      gcashSales = 0,
-      mayaSales = 0,
-      bankSales = 0,
-      creditSales = 0,
-      totalSales = 0,
-      totalRefunds = 0,
-      salesCount = 0,
-      itemsSold = 0;
-    // Gross accounting — must mirror BusinessDayService.close on the
-    // backend. Every sale counts toward the sales totals; refunds are
-    // a separate offsetting line. Skipping refunded sales from
-    // cashSales would produce a negative expectedCash whenever
-    // same-day refunds exceeded same-day completed cash sales (e.g.
-    // 3 cash sales, 2 of which got refunded later in the day).
-    //
-    // Filter: sale must be in the day's time window AND either tagged
-    // to this day or not tagged at all (orphan). The backend close
-    // sweeps orphans onto the day before aggregating, so the preview
-    // shows what that aggregation will actually count. Sales tagged
-    // to a different (closed) day are excluded — they belong to that
-    // day's snapshot, not this one.
-    for (const s of this.saleService.sales()) {
-      if (Date.parse(s.date) < openedAt) continue;
-      if (s.businessDayId !== null && s.businessDayId !== day.id) continue;
-      const refunded = s.status === 'REFUNDED';
-      totalSales += s.total;
-      salesCount++;
-      itemsSold += s.items.reduce((n, i) => n + i.quantity, 0);
-      switch (s.paymentMethod) {
-        case 'CASH':
-          cashSales += s.total;
-          break;
-        case 'CARD':
-          cardSales += s.total;
-          break;
-        case 'TRANSFER':
-          transferSales += s.total;
-          break;
-        case 'GCASH':
-          gcashSales += s.total;
-          break;
-        case 'MAYA':
-          mayaSales += s.total;
-          break;
-        case 'BANK':
-          bankSales += s.total;
-          break;
-        case 'CREDIT':
-          creditSales += s.total;
-          break;
-      }
-      if (refunded) {
-        totalRefunds += s.total;
-        // Only cash refunds affect the drawer; card/transfer refunds
-        // flow back through the customer's bank, not the till.
-        if (s.paymentMethod === 'CASH') cashRefunds += s.total;
-      }
-    }
+  private readonly previewResp = signal<ClosePreview | null>(null);
 
-    // Walk this day's credit payments. Voided payments are excluded
-    // from totals — they don't affect the drawer or the daily take.
-    let cashCreditPayments = 0;
-    let totalCreditPayments = 0;
-    for (const p of this.allPayments()) {
-      if (p.voidedAt !== null) continue;
-      if (p.businessDayId !== day.id) continue;
-      totalCreditPayments += p.amount;
-      if (p.paymentMethod === 'CASH') cashCreditPayments += p.amount;
-    }
+  /** Aggregated totals for the open day (zeros before the preview lands). */
+  protected readonly preview = computed<DayPreviewTotals>(
+    () => this.previewResp()?.totals ?? EMPTY_TOTALS,
+  );
 
-    // GCash bucket totals. Voided rows excluded so the preview matches
-    // BusinessDayService.close. Cash-in adds (amount + fee) to the
-    // drawer; cash-out removes amount but keeps fee.
-    let gcashCashInAmount = 0,
-      gcashCashInFees = 0,
-      gcashCashOutAmount = 0,
-      gcashCashOutFees = 0;
-    for (const g of this.allGcash()) {
-      if (g.voidedAt !== null) continue;
-      if (g.businessDayId !== day.id) continue;
-      if (g.type === 'CASH_IN') {
-        gcashCashInAmount += g.amount;
-        gcashCashInFees += g.fee;
-      } else {
-        gcashCashOutAmount += g.amount;
-        gcashCashOutFees += g.fee;
-      }
-    }
+  /** Expected cash in the drawer, computed server-side alongside the totals. */
+  protected readonly expectedCash = computed(() => this.previewResp()?.expectedCash ?? 0);
 
-    // Load transactions are always cash-in for the till. Same
-    // exclusion rules as GCash: voided rows + wrong-day rows skipped.
-    let loadAmount = 0,
-      loadFees = 0;
-    for (const l of this.allLoad()) {
-      if (l.voidedAt !== null) continue;
-      if (l.businessDayId !== day.id) continue;
-      loadAmount += l.amount;
-      loadFees += l.fee;
-    }
-
-    // Mid-day float top-ups. Same exclusion rule — voided rows skipped.
-    let floatAdditions = 0;
-    for (const a of this.floatAdditions()) {
-      if (a.voidedAt !== null) continue;
-      if (a.businessDayId !== day.id) continue;
-      floatAdditions += a.amount;
-    }
-
-    return {
-      cashSales,
-      cashRefunds,
-      cardSales,
-      transferSales,
-      gcashSales,
-      mayaSales,
-      bankSales,
-      creditSales,
-      cashCreditPayments,
-      totalCreditPayments,
-      gcashCashInAmount,
-      gcashCashInFees,
-      gcashCashOutAmount,
-      gcashCashOutFees,
-      loadAmount,
-      loadFees,
-      floatAdditions,
-      totalSales,
-      totalRefunds,
-      salesCount,
-      itemsSold,
-    };
-  });
-
-  protected readonly expectedCash = computed(() => {
-    const day = this.currentDay();
-    if (!day) return 0;
-    const p = this.preview();
-    // float + mid-day top-ups + cash in (sales + credit payments +
-    // GCash cash-ins + all GCash fees + load amount + load fees) −
-    // cash out (refunds + GCash cash-outs). Card / transfer credit
-    // payments don't touch the drawer.
-    return (
-      day.openingFloat +
-      p.floatAdditions +
-      p.cashSales +
-      p.cashCreditPayments +
-      p.gcashCashInAmount +
-      p.gcashCashInFees +
-      p.gcashCashOutFees +
-      p.loadAmount +
-      p.loadFees -
-      p.cashRefunds -
-      p.gcashCashOutAmount
-    );
-  });
-
-  protected readonly historyColumns = ['opened', 'closed', 'total', 'variance', 'closedBy'] as const;
+  protected readonly historyColumns = [
+    'opened',
+    'closed',
+    'total',
+    'variance',
+    'closedBy',
+  ] as const;
 
   ngOnInit(): void {
     // refreshCurrent runs in admin-layout init; do it here too so a
     // direct deep-link to this page (refresh) still has fresh state.
     this.businessDayService.refreshCurrent().subscribe();
     this.businessDayService.loadHistory();
-    // Pull the admin sales list so the live preview has data to aggregate.
-    this.saleService.load();
-    // Same for credit payments — feeds into the cash-drawer math
-    // and the "Credit payments" preview row.
-    this.paymentService.listAll().subscribe({
-      next: (list) => this.allPayments.set(list),
-      error: () => {
-        // Soft failure — preview just renders zeros. The close action
-        // re-aggregates server-side so the actual snapshot still gets
-        // the right numbers.
-      },
-    });
-    this.gcashService.listAll().subscribe({
-      next: (list) => this.allGcash.set(list),
-      error: () => {},
-    });
-    this.loadService.listAll().subscribe({
-      next: (list) => this.allLoad.set(list),
-      error: () => {},
-    });
+    this.loadPreview();
     this.loadFloatAdditions();
+  }
+
+  /** Pull the server-computed Close Day preview for the open day. Soft
+   *  failure — the live grid just shows zeros; the close re-aggregates
+   *  server-side so the snapshot is still correct. */
+  private loadPreview(): void {
+    this.businessDayService.previewCurrent().subscribe({
+      next: (preview) => this.previewResp.set(preview),
+      error: () => this.previewResp.set(null),
+    });
   }
 
   private loadFloatAdditions(): void {
@@ -346,21 +178,28 @@ export class EndOfDayPage implements OnInit {
       },
     );
     ref.afterClosed().subscribe((added) => {
-      if (added) this.loadFloatAdditions();
+      if (added) {
+        this.loadFloatAdditions();
+        this.loadPreview();
+      }
     });
   }
 
   protected confirmVoidFloatAddition(addition: FloatAddition): void {
-    if (!confirm(
-      `Void this addition of ${this.currencySymbol()}${addition.amount.toFixed(2)}?\n\n` +
-      `The cash physically added to the till stays put — voiding only removes ` +
-      `the row from the end-of-day reconciliation. Use this for mistakes ` +
-      `(wrong amount, duplicate entry).`,
-    )) return;
+    if (
+      !confirm(
+        `Void this addition of ${this.currencySymbol()}${addition.amount.toFixed(2)}?\n\n` +
+          `The cash physically added to the till stays put — voiding only removes ` +
+          `the row from the end-of-day reconciliation. Use this for mistakes ` +
+          `(wrong amount, duplicate entry).`,
+      )
+    )
+      return;
     this.businessDayService.voidFloatAddition(addition.id).subscribe({
       next: () => {
         this.snackBar.open('Float addition voided', 'Dismiss', { duration: 2500 });
         this.loadFloatAdditions();
+        this.loadPreview();
       },
       error: (err: HttpErrorResponse) => {
         this.snackBar.open(err.error?.message ?? 'Void failed.', 'Dismiss', { duration: 4000 });
@@ -377,8 +216,11 @@ export class EndOfDayPage implements OnInit {
     ref.afterClosed().subscribe((result) => {
       if (!result) return;
       this.businessDayService.open({ openingFloat: result.openingFloat }).subscribe({
-        next: () =>
-          this.snackBar.open('Business day opened.', 'Dismiss', { duration: 2500 }),
+        next: () => {
+          this.snackBar.open('Business day opened.', 'Dismiss', { duration: 2500 });
+          this.loadPreview();
+          this.loadFloatAdditions();
+        },
         error: (err: HttpErrorResponse) => {
           this.snackBar.open(err.error?.message ?? 'Could not open day.', 'Dismiss', {
             duration: 4000,
@@ -413,6 +255,10 @@ export class EndOfDayPage implements OnInit {
         .subscribe({
           next: (closed) => {
             this.snackBar.open('Business day closed.', 'Dismiss', { duration: 2500 });
+            // Day is closed now — clear the live preview and refresh the
+            // history table with the freshly-frozen snapshot row.
+            this.previewResp.set(null);
+            this.businessDayService.loadHistory();
             void this.printer.printZReport({
               storeName: this.storeName(),
               address: this.storeAddress(),
@@ -465,9 +311,8 @@ export class EndOfDayPage implements OnInit {
    * dialog itself when the row isn't reopenable.
    */
   protected openHistoryDetails(day: BusinessDay): void {
-    const canReopen = day.closedAt !== null
-      && this.currentDay() === null
-      && this.latestClosedId() === day.id;
+    const canReopen =
+      day.closedAt !== null && this.currentDay() === null && this.latestClosedId() === day.id;
     const ref = this.dialog.open<
       HistoryDetailsDialog,
       HistoryDetailsDialogData,
@@ -518,10 +363,11 @@ export class EndOfDayPage implements OnInit {
       this.businessDayService.reopen(day.id).subscribe({
         next: () => {
           this.snackBar.open('Business day reopened.', 'Dismiss', { duration: 2500 });
-          // Refresh dependent services so the preview reflects the
-          // reattached orphans immediately.
-          this.saleService.load();
+          // Day is open again — refresh the live preview (it now reflects
+          // any reattached orphans), the float log, and the history table.
+          this.loadPreview();
           this.loadFloatAdditions();
+          this.businessDayService.loadHistory();
         },
         error: (err: HttpErrorResponse) => {
           this.snackBar.open(err.error?.message ?? 'Could not reopen day.', 'Dismiss', {

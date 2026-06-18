@@ -3,6 +3,7 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { Observable, tap } from 'rxjs';
 import {
   BusinessDay,
+  ClosePreview,
   CloseDayRequest,
   CreateFloatAdditionRequest,
   FloatAddition,
@@ -54,10 +55,22 @@ export class BusinessDayService {
       );
   }
 
+  /**
+   * Live Close Day data for the open day — the day plus its server-computed
+   * totals and expected cash, in one call. Resolves to null when no day is
+   * open (backend 204 → null body). Lets the End-of-Day page drop the
+   * full sales/GCash/load/payment fetch it used to aggregate client-side.
+   */
+  previewCurrent(): Observable<ClosePreview | null> {
+    return this.http.get<ClosePreview | null>('/api/business-days/current/preview', {
+      observe: 'body',
+    });
+  }
+
   loadHistory(): void {
     this._loading.set(true);
     this._error.set(null);
-    this.http.get<BusinessDay[]>('/api/business-days').subscribe({
+    this.http.get<BusinessDay[]>('/api/business-days/history').subscribe({
       next: (list) => {
         this._history.set(list);
         this._loading.set(false);
@@ -126,23 +139,17 @@ export class BusinessDayService {
   // wires the HTTP layer; the EoD page owns the UX.
 
   listFloatAdditions(): Observable<FloatAddition[]> {
-    return this.http.get<FloatAddition[]>(
-      '/api/business-days/current/float-additions',
-    );
+    return this.http.get<FloatAddition[]>('/api/business-days/current/float-additions');
   }
 
   addFloatAddition(req: CreateFloatAdditionRequest): Observable<FloatAddition> {
-    return this.http.post<FloatAddition>(
-      '/api/business-days/current/float-additions',
-      req,
-    );
+    return this.http.post<FloatAddition>('/api/business-days/current/float-additions', req);
   }
 
   voidFloatAddition(id: string, reason?: string | null): Observable<FloatAddition> {
-    return this.http.post<FloatAddition>(
-      `/api/business-days/current/float-additions/${id}/void`,
-      { reason: reason ?? null },
-    );
+    return this.http.post<FloatAddition>(`/api/business-days/current/float-additions/${id}/void`, {
+      reason: reason ?? null,
+    });
   }
 
   /** Drop cached state on sign-out so a different user doesn't see the prior session. */
