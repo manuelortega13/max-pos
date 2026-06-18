@@ -129,7 +129,12 @@
             <mat-icon>add</mat-icon>
             Add to float
           </button>
-          <button mat-flat-button color="warn" (click)="closeDay()">
+          <button
+            mat-flat-button
+            color="warn"
+            [disabled]="previewInitialLoading()"
+            (click)="closeDay()"
+          >
             <mat-icon>event_busy</mat-icon>
             Close day
           </button>
