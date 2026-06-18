@@ -15,7 +15,10 @@
             Day open
           </mat-chip>
           <div class="eod__status-meta">
-            <small>Opened {{ day.openedAt | date: 'mediumDate' }} · {{ day.openedAt | date: 'shortTime' }} by {{ day.openedByName }}</small>
+            <small
+              >Opened {{ day.openedAt | date: 'mediumDate' }} ·
+              {{ day.openedAt | date: 'shortTime' }} by {{ day.openedByName }}</small
+            >
             <small>
               Float: <strong>{{ day.openingFloat | money }}</strong>
               @if (preview().floatAdditions > 0) {
@@ -27,90 +30,99 @@
 
         <mat-divider></mat-divider>
 
-        <div class="eod__live-grid">
-          <div>
-            <small>Transactions</small>
-            <strong>{{ preview().salesCount }}</strong>
+        @if (previewInitialLoading()) {
+          <div class="eod__live-loading">
+            <mat-progress-spinner mode="indeterminate" diameter="40"></mat-progress-spinner>
+            <p>Loading today's totals…</p>
           </div>
-          <div>
-            <small>Items sold</small>
-            <strong>{{ preview().itemsSold }}</strong>
+        } @else {
+          <div class="eod__live-grid">
+            <div>
+              <small>Transactions</small>
+              <strong>{{ preview().salesCount }}</strong>
+            </div>
+            <div>
+              <small>Items sold</small>
+              <strong>{{ preview().itemsSold }}</strong>
+            </div>
+            <div>
+              <small>Cash sales</small>
+              <strong>{{ preview().cashSales | money }}</strong>
+            </div>
+            <div>
+              <small>Card sales</small>
+              <strong>{{ preview().cardSales | money }}</strong>
+            </div>
+            <div>
+              <small>Transfer sales</small>
+              <strong>{{ preview().transferSales | money }}</strong>
+            </div>
+            @if (preview().creditSales > 0) {
+              <div>
+                <small>Credit sales</small>
+                <strong>{{ preview().creditSales | money }}</strong>
+              </div>
+            }
+            @if (preview().totalCreditPayments > 0) {
+              <div>
+                <small>Credit payments</small>
+                <strong>+{{ preview().totalCreditPayments | money }}</strong>
+              </div>
+            }
+            @if (preview().gcashCashInAmount > 0) {
+              <div>
+                <small>GCash cash-in</small>
+                <strong>{{ preview().gcashCashInAmount | money }}</strong>
+              </div>
+            }
+            @if (preview().gcashCashOutAmount > 0) {
+              <div>
+                <small>GCash cash-out</small>
+                <strong>{{ preview().gcashCashOutAmount | money }}</strong>
+              </div>
+            }
+            @if (preview().gcashCashInFees + preview().gcashCashOutFees > 0) {
+              <div>
+                <small>GCash fees</small>
+                <strong
+                  >+{{ preview().gcashCashInFees + preview().gcashCashOutFees | money }}</strong
+                >
+              </div>
+            }
+            @if (preview().loadAmount > 0) {
+              <div>
+                <small>Load</small>
+                <strong>{{ preview().loadAmount | money }}</strong>
+              </div>
+            }
+            @if (preview().loadFees > 0) {
+              <div>
+                <small>Load fees</small>
+                <strong>+{{ preview().loadFees | money }}</strong>
+              </div>
+            }
+            @if (preview().floatAdditions > 0) {
+              <div>
+                <small>Float top-ups</small>
+                <strong>+{{ preview().floatAdditions | money }}</strong>
+              </div>
+            }
+            <div>
+              <small>Total sales</small>
+              <strong>{{ preview().totalSales | money }}</strong>
+            </div>
+            @if (preview().totalRefunds > 0) {
+              <div class="eod__refunds">
+                <small>Refunds</small>
+                <strong>−{{ preview().totalRefunds | money }}</strong>
+              </div>
+            }
+            <div class="eod__expected">
+              <small>Expected cash</small>
+              <strong>{{ expectedCash() | money }}</strong>
+            </div>
           </div>
-          <div>
-            <small>Cash sales</small>
-            <strong>{{ preview().cashSales | money }}</strong>
-          </div>
-          <div>
-            <small>Card sales</small>
-            <strong>{{ preview().cardSales | money }}</strong>
-          </div>
-          <div>
-            <small>Transfer sales</small>
-            <strong>{{ preview().transferSales | money }}</strong>
-          </div>
-          @if (preview().creditSales > 0) {
-            <div>
-              <small>Credit sales</small>
-              <strong>{{ preview().creditSales | money }}</strong>
-            </div>
-          }
-          @if (preview().totalCreditPayments > 0) {
-            <div>
-              <small>Credit payments</small>
-              <strong>+{{ preview().totalCreditPayments | money }}</strong>
-            </div>
-          }
-          @if (preview().gcashCashInAmount > 0) {
-            <div>
-              <small>GCash cash-in</small>
-              <strong>{{ preview().gcashCashInAmount | money }}</strong>
-            </div>
-          }
-          @if (preview().gcashCashOutAmount > 0) {
-            <div>
-              <small>GCash cash-out</small>
-              <strong>{{ preview().gcashCashOutAmount | money }}</strong>
-            </div>
-          }
-          @if (preview().gcashCashInFees + preview().gcashCashOutFees > 0) {
-            <div>
-              <small>GCash fees</small>
-              <strong>+{{ (preview().gcashCashInFees + preview().gcashCashOutFees) | money }}</strong>
-            </div>
-          }
-          @if (preview().loadAmount > 0) {
-            <div>
-              <small>Load</small>
-              <strong>{{ preview().loadAmount | money }}</strong>
-            </div>
-          }
-          @if (preview().loadFees > 0) {
-            <div>
-              <small>Load fees</small>
-              <strong>+{{ preview().loadFees | money }}</strong>
-            </div>
-          }
-          @if (preview().floatAdditions > 0) {
-            <div>
-              <small>Float top-ups</small>
-              <strong>+{{ preview().floatAdditions | money }}</strong>
-            </div>
-          }
-          <div>
-            <small>Total sales</small>
-            <strong>{{ preview().totalSales | money }}</strong>
-          </div>
-          @if (preview().totalRefunds > 0) {
-            <div class="eod__refunds">
-              <small>Refunds</small>
-              <strong>−{{ preview().totalRefunds | money }}</strong>
-            </div>
-          }
-          <div class="eod__expected">
-            <small>Expected cash</small>
-            <strong>{{ expectedCash() | money }}</strong>
-          </div>
-        </div>
+        }
 
         <div class="eod__actions">
           <button mat-stroked-button (click)="openAddToFloat()">
@@ -221,7 +233,7 @@
             <ng-container matColumnDef="total">
               <th mat-header-cell *matHeaderCellDef>Sales</th>
               <td mat-cell *matCellDef="let d">
-                {{ (d.totalSales ?? 0) | money }}
+                {{ d.totalSales ?? 0 | money }}
                 <small class="eod__by">{{ d.salesCount ?? 0 }} txns</small>
               </td>
             </ng-container>
@@ -236,7 +248,9 @@
                 @if (d.variance == null) {
                   —
                 } @else {
-                  @if (d.variance > 0) { + }
+                  @if (d.variance > 0) {
+                    +
+                  }
                   {{ d.variance | money }}
                 }
               </td>
@@ -275,7 +289,9 @@
               class="eod__history-row"
               (click)="openHistoryDetails(row)"
               tabindex="0"
-              [attr.aria-label]="'View details for day opened ' + (row.openedAt | date: 'mediumDate')"
+              [attr.aria-label]="
+                'View details for day opened ' + (row.openedAt | date: 'mediumDate')
+              "
             ></tr>
             <tr *matNoDataRow>
               <td [attr.colspan]="historyColumns.length" class="eod__empty">

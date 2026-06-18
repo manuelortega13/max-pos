@@ -118,6 +118,19 @@ export class EndOfDayPage implements OnInit {
    */
   private readonly previewResp = signal<ClosePreview | null>(null);
 
+  /** True while a preview fetch is in flight. */
+  private readonly previewLoading = signal(false);
+
+  /**
+   * True only during the FIRST preview fetch (nothing loaded yet) — drives
+   * the live-totals loading state. Background refreshes (after a float
+   * add/void) keep the existing grid on screen instead of flashing a
+   * spinner, since `previewResp` is already populated.
+   */
+  protected readonly previewInitialLoading = computed(
+    () => this.previewLoading() && this.previewResp() === null,
+  );
+
   /** Aggregated totals for the open day (zeros before the preview lands). */
   protected readonly preview = computed<DayPreviewTotals>(
     () => this.previewResp()?.totals ?? EMPTY_TOTALS,
@@ -147,9 +160,16 @@ export class EndOfDayPage implements OnInit {
    *  failure — the live grid just shows zeros; the close re-aggregates
    *  server-side so the snapshot is still correct. */
   private loadPreview(): void {
+    this.previewLoading.set(true);
     this.businessDayService.previewCurrent().subscribe({
-      next: (preview) => this.previewResp.set(preview),
-      error: () => this.previewResp.set(null),
+      next: (preview) => {
+        this.previewResp.set(preview);
+        this.previewLoading.set(false);
+      },
+      error: () => {
+        this.previewResp.set(null);
+        this.previewLoading.set(false);
+      },
     });
   }
 

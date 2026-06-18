@@ -5,8 +5,15 @@
   padding: 1.25rem 1.5rem;
 
   &__page-header {
-    h1 { margin: 0 0 0.2rem; font-size: 1.6rem; font-weight: 600; }
-    p  { margin: 0; color: var(--mat-sys-on-surface-variant); }
+    h1 {
+      margin: 0 0 0.2rem;
+      font-size: 1.6rem;
+      font-weight: 600;
+    }
+    p {
+      margin: 0;
+      color: var(--mat-sys-on-surface-variant);
+    }
   }
 
   &__status-card,
@@ -85,7 +92,22 @@
     }
   }
 
-  &__refunds strong { color: var(--mat-sys-error); }
+  &__live-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.85rem;
+    padding: 2rem 1rem;
+    color: var(--mat-sys-on-surface-variant);
+
+    p {
+      margin: 0;
+    }
+  }
+
+  &__refunds strong {
+    color: var(--mat-sys-error);
+  }
   &__expected {
     background: var(--mat-sys-primary-container) !important;
     color: var(--mat-sys-on-primary-container);
@@ -100,7 +122,9 @@
   &__history-table {
     overflow-x: auto;
 
-    table { width: 100%; }
+    table {
+      width: 100%;
+    }
   }
 
   &__by {
@@ -170,7 +194,9 @@
   flex: 1 1 auto;
   min-width: 0;
 
-  small { color: var(--mat-sys-on-surface-variant); }
+  small {
+    color: var(--mat-sys-on-surface-variant);
+  }
 }
 
 .eod__float-note {
