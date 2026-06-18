@@ -75,7 +75,11 @@
           <div
             class="profit-stat profit-stat--net"
             [class.profit-stat--bad]="windowNetProfit() < 0"
-            [matTooltip]="windowNetProfit() < 0 ? 'You are losing money on the last 30 days.' : 'Net profit after cost of goods and expenses.'"
+            [matTooltip]="
+              windowNetProfit() < 0
+                ? 'You are losing money on the last 30 days.'
+                : 'Net profit after cost of goods and expenses.'
+            "
           >
             <span class="profit-stat__label">Net profit</span>
             <span class="profit-stat__value">{{ windowNetProfit() | money }}</span>
@@ -87,10 +91,10 @@
           <div class="profit-metric">
             <span class="profit-metric__label">Effective markup</span>
             <span class="profit-metric__value">
-              {{ (effectiveMarkup() * 100) | number: '1.0-0' }}%
+              {{ effectiveMarkup() * 100 | number: '1.0-0' }}%
             </span>
             <span class="profit-metric__sub">
-              Margin: {{ (effectiveMargin() * 100) | number: '1.0-0' }}%
+              Margin: {{ effectiveMargin() * 100 | number: '1.0-0' }}%
             </span>
           </div>
           <div class="profit-metric">
@@ -137,7 +141,9 @@
 
         <div
           class="profit-hint"
-          [class.profit-hint--bad]="windowNetProfit() < 0 || (breakEvenDailyRevenue() !== null && !aboveBreakEven())"
+          [class.profit-hint--bad]="
+            windowNetProfit() < 0 || (breakEvenDailyRevenue() !== null && !aboveBreakEven())
+          "
         >
           <mat-icon>tips_and_updates</mat-icon>
           <span>{{ profitRecommendation() }}</span>
@@ -168,7 +174,7 @@
           </div>
         } @else {
           <ul class="low-stock">
-            @for (product of lowStock(); track product.id) {
+            @for (product of lowStockPreview(); track product.id) {
               <li class="low-stock__item">
                 <span class="low-stock__emoji">{{ product.image }}</span>
                 <div class="low-stock__info">
@@ -181,6 +187,11 @@
               </li>
             }
           </ul>
+          @if (lowStockOverflow() > 0) {
+            <p class="low-stock__more">
+              +{{ lowStockOverflow() }} more low on stock — see all in inventory
+            </p>
+          }
         }
       </mat-card-content>
       <mat-card-actions align="end">
@@ -224,7 +235,10 @@
                   <small>{{ product.sku }}</small>
                 </div>
                 <mat-chip
-                  [class]="'status-chip ' + (product.stock < 0 ? 'status-chip--oversold' : 'status-chip--refunded')"
+                  [class]="
+                    'status-chip ' +
+                    (product.stock < 0 ? 'status-chip--oversold' : 'status-chip--refunded')
+                  "
                   disableRipple
                 >
                   {{ product.stock < 0 ? 'Oversold (' + product.stock + ')' : '0 left' }}
@@ -274,7 +288,9 @@
                 }
                 <div class="expiring-list__info">
                   <strong>{{ batch.productName }}</strong>
-                  <small>{{ batch.quantityRemaining }} units · expired {{ batch.expiryDate }}</small>
+                  <small
+                    >{{ batch.quantityRemaining }} units · expired {{ batch.expiryDate }}</small
+                  >
                 </div>
                 <span class="expiring-list__days">
                   @if (batch.daysUntilExpiry === 0) {

@@ -45,10 +45,18 @@
       color: white;
     }
 
-    &--primary { background: var(--mat-sys-primary); }
-    &--tertiary { background: var(--mat-sys-tertiary); }
-    &--secondary { background: #f59e0b; }
-    &--neutral { background: #64748b; }
+    &--primary {
+      background: var(--mat-sys-primary);
+    }
+    &--tertiary {
+      background: var(--mat-sys-tertiary);
+    }
+    &--secondary {
+      background: #f59e0b;
+    }
+    &--neutral {
+      background: #64748b;
+    }
   }
 
   &__body {
@@ -101,11 +109,26 @@ table.mat-mdc-table {
   font-size: 0.75rem;
   font-weight: 500;
 
-  &--completed { background: rgba(16, 185, 129, 0.15) !important; color: #047857 !important; }
-  &--refunded { background: rgba(239, 68, 68, 0.15) !important; color: #b91c1c !important; }
-  &--pending { background: rgba(245, 158, 11, 0.15) !important; color: #b45309 !important; }
-  &--warn { background: rgba(245, 158, 11, 0.15) !important; color: #b45309 !important; }
-  &--oversold { background: rgba(190, 18, 60, 0.18) !important; color: #9f1239 !important; }
+  &--completed {
+    background: rgba(16, 185, 129, 0.15) !important;
+    color: #047857 !important;
+  }
+  &--refunded {
+    background: rgba(239, 68, 68, 0.15) !important;
+    color: #b91c1c !important;
+  }
+  &--pending {
+    background: rgba(245, 158, 11, 0.15) !important;
+    color: #b45309 !important;
+  }
+  &--warn {
+    background: rgba(245, 158, 11, 0.15) !important;
+    color: #b45309 !important;
+  }
+  &--oversold {
+    background: rgba(190, 18, 60, 0.18) !important;
+    color: #9f1239 !important;
+  }
 }
 
 .low-stock {
@@ -116,6 +139,12 @@ table.mat-mdc-table {
   flex-direction: column;
   gap: 0.75rem;
 
+  &__more {
+    margin: 0.75rem 0 0;
+    font-size: 0.85rem;
+    color: var(--mat-sys-on-surface-variant);
+  }
+
   &__item {
     display: flex;
     align-items: center;
@@ -123,7 +152,9 @@ table.mat-mdc-table {
     padding: 0.5rem 0;
     border-bottom: 1px solid var(--mat-sys-outline-variant);
 
-    &:last-child { border-bottom: none; }
+    &:last-child {
+      border-bottom: none;
+    }
   }
 
   &__emoji {
@@ -178,7 +209,9 @@ table.mat-mdc-table {
     align-items: center;
     justify-content: center;
 
-    mat-icon { color: white; }
+    mat-icon {
+      color: white;
+    }
   }
 }
 
@@ -188,10 +221,16 @@ table.mat-mdc-table {
     align-items: center;
     justify-content: center;
 
-    mat-icon { color: white; }
+    mat-icon {
+      color: white;
+    }
 
-    &--out { background: #ef4444; }
-    &--expired { background: #b91c1c; }
+    &--out {
+      background: #ef4444;
+    }
+    &--expired {
+      background: #b91c1c;
+    }
   }
 }
 
@@ -210,7 +249,9 @@ table.mat-mdc-table {
     padding: 0.5rem 0;
     border-bottom: 1px solid var(--mat-sys-outline-variant);
 
-    &:last-child { border-bottom: none; }
+    &:last-child {
+      border-bottom: none;
+    }
   }
 
   &__emoji {
@@ -264,10 +305,17 @@ table.mat-mdc-table {
     border-bottom: 1px solid var(--mat-sys-outline-variant);
     border-left: 3px solid transparent;
 
-    &:last-child { border-bottom: none; }
+    &:last-child {
+      border-bottom: none;
+    }
 
-    &--soon    { border-left-color: #f59e0b; }
-    &--expired { border-left-color: #ef4444; background: rgba(239, 68, 68, 0.05); }
+    &--soon {
+      border-left-color: #f59e0b;
+    }
+    &--expired {
+      border-left-color: #ef4444;
+      background: rgba(239, 68, 68, 0.05);
+    }
   }
 
   &__emoji {
@@ -330,7 +378,9 @@ table.mat-mdc-table {
       height: 2.4rem;
       opacity: 0.6;
     }
-    p { margin: 0.6rem 0 0; }
+    p {
+      margin: 0.6rem 0 0;
+    }
   }
 }
 
@@ -366,7 +416,9 @@ table.mat-mdc-table {
   }
 
   // Negative-contribution cards (COGS, expenses) — value reads as a debit.
-  &--out &__value { color: var(--mat-sys-error); }
+  &--out &__value {
+    color: var(--mat-sys-error);
+  }
 
   // Net profit headline card — primary container background. The bad
   // modifier overrides this when the period ran at a loss.
@@ -375,7 +427,9 @@ table.mat-mdc-table {
     color: var(--mat-sys-on-primary-container);
 
     .profit-stat__label,
-    .profit-stat__sub { color: var(--mat-sys-on-primary-container); }
+    .profit-stat__sub {
+      color: var(--mat-sys-on-primary-container);
+    }
   }
   &--bad {
     background: var(--mat-sys-error-container);
@@ -383,7 +437,9 @@ table.mat-mdc-table {
 
     .profit-stat__label,
     .profit-stat__sub,
-    .profit-stat__value { color: var(--mat-sys-on-error-container); }
+    .profit-stat__value {
+      color: var(--mat-sys-on-error-container);
+    }
   }
 }
 
@@ -418,8 +474,12 @@ table.mat-mdc-table {
   }
 
   // Status colors for the avg-revenue/day card relative to break-even.
-  &--good &__value { color: var(--color-success, #10b981); }
-  &--bad  &__value { color: var(--mat-sys-error); }
+  &--good &__value {
+    color: var(--color-success, #10b981);
+  }
+  &--bad &__value {
+    color: var(--mat-sys-error);
+  }
 }
 
 .profit-hint {
@@ -440,6 +500,8 @@ table.mat-mdc-table {
   &--bad {
     background: var(--mat-sys-error-container);
     color: var(--mat-sys-on-error-container);
-    mat-icon { color: var(--mat-sys-on-error-container); }
+    mat-icon {
+      color: var(--mat-sys-on-error-container);
+    }
   }
 }

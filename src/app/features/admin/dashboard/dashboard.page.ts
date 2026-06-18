@@ -91,6 +91,22 @@ export class DashboardPage {
   protected readonly lowStock = this.productService.lowStockProducts;
   protected readonly outOfStock = this.productService.outOfStockProducts;
 
+  /** How many low-stock items the dashboard card shows before collapsing
+   *  the rest behind a "+N more" line — keeps the card compact when many
+   *  products are low. The full list lives on the Inventory page. */
+  private readonly LOW_STOCK_PREVIEW = 6;
+
+  /** The most urgent low-stock items (lowest stock first), capped for the
+   *  dashboard card. */
+  protected readonly lowStockPreview = computed(() =>
+    [...this.lowStock()].sort((a, b) => a.stock - b.stock).slice(0, this.LOW_STOCK_PREVIEW),
+  );
+
+  /** Count of low-stock items beyond the preview cap (0 when all fit). */
+  protected readonly lowStockOverflow = computed(() =>
+    Math.max(0, this.lowStock().length - this.LOW_STOCK_PREVIEW),
+  );
+
   /** Batches that have already passed their expiry — surfaced with write-off actions. */
   protected readonly expiredBatches = computed(() =>
     this.notifications.expiring().filter((b) => b.daysUntilExpiry < 0),
@@ -126,16 +142,12 @@ export class DashboardPage {
 
   private readonly windowGcash = computed(() => {
     const startMs = this.windowStartMs();
-    return this.gcashService
-      .completedTransactions()
-      .filter((t) => Date.parse(t.date) >= startMs);
+    return this.gcashService.completedTransactions().filter((t) => Date.parse(t.date) >= startMs);
   });
 
   private readonly windowLoad = computed(() => {
     const startMs = this.windowStartMs();
-    return this.loadService
-      .completedTransactions()
-      .filter((t) => Date.parse(t.date) >= startMs);
+    return this.loadService.completedTransactions().filter((t) => Date.parse(t.date) >= startMs);
   });
 
   /** 30-day service-fee revenue (GCash + Load). Fees are the store's
@@ -149,15 +161,11 @@ export class DashboardPage {
 
   private readonly windowExpenses = computed(() => {
     const startMs = this.windowStartMs();
-    return this.expenseService
-      .expenses()
-      .filter((e) => Date.parse(e.date) >= startMs);
+    return this.expenseService.expenses().filter((e) => Date.parse(e.date) >= startMs);
   });
 
   protected readonly windowRevenue = computed(
-    () =>
-      this.windowSales().reduce((sum, s) => sum + s.total, 0) +
-      this.windowServiceFees(),
+    () => this.windowSales().reduce((sum, s) => sum + s.total, 0) + this.windowServiceFees(),
   );
 
   /** Pre-V14 sales have null unitCost — treated as zero cost. The UI
@@ -165,9 +173,7 @@ export class DashboardPage {
    *  face value. */
   protected readonly windowCogs = computed(() =>
     this.windowSales().reduce(
-      (sum, s) =>
-        sum +
-        s.items.reduce((n, i) => n + (i.unitCost ?? 0) * i.quantity, 0),
+      (sum, s) => sum + s.items.reduce((n, i) => n + (i.unitCost ?? 0) * i.quantity, 0),
       0,
     ),
   );
@@ -176,9 +182,7 @@ export class DashboardPage {
     this.windowExpenses().reduce((sum, e) => sum + Number(e.amount), 0),
   );
 
-  protected readonly windowGrossProfit = computed(
-    () => this.windowRevenue() - this.windowCogs(),
-  );
+  protected readonly windowGrossProfit = computed(() => this.windowRevenue() - this.windowCogs());
 
   protected readonly windowNetProfit = computed(
     () => this.windowGrossProfit() - this.windowExpenseTotal(),
@@ -194,17 +198,11 @@ export class DashboardPage {
     return c > 0 ? this.windowGrossProfit() / c : 0;
   });
 
-  protected readonly avgDailyRevenue = computed(
-    () => this.windowRevenue() / this.WINDOW_DAYS,
-  );
+  protected readonly avgDailyRevenue = computed(() => this.windowRevenue() / this.WINDOW_DAYS);
 
-  protected readonly dailyFixedCost = computed(
-    () => this.windowExpenseTotal() / this.WINDOW_DAYS,
-  );
+  protected readonly dailyFixedCost = computed(() => this.windowExpenseTotal() / this.WINDOW_DAYS);
 
-  protected readonly netPerDay = computed(
-    () => this.windowNetProfit() / this.WINDOW_DAYS,
-  );
+  protected readonly netPerDay = computed(() => this.windowNetProfit() / this.WINDOW_DAYS);
 
   /** Daily revenue needed to cover fixed costs at the *current*
    *  margin. Returns null when margin is zero (can't break even at
@@ -268,8 +266,7 @@ export class DashboardPage {
 
   protected confirmWriteOff(batch: ExpiringBatch): void {
     const daysAgo = -batch.daysUntilExpiry;
-    const ageLabel =
-      daysAgo === 0 ? 'today' : daysAgo === 1 ? '1 day ago' : `${daysAgo} days ago`;
+    const ageLabel = daysAgo === 0 ? 'today' : daysAgo === 1 ? '1 day ago' : `${daysAgo} days ago`;
     const ref = this.dialog.open(ConfirmDialog, {
       width: '460px',
       data: {
@@ -293,11 +290,9 @@ export class DashboardPage {
           this.snackBar.open(`Wrote off "${batch.productName}"`, 'Dismiss', { duration: 2500 });
         },
         error: (err: HttpErrorResponse) => {
-          this.snackBar.open(
-            err.error?.message ?? 'Write-off failed.',
-            'Dismiss',
-            { duration: 4000 },
-          );
+          this.snackBar.open(err.error?.message ?? 'Write-off failed.', 'Dismiss', {
+            duration: 4000,
+          });
         },
       });
     });
