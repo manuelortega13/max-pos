@@ -273,20 +273,14 @@ export class EndOfDayPage implements OnInit {
       this.businessDayService
         .close({ countedCash: result.countedCash, notes: result.notes })
         .subscribe({
-          next: (closed) => {
+          next: () => {
             this.snackBar.open('Business day closed.', 'Dismiss', { duration: 2500 });
             // Day is closed now — clear the live preview and refresh the
-            // history table with the freshly-frozen snapshot row.
+            // history table with the freshly-frozen snapshot row. The
+            // Z-report is no longer printed automatically; use the
+            // Reprint action in the history row to print it on demand.
             this.previewResp.set(null);
             this.businessDayService.loadHistory();
-            void this.printer.printZReport({
-              storeName: this.storeName(),
-              address: this.storeAddress(),
-              phone: this.storePhone(),
-              footer: this.receiptFooter(),
-              currencySymbol: this.currencySymbol(),
-              day: closed,
-            });
           },
           error: (err: HttpErrorResponse) => {
             this.snackBar.open(err.error?.message ?? 'Could not close day.', 'Dismiss', {
