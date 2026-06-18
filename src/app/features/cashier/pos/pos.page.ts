@@ -22,6 +22,7 @@ import { MatDividerModule } from '@angular/material/divider';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { BarcodeScannerService } from '../../../core/services/barcode-scanner.service';
@@ -32,11 +33,7 @@ import { OpenDayDialog, OpenDayDialogResult } from '../../admin/end-of-day/open-
 import { ProductService } from '../../../core/services/product.service';
 import { SettingsService } from '../../../core/services/settings.service';
 import { CartLine, Product } from '../../../core/models';
-import {
-  lineDiscountAmount,
-  lineGross,
-  lineNet,
-} from '../../../core/services/cart.service';
+import { lineDiscountAmount, lineGross, lineNet } from '../../../core/services/cart.service';
 import { MoneyPipe } from '../../../shared/pipes/currency-symbol.pipe';
 import {
   DiscountDialog,
@@ -60,6 +57,7 @@ import { StockLimitDialog, StockLimitDialogData } from './stock-limit-dialog';
     MatFormFieldModule,
     MatIconModule,
     MatInputModule,
+    MatProgressSpinnerModule,
     MatTooltipModule,
     MoneyPipe,
   ],
@@ -88,6 +86,16 @@ export class PosPage implements AfterViewInit, OnDestroy {
   /** Store-level override: lets the cashier oversell past zero stock. */
   protected readonly allowNegativeStock = computed(
     () => this.settingsService.settings().allowNegativeStock,
+  );
+
+  /**
+   * True while the catalogue is still being fetched and nothing has
+   * arrived yet. Used to show a loading state in the grid instead of the
+   * "no products" empty message, which would otherwise flash during the
+   * initial load and read as "this store has no products".
+   */
+  protected readonly productsLoading = computed(
+    () => this.productService.loading() && this.productService.activeProducts().length === 0,
   );
 
   /** Active A-Z filter — 'all' means no letter restriction. */
@@ -126,8 +134,7 @@ export class PosPage implements AfterViewInit, OnDestroy {
     const term = this.search().trim().toLowerCase();
     const letter = this.activeLetter();
     const matches = this.productService.activeProducts().filter((product) => {
-      const matchesLetter =
-        letter === 'all' || product.name.charAt(0).toUpperCase() === letter;
+      const matchesLetter = letter === 'all' || product.name.charAt(0).toUpperCase() === letter;
       if (!matchesLetter) return false;
       if (!term) return true;
       return (
@@ -235,11 +242,7 @@ export class PosPage implements AfterViewInit, OnDestroy {
         // something. An empty search + empty grid is just an empty
         // store — silently no-op.
         if (term) {
-          this.snackBar.open(
-            `No product matches "${term}"`,
-            'Dismiss',
-            { duration: 2000 },
-          );
+          this.snackBar.open(`No product matches "${term}"`, 'Dismiss', { duration: 2000 });
           this.clearSearchAndRefocus();
         }
         return;
@@ -261,18 +264,26 @@ export class PosPage implements AfterViewInit, OnDestroy {
     // Arrow-key navigation only matters when there's something to navigate.
     if (this.filteredProducts().length === 0) return;
 
-    if (key !== 'ArrowLeft' && key !== 'ArrowRight'
-        && key !== 'ArrowUp' && key !== 'ArrowDown') return;
+    if (key !== 'ArrowLeft' && key !== 'ArrowRight' && key !== 'ArrowUp' && key !== 'ArrowDown')
+      return;
 
     event.preventDefault();
     const cols = this.detectColumnCount();
     const current = Math.max(0, this.activeIndex());
     let next = current;
     switch (key) {
-      case 'ArrowRight': next = current + 1; break;
-      case 'ArrowLeft':  next = current - 1; break;
-      case 'ArrowDown':  next = current + cols; break;
-      case 'ArrowUp':    next = current - cols; break;
+      case 'ArrowRight':
+        next = current + 1;
+        break;
+      case 'ArrowLeft':
+        next = current - 1;
+        break;
+      case 'ArrowDown':
+        next = current + cols;
+        break;
+      case 'ArrowUp':
+        next = current - cols;
+        break;
     }
     next = Math.max(0, Math.min(this.filteredProducts().length - 1, next));
     if (next !== current || this.activeIndex() < 0) {
@@ -319,15 +330,15 @@ export class PosPage implements AfterViewInit, OnDestroy {
    * behaviour are identical to the auto-prompt path.
    */
   protected promptOpenDay(): void {
-    const ref = this.dialog.open<OpenDayDialog, void, OpenDayDialogResult>(
-      OpenDayDialog,
-      { width: '420px', panelClass: 'dialog-fullscreen-mobile', autoFocus: false },
-    );
+    const ref = this.dialog.open<OpenDayDialog, void, OpenDayDialogResult>(OpenDayDialog, {
+      width: '420px',
+      panelClass: 'dialog-fullscreen-mobile',
+      autoFocus: false,
+    });
     ref.afterClosed().subscribe((result) => {
       if (!result) return;
       this.businessDayService.open({ openingFloat: result.openingFloat }).subscribe({
-        next: () =>
-          this.snackBar.open('Business day opened.', 'Dismiss', { duration: 2500 }),
+        next: () => this.snackBar.open('Business day opened.', 'Dismiss', { duration: 2500 }),
         error: (err: HttpErrorResponse) => {
           this.snackBar.open(err.error?.message ?? 'Could not open day.', 'Dismiss', {
             duration: 4000,
@@ -349,11 +360,7 @@ export class PosPage implements AfterViewInit, OnDestroy {
     if (product) {
       this.addToCart(product);
     } else {
-      this.snackBar.open(
-        `No product with barcode ${code}`,
-        'Dismiss',
-        { duration: 2500 },
-      );
+      this.snackBar.open(`No product with barcode ${code}`, 'Dismiss', { duration: 2500 });
     }
     queueMicrotask(() => this.searchInputRef()?.nativeElement.focus());
   }
@@ -362,9 +369,7 @@ export class PosPage implements AfterViewInit, OnDestroy {
    *  Returns the first product whose `barcodes` list contains the
    *  exact term — supports a product carrying multiple scan codes. */
   private findByExactBarcode(term: string): Product | undefined {
-    return this.productService
-      .activeProducts()
-      .find((p) => p.barcodes.includes(term));
+    return this.productService.activeProducts().find((p) => p.barcodes.includes(term));
   }
 
   /**
@@ -423,8 +428,10 @@ export class PosPage implements AfterViewInit, OnDestroy {
     if (!tile) return 1;
     const style = getComputedStyle(grid);
     const gapPx = parseFloat(style.columnGap || style.gap || '0') || 0;
-    const inner = grid.clientWidth - (parseFloat(style.paddingLeft || '0') || 0)
-      - (parseFloat(style.paddingRight || '0') || 0);
+    const inner =
+      grid.clientWidth -
+      (parseFloat(style.paddingLeft || '0') || 0) -
+      (parseFloat(style.paddingRight || '0') || 0);
     const tileWidth = tile.offsetWidth || 150;
     const cols = Math.floor((inner + gapPx) / (tileWidth + gapPx));
     return Math.max(1, cols);

@@ -12,7 +12,7 @@
   // the two-column split down to 768px so the cart doesn't stack below
   // the catalog and "take over" a short landscape viewport.
   @media (max-width: 1024px) and (orientation: portrait),
-         (max-width: 768px) and (orientation: landscape) {
+    (max-width: 768px) and (orientation: landscape) {
     grid-template-columns: 1fr;
   }
 
@@ -140,6 +140,17 @@
       width: 3rem;
       height: 3rem;
     }
+
+    &--loading {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.85rem;
+
+      p {
+        margin: 0;
+      }
+    }
   }
 
   &__cart {
@@ -163,7 +174,7 @@
     // cart and stack it below the catalog with auto height — quickly
     // consuming most of a short landscape viewport.
     @media (max-width: 1024px) and (orientation: portrait),
-           (max-width: 768px) and (orientation: landscape) {
+      (max-width: 768px) and (orientation: landscape) {
       position: static;
       border-left: none;
       border-top: 1px solid var(--mat-sys-outline-variant);
@@ -194,8 +205,14 @@
     justify-content: space-between;
     padding: 1rem 1.25rem;
 
-    strong { display: block; font-size: 1.05rem; }
-    small { color: var(--mat-sys-on-surface-variant); font-size: 0.8rem; }
+    strong {
+      display: block;
+      font-size: 1.05rem;
+    }
+    small {
+      color: var(--mat-sys-on-surface-variant);
+      font-size: 0.8rem;
+    }
   }
 
   &__cart-header-actions {
@@ -277,8 +294,13 @@
       height: 3rem;
     }
 
-    p { margin: 0; font-weight: 500; }
-    small { font-size: 0.75rem; }
+    p {
+      margin: 0;
+      font-weight: 500;
+    }
+    small {
+      font-size: 0.75rem;
+    }
   }
 
   &__cart-footer {
@@ -341,7 +363,10 @@
   background: var(--mat-sys-surface-container);
   border-radius: 0.85rem;
   border: 1px solid var(--mat-sys-outline-variant);
-  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease,
+    border-color 0.15s ease;
   text-align: left;
   gap: 0.5rem;
 
@@ -445,8 +470,12 @@
   }
 
   /* Status border tints — kept as supplementary signal to the badge. */
-  &--low { border-color: color-mix(in srgb, var(--color-warning) 55%, var(--mat-sys-outline-variant)); }
-  &--out { border-color: color-mix(in srgb, var(--mat-sys-error) 55%, var(--mat-sys-outline-variant)); }
+  &--low {
+    border-color: color-mix(in srgb, var(--color-warning) 55%, var(--mat-sys-outline-variant));
+  }
+  &--out {
+    border-color: color-mix(in srgb, var(--mat-sys-error) 55%, var(--mat-sys-outline-variant));
+  }
 
   &--active {
     border-color: var(--mat-sys-primary);
@@ -718,7 +747,9 @@
       min-width: 3rem;
       padding: 0 0.75rem;
 
-      .pos__kbd { display: none; }
+      .pos__kbd {
+        display: none;
+      }
     }
 
     &__categories {
@@ -727,7 +758,9 @@
       overflow-x: auto;
       scrollbar-width: none;
 
-      &::-webkit-scrollbar { display: none; }
+      &::-webkit-scrollbar {
+        display: none;
+      }
     }
 
     &__grid {
@@ -849,7 +882,9 @@
       border-radius: 0.45rem;
     }
 
-    &__image { font-size: 2rem; }
+    &__image {
+      font-size: 2rem;
+    }
 
     &__name {
       font-size: 0.8rem;
@@ -863,26 +898,51 @@
       font-size: 0.6rem;
     }
 
-    &__price { font-size: 0.92rem; }
-    &__stock { font-size: 0.65rem; }
+    &__price {
+      font-size: 0.92rem;
+    }
+    &__stock {
+      font-size: 0.65rem;
+    }
   }
 
   .cart-line {
     grid-template-columns: 2rem minmax(0, 1fr) auto auto;
     grid-template-areas:
-      "img  info  info  qty"
-      "img  total disc  remove";
+      'img  info  info  qty'
+      'img  total disc  remove';
     gap: 0.3rem 0.4rem;
     padding: 0.6rem 1rem;
 
     &__photo,
-    &__image { grid-area: img; grid-row: 1 / span 2; align-self: center; }
-    &__info { grid-area: info; }
-    &__qty { grid-area: qty; justify-self: end; }
+    &__image {
+      grid-area: img;
+      grid-row: 1 / span 2;
+      align-self: center;
+    }
+    &__info {
+      grid-area: info;
+    }
+    &__qty {
+      grid-area: qty;
+      justify-self: end;
+    }
     // Totals column sits under info on row 2 — reads like a receipt.
-    &__totals { grid-area: total; align-items: flex-start; min-width: 0; }
-    &__total { text-align: left; }
-    &__discount { grid-area: disc; justify-self: end; }
-    &__remove { grid-area: remove; justify-self: end; }
+    &__totals {
+      grid-area: total;
+      align-items: flex-start;
+      min-width: 0;
+    }
+    &__total {
+      text-align: left;
+    }
+    &__discount {
+      grid-area: disc;
+      justify-self: end;
+    }
+    &__remove {
+      grid-area: remove;
+      justify-self: end;
+    }
   }
 }

@@ -143,18 +143,22 @@
           </div>
         </button>
       } @empty {
-        <div class="pos__empty">
-          <mat-icon>search_off</mat-icon>
-          <p>No products match your search.</p>
-        </div>
+        @if (productsLoading()) {
+          <div class="pos__empty pos__empty--loading">
+            <mat-progress-spinner mode="indeterminate" diameter="44"></mat-progress-spinner>
+            <p>Loading products…</p>
+          </div>
+        } @else {
+          <div class="pos__empty">
+            <mat-icon>search_off</mat-icon>
+            <p>No products match your search.</p>
+          </div>
+        }
       }
     </div>
   </section>
 
-  <aside
-    class="pos__cart"
-    [class.pos__cart--expanded]="cartExpanded()"
-  >
+  <aside class="pos__cart" [class.pos__cart--expanded]="cartExpanded()">
     <!-- Mobile-only collapsed summary bar. Tap to expand the cart. -->
     <button
       type="button"
@@ -231,12 +235,13 @@
         } @else {
           <ul class="cart-list">
             @for (line of cart(); track line.product.id; let i = $index) {
-              <li
-                class="cart-line"
-                [class.cart-line--focused]="cartFocusIndex() === i"
-              >
+              <li class="cart-line" [class.cart-line--focused]="cartFocusIndex() === i">
                 @if (line.product.imageUrl) {
-                  <img [src]="line.product.imageUrl" [alt]="line.product.name" class="cart-line__photo" />
+                  <img
+                    [src]="line.product.imageUrl"
+                    [alt]="line.product.name"
+                    class="cart-line__photo"
+                  />
                 } @else {
                   <span class="cart-line__image">{{ line.product.image }}</span>
                 }
@@ -269,7 +274,9 @@
                     class="cart-line__qty-btn"
                     (click)="increment(line.product.id)"
                     [disabled]="isAtMaxStock(line.product.id, line.quantity)"
-                    [matTooltip]="isAtMaxStock(line.product.id, line.quantity) ? 'At stock limit' : ''"
+                    [matTooltip]="
+                      isAtMaxStock(line.product.id, line.quantity) ? 'At stock limit' : ''
+                    "
                     aria-label="Increase"
                   >
                     <mat-icon>add</mat-icon>
