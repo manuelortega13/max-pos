@@ -26,18 +26,26 @@
   display: flex;
   gap: 1rem;
   flex-wrap: wrap;
+  // Center items on each (wrapped) line so the "Clear dates" button sits
+  // vertically centered beside the filter fields rather than at the top.
+  align-items: center;
 
   &__search {
-    flex: 1 1 280px;
+    flex: 1 1 240px;
+    max-width: 320px;
   }
   &__field {
     flex: 0 0 200px;
   }
+  // Match the selects' width so the date text + calendar toggle aren't
+  // squeezed, and (without subscriptSizing="dynamic") the same height so
+  // the row's fields align along a common baseline.
   &__date {
-    flex: 0 0 170px;
+    flex: 0 0 200px;
   }
   &__clear-dates {
     flex: 0 0 auto;
+    // Center against the form-field row (which reserves subscript space).
     align-self: center;
   }
 }
