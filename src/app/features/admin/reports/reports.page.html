@@ -2,9 +2,7 @@
   <header class="page__header">
     <div>
       <h1 class="page__title">Reports</h1>
-      <p class="page__subtitle">
-        Gross profit, expenses, and net profit for a selected date range
-      </p>
+      <p class="page__subtitle">Gross profit, expenses, and net profit for a selected date range</p>
     </div>
     <button
       mat-stroked-button
@@ -76,13 +74,17 @@
     </mat-card-content>
   </mat-card>
 
+  @if (summaryLoading()) {
+    <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+  }
+
   <!-- ── Summary tiles ──────────────────────────────────────────────── -->
   <div class="summary">
     <mat-card appearance="outlined" class="summary__tile">
       <span class="summary__label">Revenue</span>
       <span class="summary__value">{{ revenue() | money }}</span>
       <small class="summary__meta">
-        {{ rangeSales().length }} sale(s)
+        {{ salesCount() }} sale(s)
         @if (serviceFeeRevenue() > 0) {
           · {{ serviceFeeRevenue() | money }} in service fees
         }
@@ -100,9 +102,7 @@
     </mat-card>
     <mat-card appearance="outlined" class="summary__tile">
       <span class="summary__label">Expenses</span>
-      <span class="summary__value summary__value--muted">
-        −{{ totalExpenses() | money }}
-      </span>
+      <span class="summary__value summary__value--muted"> −{{ totalExpenses() | money }} </span>
       <small class="summary__meta">{{ expenses().length }} entry(ies)</small>
     </mat-card>
     <mat-card
@@ -121,9 +121,7 @@
   <mat-card appearance="outlined">
     <mat-card-header class="expenses__header">
       <mat-card-title>Expenses</mat-card-title>
-      <mat-card-subtitle>
-        Counted against gross profit to compute net profit
-      </mat-card-subtitle>
+      <mat-card-subtitle> Counted against gross profit to compute net profit </mat-card-subtitle>
       <span class="expenses__spacer"></span>
       <button mat-flat-button color="primary" (click)="openCreateExpense()">
         <mat-icon>add</mat-icon>
@@ -165,12 +163,7 @@
             <button mat-icon-button (click)="openEditExpense(e)" matTooltip="Edit">
               <mat-icon>edit</mat-icon>
             </button>
-            <button
-              mat-icon-button
-              color="warn"
-              (click)="confirmDelete(e)"
-              matTooltip="Delete"
-            >
+            <button mat-icon-button color="warn" (click)="confirmDelete(e)" matTooltip="Delete">
               <mat-icon>delete</mat-icon>
             </button>
           </td>

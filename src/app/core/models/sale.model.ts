@@ -103,3 +103,26 @@ export interface TodaySummary {
   readonly transactions: number;
   readonly averageTicket: number;
 }
+
+/** Raw aggregates for the dashboard's rolling profit-insights window, from
+ *  `GET /api/dashboard/profit-summary`. The client derives margin, markup,
+ *  break-even, etc. from these. */
+export interface ProfitSummary {
+  readonly salesRevenue: number;
+  readonly cogs: number;
+  readonly serviceFees: number;
+  readonly expenseTotal: number;
+  readonly salesCount: number;
+  readonly days: number;
+}
+
+/** Range aggregates for the admin Reports page, from
+ *  `GET /api/dashboard/report-summary`. The client combines these with the
+ *  expenses it loads separately to produce revenue / profit / margin. */
+export interface ReportSummary {
+  readonly productRevenue: number;
+  readonly cogs: number;
+  readonly gcashFees: number;
+  readonly loadFees: number;
+  readonly salesCount: number;
+}

@@ -2,7 +2,15 @@ import { HttpClient, HttpErrorResponse, HttpParams } from '@angular/common/http'
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { Observable, of, tap, throwError } from 'rxjs';
 import { catchError } from 'rxjs/operators';
-import { CreateSaleRequest, Sale, SaleItem, SalesGrowth, TodaySummary } from '../models';
+import {
+  CreateSaleRequest,
+  ProfitSummary,
+  ReportSummary,
+  Sale,
+  SaleItem,
+  SalesGrowth,
+  TodaySummary,
+} from '../models';
 import { computeDiscount } from './cart.service';
 import { AuthService } from './auth.service';
 import { BusinessDayService } from './business-day.service';
@@ -120,6 +128,21 @@ export class SaleService {
    *  dashboard, computed server-side instead of derived from the full list. */
   todaySummary(): Observable<TodaySummary> {
     return this.http.get<TodaySummary>('/api/sales/today-summary');
+  }
+
+  /** Rolling-window profit aggregates for the dashboard's profit panel
+   *  (sales revenue, COGS, service fees, expenses), computed server-side. */
+  profitSummary(days: number): Observable<ProfitSummary> {
+    const params = new HttpParams().set('days', days);
+    return this.http.get<ProfitSummary>('/api/dashboard/profit-summary', { params });
+  }
+
+  /** Range aggregates (product revenue, COGS, GCash/Load fees) for the
+   *  Reports page, computed server-side. `from` inclusive, `to` exclusive
+   *  (ISO instants). */
+  reportSummary(from: string, to: string): Observable<ReportSummary> {
+    const params = new HttpParams().set('from', from).set('to', to);
+    return this.http.get<ReportSummary>('/api/dashboard/report-summary', { params });
   }
 
   /**

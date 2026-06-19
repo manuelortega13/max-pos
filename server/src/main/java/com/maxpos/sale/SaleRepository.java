@@ -67,4 +67,28 @@ public interface SaleRepository extends JpaRepository<Sale, UUID> {
             where s.status = com.maxpos.sale.SaleStatus.COMPLETED
             """)
     double averageCompletedTotal();
+
+    /** Cost of goods sold for completed sales since {@code from}: the sum of
+     *  unitCost × quantity across their line items. Lines with a null
+     *  unitCost (pre-V14 rows) drop out of the sum — treated as zero cost,
+     *  matching the dashboard's previous client-side math. */
+    @Query("""
+            select coalesce(sum(i.unitCost * i.quantity), 0)
+            from SaleItem i
+            where i.sale.status = com.maxpos.sale.SaleStatus.COMPLETED
+              and i.sale.date >= :from
+            """)
+    BigDecimal completedCogsSince(@Param("from") Instant from);
+
+    /** COGS for completed sales in [from, to) for the Reports page. Unlike
+     *  {@link #completedCogsSince}, a null line unitCost (pre-V14 rows)
+     *  falls back to the product's current cost — matching the Reports
+     *  page's previous client-side math. */
+    @Query("""
+            select coalesce(sum(coalesce(i.unitCost, i.product.cost) * i.quantity), 0)
+            from SaleItem i
+            where i.sale.status = com.maxpos.sale.SaleStatus.COMPLETED
+              and i.sale.date >= :from and i.sale.date < :to
+            """)
+    BigDecimal completedCogsBetween(@Param("from") Instant from, @Param("to") Instant to);
 }

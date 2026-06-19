@@ -11,8 +11,7 @@ import { MatDividerModule } from '@angular/material/divider';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { RouterLink } from '@angular/router';
-import { ExpiringBatch, TodaySummary } from '../../../core/models';
-import { ExpenseService } from '../../../core/services/expense.service';
+import { ExpiringBatch, ProfitSummary, TodaySummary } from '../../../core/models';
 import { GcashService } from '../../../core/services/gcash.service';
 import { LoadService } from '../../../core/services/load.service';
 import { NotificationService } from '../../../core/services/notification.service';
@@ -50,7 +49,6 @@ export class DashboardPage {
   private readonly productService = inject(ProductService);
   private readonly userService = inject(UserService);
   private readonly notifications = inject(NotificationService);
-  private readonly expenseService = inject(ExpenseService);
   private readonly gcashService = inject(GcashService);
   private readonly loadService = inject(LoadService);
   private readonly settingsService = inject(SettingsService);
@@ -149,59 +147,23 @@ export class DashboardPage {
 
   private readonly WINDOW_DAYS = 30;
 
-  private readonly windowStartMs = computed(() => {
-    const now = new Date();
-    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    start.setDate(start.getDate() - (this.WINDOW_DAYS - 1));
-    return start.getTime();
-  });
+  /**
+   * Rolling-window profit aggregates, computed server-side
+   * (GET /api/dashboard/profit-summary) instead of derived from the full
+   * sales / GCash / load / expense lists in the browser. Null until the
+   * fetch resolves; {@link profitLoading} drives the panel's loading state.
+   */
+  private readonly profitData = signal<ProfitSummary | null>(null);
+  protected readonly profitLoading = signal(true);
 
-  private readonly windowSales = computed(() => {
-    const startMs = this.windowStartMs();
-    return this.saleService.completedSales().filter((s) => Date.parse(s.date) >= startMs);
-  });
-
-  private readonly windowGcash = computed(() => {
-    const startMs = this.windowStartMs();
-    return this.gcashService.completedTransactions().filter((t) => Date.parse(t.date) >= startMs);
-  });
-
-  private readonly windowLoad = computed(() => {
-    const startMs = this.windowStartMs();
-    return this.loadService.completedTransactions().filter((t) => Date.parse(t.date) >= startMs);
-  });
-
-  /** 30-day service-fee revenue (GCash + Load). Fees are the store's
-   *  cut on each transaction — the principal passes through to the
-   *  wallet, so it isn't counted toward revenue. */
-  private readonly windowServiceFees = computed(
-    () =>
-      this.windowGcash().reduce((s, t) => s + Number(t.fee ?? 0), 0) +
-      this.windowLoad().reduce((s, t) => s + Number(t.fee ?? 0), 0),
-  );
-
-  private readonly windowExpenses = computed(() => {
-    const startMs = this.windowStartMs();
-    return this.expenseService.expenses().filter((e) => Date.parse(e.date) >= startMs);
-  });
-
+  /** Window revenue = product sales + GCash/Load service fees. */
   protected readonly windowRevenue = computed(
-    () => this.windowSales().reduce((sum, s) => sum + s.total, 0) + this.windowServiceFees(),
+    () => (this.profitData()?.salesRevenue ?? 0) + (this.profitData()?.serviceFees ?? 0),
   );
 
-  /** Pre-V14 sales have null unitCost — treated as zero cost. The UI
-   *  hint flags this so a low-cost-coverage period isn't taken at
-   *  face value. */
-  protected readonly windowCogs = computed(() =>
-    this.windowSales().reduce(
-      (sum, s) => sum + s.items.reduce((n, i) => n + (i.unitCost ?? 0) * i.quantity, 0),
-      0,
-    ),
-  );
+  protected readonly windowCogs = computed(() => this.profitData()?.cogs ?? 0);
 
-  protected readonly windowExpenseTotal = computed(() =>
-    this.windowExpenses().reduce((sum, e) => sum + Number(e.amount), 0),
-  );
+  protected readonly windowExpenseTotal = computed(() => this.profitData()?.expenseTotal ?? 0);
 
   protected readonly windowGrossProfit = computed(() => this.windowRevenue() - this.windowCogs());
 
@@ -245,7 +207,7 @@ export class DashboardPage {
    *  Requires both at least one sale and one expense in the window —
    *  otherwise the ratios are misleading. */
   protected readonly hasProfitData = computed(
-    () => this.windowSales().length > 0 && this.windowExpenseTotal() > 0,
+    () => (this.profitData()?.salesCount ?? 0) > 0 && this.windowExpenseTotal() > 0,
   );
 
   /** Single-line tailored guidance. Order matters: data-availability
@@ -276,13 +238,6 @@ export class DashboardPage {
     // Ensure the notification poller is running even if the user landed here
     // without bouncing through the shell (e.g. direct URL after login).
     this.notifications.start();
-    // Load expenses scoped to the insights window — admin landing on
-    // the dashboard cold should see the profit panel populated.
-    const today = new Date();
-    const start = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    start.setDate(start.getDate() - (this.WINDOW_DAYS - 1));
-    const iso = (d: Date) => d.toISOString().slice(0, 10);
-    this.expenseService.load(iso(start), iso(today));
 
     // Today KPIs from the dedicated server endpoint. Soft failure — the
     // tiles fall back to zeros and the loading state ends either way.
@@ -292,6 +247,15 @@ export class DashboardPage {
         this.kpiLoading.set(false);
       },
       error: () => this.kpiLoading.set(false),
+    });
+
+    // Profit-insights aggregates from the dedicated server endpoint.
+    this.saleService.profitSummary(this.WINDOW_DAYS).subscribe({
+      next: (summary) => {
+        this.profitData.set(summary);
+        this.profitLoading.set(false);
+      },
+      error: () => this.profitLoading.set(false),
     });
   }
 

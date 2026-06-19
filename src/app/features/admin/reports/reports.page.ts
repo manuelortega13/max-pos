@@ -1,5 +1,12 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  inject,
+  signal,
+} from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -16,11 +23,8 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { Expense, GcashTransaction, LoadTransaction, Sale } from '../../../core/models';
+import { Expense, ReportSummary } from '../../../core/models';
 import { ExpenseService } from '../../../core/services/expense.service';
-import { GcashService } from '../../../core/services/gcash.service';
-import { LoadService } from '../../../core/services/load.service';
-import { ProductService } from '../../../core/services/product.service';
 import { SaleService } from '../../../core/services/sale.service';
 import { SettingsService } from '../../../core/services/settings.service';
 import { ConfirmDialog } from '../../../shared/dialogs/confirm-dialog';
@@ -56,9 +60,6 @@ type RangePreset = 'today' | 'week' | 'month' | 'year' | 'custom';
 export class ReportsPage {
   private readonly saleService = inject(SaleService);
   private readonly expenseService = inject(ExpenseService);
-  private readonly gcashService = inject(GcashService);
-  private readonly loadService = inject(LoadService);
-  private readonly productService = inject(ProductService);
   private readonly settingsService = inject(SettingsService);
   private readonly dialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
@@ -74,92 +75,45 @@ export class ReportsPage {
     () => this.settingsService.settings().currencySymbol,
   );
 
-  /** Sales that fall inside the selected date range, status = COMPLETED. */
-  protected readonly rangeSales = computed<readonly Sale[]>(() => {
-    const from = startOfDay(this.fromDate()).getTime();
-    const to = endOfDay(this.toDate()).getTime();
-    return this.saleService.sales().filter((s) => {
-      if (s.status !== 'COMPLETED') return false;
-      const t = new Date(s.date).getTime();
-      return t >= from && t <= to;
-    });
-  });
+  /**
+   * Range aggregates fetched from the server (sales + GCash + load) so the
+   * page no longer pulls those full lists to total them in the browser.
+   * Refreshed by the range effect in the constructor.
+   */
+  private readonly summary = signal<ReportSummary | null>(null);
+  protected readonly summaryLoading = signal<boolean>(false);
 
-  /** GCash transactions inside the selected window, completed and
-   *  not voided. */
-  protected readonly rangeGcash = computed<readonly GcashTransaction[]>(() => {
-    const from = startOfDay(this.fromDate()).getTime();
-    const to = endOfDay(this.toDate()).getTime();
-    return this.gcashService.completedTransactions().filter((t) => {
-      const ts = Date.parse(t.date);
-      return ts >= from && ts <= to;
-    });
-  });
-
-  /** Load transactions inside the selected window, completed and
-   *  not voided. */
-  protected readonly rangeLoad = computed<readonly LoadTransaction[]>(() => {
-    const from = startOfDay(this.fromDate()).getTime();
-    const to = endOfDay(this.toDate()).getTime();
-    return this.loadService.completedTransactions().filter((t) => {
-      const ts = Date.parse(t.date);
-      return ts >= from && ts <= to;
-    });
-  });
-
-  /** Service-fee revenue from GCash transactions in range — the fee
-   *  is the store's cut; the principal passes through to the wallet. */
-  protected readonly gcashFeeRevenue = computed(() =>
-    round2(this.rangeGcash().reduce((sum, t) => sum + Number(t.fee ?? 0), 0)),
-  );
+  /** Service-fee revenue from GCash transactions in range — the fee is
+   *  the store's cut; the principal passes through to the wallet. */
+  protected readonly gcashFeeRevenue = computed(() => round2(this.summary()?.gcashFees ?? 0));
 
   /** Service-fee revenue from cellphone-load transactions in range. */
-  protected readonly loadFeeRevenue = computed(() =>
-    round2(this.rangeLoad().reduce((sum, t) => sum + Number(t.fee ?? 0), 0)),
-  );
+  protected readonly loadFeeRevenue = computed(() => round2(this.summary()?.loadFees ?? 0));
 
-  /** Combined service-fee revenue (GCash + Load) shown on the dashboard
-   *  alongside product sales revenue. */
+  /** Combined service-fee revenue (GCash + Load). */
   protected readonly serviceFeeRevenue = computed(() =>
     round2(this.gcashFeeRevenue() + this.loadFeeRevenue()),
   );
 
-  /**
-   * Product-sales revenue: sum of {@code sale.total} (already net of
-   * line + order discounts, inclusive of tax). Matches the Dashboard
-   * KPI so both screens report the same headline — otherwise a
-   * non-zero tax rate makes Reports look lower than Dashboard for
-   * the same window.
-   */
-  protected readonly productRevenue = computed(() =>
-    round2(this.rangeSales().reduce((sum, s) => sum + Number(s.total), 0)),
-  );
+  /** Number of completed sales in range — shown beside product revenue. */
+  protected readonly salesCount = computed(() => this.summary()?.salesCount ?? 0);
+
+  /** Product-sales revenue: sum of sale totals (net of discounts, incl.
+   *  tax) — matches the Dashboard KPI. */
+  protected readonly productRevenue = computed(() => round2(this.summary()?.productRevenue ?? 0));
 
   /** Total revenue = product sales + GCash service fees + Load fees. */
   protected readonly revenue = computed(() =>
     round2(this.productRevenue() + this.serviceFeeRevenue()),
   );
 
-  /** COGS = sum of unit_cost × qty across every sold line item in range. */
-  protected readonly cogs = computed(() => {
-    let total = 0;
-    for (const sale of this.rangeSales()) {
-      for (const item of sale.items) {
-        // unitCost is null for pre-V14 historical rows — fall back to the
-        // product's current cost so old data still produces a number.
-        const cost =
-          item.unitCost ?? this.productService.getById(item.productId)?.cost ?? 0;
-        total += Number(cost) * item.quantity;
-      }
-    }
-    return round2(total);
-  });
+  /** COGS = Σ unit_cost × qty across sold line items in range (server
+   *  falls back to current product cost for pre-V14 null unit costs). */
+  protected readonly cogs = computed(() => round2(this.summary()?.cogs ?? 0));
 
   protected readonly grossProfit = computed(() => round2(this.revenue() - this.cogs()));
   protected readonly totalExpenses = computed(() => round2(this.expenseService.total()));
-  protected readonly netProfit = computed(() =>
-    round2(this.grossProfit() - this.totalExpenses()),
-  );
+  protected readonly netProfit = computed(() => round2(this.grossProfit() - this.totalExpenses()));
 
   protected readonly grossMargin = computed(() => {
     const r = this.revenue();
@@ -169,12 +123,26 @@ export class ReportsPage {
   protected readonly columns = ['date', 'category', 'description', 'amount', 'actions'] as const;
 
   constructor() {
-    // Refetch expenses whenever the range changes; sales are already loaded
-    // into SaleService by the admin layout and are filtered client-side.
+    // Refetch the range data whenever the range changes: expenses (list +
+    // total) from the expense endpoints, and the sales/GCash/load roll-up
+    // from the dedicated report-summary endpoint.
     effect(() => {
-      const from = toISODate(this.fromDate());
-      const to = toISODate(this.toDate());
-      this.expenseService.load(from, to);
+      const fromD = this.fromDate();
+      const toD = this.toDate();
+      this.expenseService.load(toISODate(fromD), toISODate(toD));
+
+      // from = start of the local "from" day; to = start of the day after
+      // the local "to" day (exclusive), so the whole "to" day is included.
+      const fromIso = startOfDay(fromD).toISOString();
+      const toIso = new Date(toD.getFullYear(), toD.getMonth(), toD.getDate() + 1).toISOString();
+      this.summaryLoading.set(true);
+      this.saleService.reportSummary(fromIso, toIso).subscribe({
+        next: (s) => {
+          this.summary.set(s);
+          this.summaryLoading.set(false);
+        },
+        error: () => this.summaryLoading.set(false),
+      });
     });
   }
 
@@ -253,11 +221,9 @@ export class ReportsPage {
       this.expenseService.delete(expense.id).subscribe({
         next: () => this.snackBar.open('Expense deleted', 'Dismiss', { duration: 2000 }),
         error: (err: HttpErrorResponse) => {
-          this.snackBar.open(
-            err.error?.message ?? 'Could not delete expense.',
-            'Dismiss',
-            { duration: 3000 },
-          );
+          this.snackBar.open(err.error?.message ?? 'Could not delete expense.', 'Dismiss', {
+            duration: 3000,
+          });
         },
       });
     });
@@ -304,9 +270,11 @@ export class ReportsPage {
       const jspdfMod = await import('jspdf');
       const autotableMod = await import('jspdf-autotable');
       const JsPDF = jspdfMod.default;
-      const autoTable = (autotableMod as unknown as {
-        default: (doc: object, opts: object) => void;
-      }).default;
+      const autoTable = (
+        autotableMod as unknown as {
+          default: (doc: object, opts: object) => void;
+        }
+      ).default;
 
       const doc = new JsPDF({ unit: 'pt', format: 'a4' });
       const sym = this.currencySymbol();
@@ -399,12 +367,7 @@ export class ReportsPage {
       ['Date', 'Category', 'Description', 'Amount'],
     ];
     for (const e of this.expenses()) {
-      rows.push([
-        e.date,
-        e.category ?? '',
-        e.description,
-        Number(e.amount).toFixed(2),
-      ]);
+      rows.push([e.date, e.category ?? '', e.description, Number(e.amount).toFixed(2)]);
     }
     return rows;
   }
@@ -420,12 +383,6 @@ function toISODate(d: Date): string {
 function startOfDay(d: Date): Date {
   const out = new Date(d);
   out.setHours(0, 0, 0, 0);
-  return out;
-}
-
-function endOfDay(d: Date): Date {
-  const out = new Date(d);
-  out.setHours(23, 59, 59, 999);
   return out;
 }
 

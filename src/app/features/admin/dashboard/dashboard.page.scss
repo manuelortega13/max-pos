@@ -74,10 +74,14 @@
     font-weight: 600;
   }
 
-  // Sits in place of the value while the today-summary loads; the top
-  // margin keeps the tile the same height as its loaded state.
+  // Stands in for the value while the today-summary loads. Occupy the same
+  // vertical footprint as the value text (1.5rem font ≈ 2rem line box) and
+  // left-align, so the tile doesn't shift and the spinner lines up where
+  // the number will be.
   &__spinner {
-    margin-top: 0.35rem;
+    height: 2rem;
+    display: flex;
+    align-items: center;
   }
 }
 
