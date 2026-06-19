@@ -77,3 +77,20 @@ export interface CreateSaleRequest {
   /** Required when paymentMethod = 'CREDIT', forbidden otherwise. */
   readonly creditorId?: string;
 }
+
+/** One day's completed-sale revenue (UTC calendar day, `yyyy-MM-dd`). */
+export interface DailyRevenue {
+  readonly date: string;
+  readonly total: number;
+}
+
+/**
+ * Pre-aggregated data for the dashboard Sales Growth chart, from
+ * `GET /api/sales/daily-revenue`. `points` is one entry per day across the
+ * window (oldest → newest, zero-filled); `previousTotal` is the preceding
+ * window's total for the growth-vs-previous badge.
+ */
+export interface SalesGrowth {
+  readonly points: readonly DailyRevenue[];
+  readonly previousTotal: number;
+}

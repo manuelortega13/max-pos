@@ -33,6 +33,15 @@ public class SaleController {
         return service.listByCashier(principal.getId());
     }
 
+    /** Pre-aggregated daily revenue for the dashboard Sales Growth chart.
+     *  Admin-only; avoids shipping the whole sales history to the client. */
+    @GetMapping("/daily-revenue")
+    @PreAuthorize("hasRole('ADMIN')")
+    public com.maxpos.sale.dto.SalesGrowthDto dailyRevenue(
+            @RequestParam(defaultValue = "14") int days) {
+        return service.growth(days);
+    }
+
     @GetMapping("/{id}")
     public SaleDto get(@PathVariable UUID id) {
         return service.get(id);

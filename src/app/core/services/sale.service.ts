@@ -1,8 +1,8 @@
-import { HttpClient, HttpErrorResponse } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse, HttpParams } from '@angular/common/http';
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { Observable, of, tap, throwError } from 'rxjs';
 import { catchError } from 'rxjs/operators';
-import { CreateSaleRequest, Sale, SaleItem } from '../models';
+import { CreateSaleRequest, Sale, SaleItem, SalesGrowth } from '../models';
 import { computeDiscount } from './cart.service';
 import { AuthService } from './auth.service';
 import { BusinessDayService } from './business-day.service';
@@ -53,18 +53,14 @@ export class SaleService {
     }
   }
 
-  readonly completedSales = computed(() =>
-    this._sales().filter((s) => s.status === 'COMPLETED'),
-  );
+  readonly completedSales = computed(() => this._sales().filter((s) => s.status === 'COMPLETED'));
 
   readonly todaySales = computed(() => {
     const today = new Date().toISOString().slice(0, 10);
     return this.completedSales().filter((s) => s.date.startsWith(today));
   });
 
-  readonly todayRevenue = computed(() =>
-    this.todaySales().reduce((sum, s) => sum + s.total, 0),
-  );
+  readonly todayRevenue = computed(() => this.todaySales().reduce((sum, s) => sum + s.total, 0));
 
   readonly todayTransactionCount = computed(() => this.todaySales().length);
 
@@ -112,6 +108,14 @@ export class SaleService {
     return this.http.get<Sale>(`/api/sales/${id}`);
   }
 
+  /** Pre-aggregated daily revenue for the dashboard Sales Growth chart.
+   *  Server-side aggregate so the chart doesn't bucket the whole sales
+   *  history in the browser. */
+  salesGrowth(days: number): Observable<SalesGrowth> {
+    const params = new HttpParams().set('days', days);
+    return this.http.get<SalesGrowth>('/api/sales/daily-revenue', { params });
+  }
+
   /**
    * Ring up a sale. Behaves exactly like the online flow when the network
    * cooperates. When the device is offline (`navigator.onLine === false`)
@@ -154,17 +158,15 @@ export class SaleService {
     // land against zero stock, and offlineModeEnabled enforces
     // allowNegativeStock so the backend accepts them.
     if (this._fastCheckout() && offlineEnabled) {
-      return of(this.enqueueOffline(payload, clientRef, 'fast checkout (queued for background sync)'));
+      return of(
+        this.enqueueOffline(payload, clientRef, 'fast checkout (queued for background sync)'),
+      );
     }
 
     // Only short-circuit to the offline queue when the admin has explicitly
     // enabled offline mode in Settings. Otherwise keep the legacy behavior
     // (network errors surface to the caller so the cashier sees them).
-    if (
-      offlineEnabled &&
-      typeof navigator !== 'undefined' &&
-      navigator.onLine === false
-    ) {
+    if (offlineEnabled && typeof navigator !== 'undefined' && navigator.onLine === false) {
       return of(this.enqueueOffline(payload, clientRef, 'device offline'));
     }
 
@@ -195,9 +197,7 @@ export class SaleService {
     const offlineEnabled = this.settingsService.settings().offlineModeEnabled;
 
     return this.http.post<Sale>(`/api/sales/${id}/refund`, body).pipe(
-      tap((updated) =>
-        this._sales.update((list) => list.map((s) => (s.id === id ? updated : s))),
-      ),
+      tap((updated) => this._sales.update((list) => list.map((s) => (s.id === id ? updated : s)))),
       catchError((err: HttpErrorResponse) => {
         if (err.status === 0 && offlineEnabled) {
           const optimistic = this.enqueueOfflineRefund(id, trimmed);
@@ -238,13 +238,13 @@ export class SaleService {
    */
   replayQueuedRefund(entry: QueuedRefund): Observable<Sale> {
     const body = entry.reason ? { reason: entry.reason } : {};
-    return this.http.post<Sale>(`/api/sales/${entry.saleId}/refund`, body).pipe(
-      tap((updated) =>
-        this._sales.update((list) =>
-          list.map((s) => (s.id === entry.saleId ? updated : s)),
+    return this.http
+      .post<Sale>(`/api/sales/${entry.saleId}/refund`, body)
+      .pipe(
+        tap((updated) =>
+          this._sales.update((list) => list.map((s) => (s.id === entry.saleId ? updated : s))),
         ),
-      ),
-    );
+      );
   }
 
   /**
@@ -269,11 +269,7 @@ export class SaleService {
     return optimistic;
   }
 
-  private enqueueOffline(
-    payload: CreateSaleRequest,
-    clientRef: string,
-    reason: string,
-  ): Sale {
+  private enqueueOffline(payload: CreateSaleRequest, clientRef: string, reason: string): Sale {
     const optimistic = this.buildOptimisticSale(payload, clientRef);
     this.offlineQueue.enqueue({
       kind: 'sale',

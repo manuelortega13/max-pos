@@ -1,6 +1,8 @@
 package com.maxpos.sale;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.time.Instant;
 import java.util.List;
@@ -20,4 +22,20 @@ public interface SaleRepository extends JpaRepository<Sale, UUID> {
      *  business day's window. Drives the reopen-day flow's auto re-
      *  attachment of sales that lost their FK link. */
     List<Sale> findAllByBusinessDayIsNullAndDateBetween(Instant start, Instant end);
+
+    /**
+     * Completed-sale revenue grouped by UTC calendar day, from {@code start}
+     * onward. Backs the dashboard Sales Growth chart so it aggregates in the
+     * database instead of shipping every sale to the browser. Returns rows of
+     * {@code [day 'YYYY-MM-DD' (String), total (BigDecimal)]}; days with no
+     * sales are absent (the service zero-fills the window).
+     */
+    @Query(value = """
+            SELECT to_char((date AT TIME ZONE 'UTC')::date, 'YYYY-MM-DD') AS day,
+                   COALESCE(SUM(total), 0) AS total
+            FROM sales
+            WHERE status = 'COMPLETED' AND date >= :start
+            GROUP BY (date AT TIME ZONE 'UTC')::date
+            """, nativeQuery = true)
+    List<Object[]> dailyCompletedRevenueSince(@Param("start") Instant start);
 }

@@ -9,21 +9,25 @@ import {
   input,
   viewChild,
 } from '@angular/core';
+import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { DecimalPipe } from '@angular/common';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
 import ApexCharts from 'apexcharts';
 import type { ApexOptions } from 'apexcharts';
+import { catchError, of, switchMap } from 'rxjs';
+import { SalesGrowth } from '../../../../core/models';
 import { SaleService } from '../../../../core/services/sale.service';
 import { SettingsService } from '../../../../core/services/settings.service';
 import { MoneyPipe } from '../../../../shared/pipes/currency-symbol.pipe';
+
+/** Empty series shown before the first fetch resolves. */
+const EMPTY_GROWTH: SalesGrowth = { points: [], previousTotal: 0 };
 
 interface DayPoint {
   readonly iso: string;
   readonly value: number;
 }
-
-const MS_PER_DAY = 86_400_000;
 
 /**
  * Sales-growth widget for the dashboard. Buckets completed sales into a
@@ -182,51 +186,32 @@ export class SalesGrowthChart {
     () => this.settingsService.settings().currencySymbol,
   );
 
-  /** Completed-sale revenue bucketed by UTC calendar day (yyyy-mm-dd),
-   *  matching the rest of the dashboard's UTC day boundaries. */
-  private readonly byDay = computed(() => {
-    const m = new Map<string, number>();
-    for (const s of this.saleService.completedSales()) {
-      const iso = s.date.slice(0, 10);
-      m.set(iso, (m.get(iso) ?? 0) + s.total);
-    }
-    return m;
-  });
-
-  /** Today's UTC midnight in epoch ms — the window's right edge. */
-  private readonly todayMs = computed(() =>
-    new Date(new Date().toISOString().slice(0, 10) + 'T00:00:00Z').getTime(),
+  /**
+   * Pre-aggregated daily revenue from the server (re-fetched when the
+   * window length changes), so the chart no longer buckets the whole sales
+   * history in the browser.
+   */
+  private readonly data = toSignal(
+    toObservable(this.windowDays).pipe(
+      switchMap((days) =>
+        this.saleService.salesGrowth(days).pipe(catchError(() => of(EMPTY_GROWTH))),
+      ),
+    ),
+    { initialValue: EMPTY_GROWTH },
   );
 
-  /** One point per day across the window, oldest → newest, zero-filled. */
-  protected readonly points = computed<DayPoint[]>(() => {
-    const n = this.windowDays();
-    const m = this.byDay();
-    const base = this.todayMs();
-    const out: DayPoint[] = [];
-    for (let i = n - 1; i >= 0; i--) {
-      const iso = new Date(base - i * MS_PER_DAY).toISOString().slice(0, 10);
-      out.push({ iso, value: m.get(iso) ?? 0 });
-    }
-    return out;
-  });
+  /** One point per day across the window, oldest → newest, zero-filled
+   *  (the server already zero-fills and orders the series). */
+  protected readonly points = computed<DayPoint[]>(() =>
+    this.data().points.map((p) => ({ iso: p.date, value: p.total })),
+  );
 
   protected readonly periodTotal = computed(() =>
     this.points().reduce((sum, p) => sum + p.value, 0),
   );
 
   /** Total of the window immediately preceding the current one. */
-  private readonly prevPeriodTotal = computed(() => {
-    const n = this.windowDays();
-    const m = this.byDay();
-    const base = this.todayMs();
-    let sum = 0;
-    for (let i = 2 * n - 1; i >= n; i--) {
-      const iso = new Date(base - i * MS_PER_DAY).toISOString().slice(0, 10);
-      sum += m.get(iso) ?? 0;
-    }
-    return sum;
-  });
+  private readonly prevPeriodTotal = computed(() => this.data().previousTotal);
 
   /** Fractional change vs. the previous window, or null when there's no
    *  prior baseline to grow from (avoids a divide-by-zero "∞%"). */

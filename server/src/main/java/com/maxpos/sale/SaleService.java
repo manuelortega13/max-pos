@@ -76,6 +76,43 @@ public class SaleService {
         return sales.findAllByOrderByDateDesc().stream().map(SaleDto::from).toList();
     }
 
+    /** Largest window the growth chart will aggregate, so a crafted
+     *  {@code days} can't scan an unbounded history. */
+    private static final int MAX_GROWTH_DAYS = 366;
+
+    /**
+     * Daily completed-sale revenue for the dashboard Sales Growth chart:
+     * one zero-filled point per day across the last {@code days} (UTC), plus
+     * the total of the immediately-preceding window of equal length for the
+     * growth badge. Aggregated in the DB so the dashboard doesn't pull the
+     * whole sales history to bucket client-side.
+     */
+    public com.maxpos.sale.dto.SalesGrowthDto growth(int days) {
+        int n = Math.min(Math.max(days, 1), MAX_GROWTH_DAYS);
+        LocalDate today = LocalDate.now(ZoneOffset.UTC);
+        LocalDate windowStart = today.minusDays(n - 1L);
+        LocalDate prevStart = today.minusDays(2L * n - 1);
+
+        // Fetch both windows in one grouped query (prevStart .. today).
+        Map<String, BigDecimal> byDay = new HashMap<>();
+        for (Object[] r : sales.dailyCompletedRevenueSince(
+                prevStart.atStartOfDay(ZoneOffset.UTC).toInstant())) {
+            byDay.put((String) r[0], (BigDecimal) r[1]);
+        }
+
+        List<com.maxpos.sale.dto.SalesGrowthDto.DailyRevenue> points = new java.util.ArrayList<>(n);
+        for (LocalDate d = windowStart; !d.isAfter(today); d = d.plusDays(1)) {
+            points.add(new com.maxpos.sale.dto.SalesGrowthDto.DailyRevenue(
+                    d.toString(), byDay.getOrDefault(d.toString(), BigDecimal.ZERO)));
+        }
+
+        BigDecimal previousTotal = BigDecimal.ZERO;
+        for (LocalDate d = prevStart; d.isBefore(windowStart); d = d.plusDays(1)) {
+            previousTotal = previousTotal.add(byDay.getOrDefault(d.toString(), BigDecimal.ZERO));
+        }
+        return new com.maxpos.sale.dto.SalesGrowthDto(points, previousTotal);
+    }
+
     public List<SaleDto> listByCashier(UUID cashierId) {
         return sales.findAllByCashierIdOrderByDateDesc(cashierId).stream().map(SaleDto::from).toList();
     }
