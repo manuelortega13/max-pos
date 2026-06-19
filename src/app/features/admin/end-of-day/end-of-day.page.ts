@@ -121,6 +121,10 @@ export class EndOfDayPage implements OnInit {
   /** True while a preview fetch is in flight. */
   private readonly previewLoading = signal(false);
 
+  /** True while a close-day request is in flight — disables the Close day
+   *  button and shows a spinner so it can't be double-submitted. */
+  protected readonly closing = signal(false);
+
   /**
    * True only during the FIRST preview fetch (nothing loaded yet) — drives
    * the live-totals loading state. Background refreshes (after a float
@@ -270,10 +274,12 @@ export class EndOfDayPage implements OnInit {
     );
     ref.afterClosed().subscribe((result) => {
       if (!result) return;
+      this.closing.set(true);
       this.businessDayService
         .close({ countedCash: result.countedCash, notes: result.notes })
         .subscribe({
           next: () => {
+            this.closing.set(false);
             this.snackBar.open('Business day closed.', 'Dismiss', { duration: 2500 });
             // Day is closed now — clear the live preview and refresh the
             // history table with the freshly-frozen snapshot row. The
@@ -283,6 +289,7 @@ export class EndOfDayPage implements OnInit {
             this.businessDayService.loadHistory();
           },
           error: (err: HttpErrorResponse) => {
+            this.closing.set(false);
             this.snackBar.open(err.error?.message ?? 'Could not close day.', 'Dismiss', {
               duration: 4000,
             });

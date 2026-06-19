@@ -125,18 +125,23 @@
         }
 
         <div class="eod__actions">
-          <button mat-stroked-button (click)="openAddToFloat()">
+          <button mat-stroked-button [disabled]="closing()" (click)="openAddToFloat()">
             <mat-icon>add</mat-icon>
             Add to float
           </button>
           <button
             mat-flat-button
             color="warn"
-            [disabled]="previewInitialLoading()"
+            [disabled]="previewInitialLoading() || closing()"
             (click)="closeDay()"
           >
-            <mat-icon>event_busy</mat-icon>
-            Close day
+            @if (closing()) {
+              <mat-progress-spinner mode="indeterminate" diameter="18" />
+              Closing…
+            } @else {
+              <mat-icon>event_busy</mat-icon>
+              Close day
+            }
           </button>
         </div>
       </mat-card-content>

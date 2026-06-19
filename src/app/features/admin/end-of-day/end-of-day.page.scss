@@ -117,6 +117,13 @@
     display: flex;
     justify-content: flex-end;
     gap: 0.5rem;
+
+    // Inline "Closing…" spinner: match the button's text colour (white on
+    // the warn-filled button) and sit just left of the label.
+    mat-progress-spinner {
+      --mdc-circular-progress-active-indicator-color: currentColor;
+      margin-right: 0.5rem;
+    }
   }
 
   &__history-table {
