@@ -2,7 +2,9 @@
   <header class="page__header">
     <div>
       <h1 class="page__title">Sales</h1>
-      <p class="page__subtitle">Every transaction across the store — product sales, GCash, and load</p>
+      <p class="page__subtitle">
+        Every transaction across the store — product sales, GCash, and load
+      </p>
     </div>
     <button mat-stroked-button>
       <mat-icon>download</mat-icon>
@@ -74,6 +76,40 @@
             }
           </mat-select>
         </mat-form-field>
+
+        <mat-form-field appearance="outline" class="filters__date" subscriptSizing="dynamic">
+          <mat-label>From</mat-label>
+          <input
+            matInput
+            [matDatepicker]="fromPicker"
+            [max]="toDate() ?? today"
+            [ngModel]="fromDate()"
+            (ngModelChange)="setFromDate($event)"
+          />
+          <mat-datepicker-toggle matIconSuffix [for]="fromPicker"></mat-datepicker-toggle>
+          <mat-datepicker #fromPicker></mat-datepicker>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="filters__date" subscriptSizing="dynamic">
+          <mat-label>To</mat-label>
+          <input
+            matInput
+            [matDatepicker]="toPicker"
+            [min]="fromDate()"
+            [max]="today"
+            [ngModel]="toDate()"
+            (ngModelChange)="setToDate($event)"
+          />
+          <mat-datepicker-toggle matIconSuffix [for]="toPicker"></mat-datepicker-toggle>
+          <mat-datepicker #toPicker></mat-datepicker>
+        </mat-form-field>
+
+        @if (hasDateFilter()) {
+          <button type="button" mat-button class="filters__clear-dates" (click)="clearDates()">
+            <mat-icon>clear</mat-icon>
+            Clear dates
+          </button>
+        }
       </div>
 
       <div class="table-wrap">
@@ -180,7 +216,9 @@
           <tr mat-header-row *matHeaderRowDef="columns"></tr>
           <tr mat-row *matRowDef="let row; columns: columns"></tr>
           <tr *matNoDataRow>
-            <td [attr.colspan]="columns.length" class="no-data">No transactions match your filters.</td>
+            <td [attr.colspan]="columns.length" class="no-data">
+              No transactions match your filters.
+            </td>
           </tr>
         </table>
       </div>

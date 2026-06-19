@@ -6,6 +6,7 @@ import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatChipsModule } from '@angular/material/chips';
+import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatDialog } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
@@ -18,12 +19,7 @@ import { MatTableModule } from '@angular/material/table';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { catchError, debounceTime, of, switchMap, tap } from 'rxjs';
-import {
-  Page,
-  SaleStatus,
-  TransactionKind,
-  TransactionRow,
-} from '../../../core/models';
+import { Page, SaleStatus, TransactionKind, TransactionRow } from '../../../core/models';
 import { SaleService } from '../../../core/services/sale.service';
 import {
   TransactionFeedQuery,
@@ -61,6 +57,7 @@ interface DisplayRow extends TransactionRow {
     MatButtonModule,
     MatCardModule,
     MatChipsModule,
+    MatDatepickerModule,
     MatFormFieldModule,
     MatIconModule,
     MatInputModule,
@@ -90,6 +87,30 @@ export class SalesPage {
   protected readonly source = signal<SourceFilter>('all');
   protected readonly cashier = signal<string>('all');
 
+  /** Date-range filter (inclusive on both ends). Null = unbounded. */
+  protected readonly fromDate = signal<Date | null>(null);
+  protected readonly toDate = signal<Date | null>(null);
+
+  /** Upper bound for the pickers — no future transactions exist. */
+  protected readonly today = new Date();
+
+  /** `from` as an ISO instant at the start of the picked local day. */
+  private readonly fromIso = computed(() => {
+    const d = this.fromDate();
+    return d ? new Date(d.getFullYear(), d.getMonth(), d.getDate()).toISOString() : undefined;
+  });
+
+  /** `to` as an ISO instant at the start of the day AFTER the picked
+   *  local day — an exclusive upper bound so the whole 'to' day is kept. */
+  private readonly toIso = computed(() => {
+    const d = this.toDate();
+    return d ? new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).toISOString() : undefined;
+  });
+
+  protected readonly hasDateFilter = computed(
+    () => this.fromDate() !== null || this.toDate() !== null,
+  );
+
   // ─── Pagination ───────────────────────────────────────────────
   protected readonly pageSizeOptions = [10, 25, 50, 100];
   protected readonly pageSize = signal(10);
@@ -118,6 +139,8 @@ export class SalesPage {
     status: this.status(),
     source: this.source(),
     cashierId: this.cashier(),
+    from: this.fromIso(),
+    to: this.toIso(),
     page: this.pageIndex(),
     size: this.pageSize(),
     tick: this.reloadTick(),
@@ -196,6 +219,22 @@ export class SalesPage {
     this.pageIndex.set(0);
   }
 
+  protected setFromDate(value: Date | null): void {
+    this.fromDate.set(value);
+    this.pageIndex.set(0);
+  }
+
+  protected setToDate(value: Date | null): void {
+    this.toDate.set(value);
+    this.pageIndex.set(0);
+  }
+
+  protected clearDates(): void {
+    this.fromDate.set(null);
+    this.toDate.set(null);
+    this.pageIndex.set(0);
+  }
+
   protected retry(): void {
     this.reload();
   }
@@ -218,11 +257,9 @@ export class SalesPage {
           data: sale,
         }),
       error: (err: HttpErrorResponse) =>
-        this.snackBar.open(
-          err.error?.message ?? 'Could not load sale items.',
-          'Dismiss',
-          { duration: 3000 },
-        ),
+        this.snackBar.open(err.error?.message ?? 'Could not load sale items.', 'Dismiss', {
+          duration: 3000,
+        }),
     });
   }
 

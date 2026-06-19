@@ -33,8 +33,10 @@ public class TransactionController {
             @RequestParam(required = false) String status,
             @RequestParam(required = false) UUID cashierId,
             @RequestParam(required = false) String search,
+            @RequestParam(required = false) String from,
+            @RequestParam(required = false) String to,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
-        return service.query(source, status, cashierId, search, page, size);
+        return service.query(source, status, cashierId, search, from, to, page, size);
     }
 }

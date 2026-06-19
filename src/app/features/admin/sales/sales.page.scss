@@ -11,8 +11,15 @@
     gap: 1rem;
   }
 
-  &__title { margin: 0; font-size: 1.75rem; font-weight: 600; }
-  &__subtitle { margin: 0; color: var(--mat-sys-on-surface-variant); }
+  &__title {
+    margin: 0;
+    font-size: 1.75rem;
+    font-weight: 600;
+  }
+  &__subtitle {
+    margin: 0;
+    color: var(--mat-sys-on-surface-variant);
+  }
 }
 
 .filters {
@@ -20,11 +27,24 @@
   gap: 1rem;
   flex-wrap: wrap;
 
-  &__search { flex: 1 1 280px; }
-  &__field { flex: 0 0 200px; }
+  &__search {
+    flex: 1 1 280px;
+  }
+  &__field {
+    flex: 0 0 200px;
+  }
+  &__date {
+    flex: 0 0 170px;
+  }
+  &__clear-dates {
+    flex: 0 0 auto;
+    align-self: center;
+  }
 }
 
-.table-wrap { overflow-x: auto; }
+.table-wrap {
+  overflow-x: auto;
+}
 
 .error-card {
   border-color: var(--mat-sys-error) !important;
@@ -48,7 +68,9 @@
     flex-direction: column;
     line-height: 1.2;
 
-    small { color: var(--mat-sys-on-surface-variant); }
+    small {
+      color: var(--mat-sys-on-surface-variant);
+    }
   }
 }
 
@@ -62,10 +84,22 @@
   font-size: 0.75rem;
   font-weight: 500;
 
-  &--completed { background: rgba(16, 185, 129, 0.15) !important; color: #047857 !important; }
-  &--refunded { background: rgba(239, 68, 68, 0.15) !important; color: #b91c1c !important; }
-  &--pending { background: rgba(245, 158, 11, 0.15) !important; color: #b45309 !important; }
-  &--voided { background: rgba(107, 114, 128, 0.18) !important; color: #4b5563 !important; }
+  &--completed {
+    background: rgba(16, 185, 129, 0.15) !important;
+    color: #047857 !important;
+  }
+  &--refunded {
+    background: rgba(239, 68, 68, 0.15) !important;
+    color: #b91c1c !important;
+  }
+  &--pending {
+    background: rgba(245, 158, 11, 0.15) !important;
+    color: #b45309 !important;
+  }
+  &--voided {
+    background: rgba(107, 114, 128, 0.18) !important;
+    color: #4b5563 !important;
+  }
 }
 
 .ref-static {
@@ -129,7 +163,10 @@
   font: inherit;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease,
+    color 0.12s ease;
 
   mat-icon {
     font-size: 1rem;
@@ -143,7 +180,9 @@
     color: var(--mat-sys-on-secondary-container);
     border-color: var(--mat-sys-outline-variant);
 
-    mat-icon { color: inherit; }
+    mat-icon {
+      color: inherit;
+    }
   }
 
   &:focus-visible {
