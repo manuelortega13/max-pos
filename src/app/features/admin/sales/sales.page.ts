@@ -221,6 +221,11 @@ export class SalesPage {
 
   protected setFromDate(value: Date | null): void {
     this.fromDate.set(value);
+    // Prefill "To" with the same date when it hasn't been set yet, so a
+    // single-day range is one tap; leave an existing "To" untouched.
+    if (value && this.toDate() === null) {
+      this.toDate.set(value);
+    }
     this.pageIndex.set(0);
   }
 
