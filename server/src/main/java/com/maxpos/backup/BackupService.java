@@ -248,37 +248,61 @@ public class BackupService {
         return new RestoreSummary("Database restored.", order.size(), totalRows);
     }
 
-    /** Insert all rows for one table, deferring any self-referencing FK column. */
+    /** How many rows to push per JDBC batch — keeps a huge table from
+     *  buffering its entire insert set in memory at once while still
+     *  collapsing thousands of per-row round-trips into a handful. */
+    private static final int BATCH_SIZE = 500;
+
+    /**
+     * Insert all rows for one table, deferring any self-referencing FK column.
+     *
+     * <p>Batched: every row of a table carries the same columns (the export
+     * dumps {@code SELECT *} for all rows), so we build one parameterized
+     * INSERT and push the rows through {@link JdbcTemplate#batchUpdate} in
+     * chunks. This is the difference between a restore that finishes in
+     * seconds and one that issues ~one network round-trip per row — slow
+     * enough on a remote database to hit a request/gateway timeout, which
+     * rolls the whole transaction back and looks like "it didn't restore".
+     */
     private int insertRows(String table, JsonNode rows) {
         if (rows.isEmpty()) return 0;
         Map<String, String> types = columnTypes(table);
         Set<String> selfRefs = selfRefColumns(table);
+
+        // Column set is uniform across the table's rows — derive it once from
+        // the first row (intersected with the live schema).
+        List<String> cols = new ArrayList<>();
+        for (Iterator<String> it = rows.get(0).fieldNames(); it.hasNext(); ) {
+            String c = it.next();
+            if (types.containsKey(c)) cols.add(c); // ignore unknown columns
+        }
+        if (cols.isEmpty()) return 0;
+
+        StringBuilder sql = new StringBuilder("INSERT INTO ").append(quote(table)).append(" (");
+        StringBuilder values = new StringBuilder();
+        for (int i = 0; i < cols.size(); i++) {
+            if (i > 0) { sql.append(", "); values.append(", "); }
+            sql.append(quote(cols.get(i)));
+            values.append("?::").append(types.get(cols.get(i)));
+        }
+        sql.append(") VALUES (").append(values).append(')');
+        String insertSql = sql.toString();
+
+        List<Object[]> batch = new ArrayList<>(BATCH_SIZE);
         List<DeferredSelfRef> deferred = new ArrayList<>();
         int count = 0;
 
         for (JsonNode row : rows) {
-            List<String> cols = new ArrayList<>();
-            for (Iterator<String> it = row.fieldNames(); it.hasNext(); ) {
-                String c = it.next();
-                if (types.containsKey(c)) cols.add(c); // ignore unknown columns
-            }
-            if (cols.isEmpty()) continue;
-
-            StringBuilder sql = new StringBuilder("INSERT INTO ").append(quote(table)).append(" (");
-            StringBuilder values = new StringBuilder();
-            List<String> binds = new ArrayList<>(cols.size());
+            Object[] binds = new Object[cols.size()];
             for (int i = 0; i < cols.size(); i++) {
                 String c = cols.get(i);
-                if (i > 0) { sql.append(", "); values.append(", "); }
-                sql.append(quote(c));
-                values.append("?::").append(types.get(c));
                 JsonNode v = row.get(c);
                 // Self-referencing FK → insert NULL now, patch after the table
                 // is fully loaded (the target row may not exist yet).
-                binds.add(selfRefs.contains(c) || v == null || v.isNull() ? null : v.asText());
+                binds[i] = (selfRefs.contains(c) || v == null || v.isNull()) ? null : v.asText();
             }
-            sql.append(") VALUES (").append(values).append(')');
-            jdbc.update(sql.toString(), binds.toArray());
+            batch.add(binds);
+            count++;
 
             if (!selfRefs.isEmpty()) {
                 String id = textOrNull(row.get("id"));
@@ -289,15 +313,30 @@ public class BackupService {
                     }
                 }
             }
-            count++;
-        }
 
-        // Second pass: wire up the self-references now that every row exists.
-        for (DeferredSelfRef d : deferred) {
-            jdbc.update(
-                    "UPDATE " + quote(table) + " SET " + quote(d.column()) + " = ?::" + types.get(d.column()) +
-                    " WHERE id = ?::" + types.get("id"),
-                    d.value(), d.id());
+            if (batch.size() >= BATCH_SIZE) {
+                jdbc.batchUpdate(insertSql, batch);
+                batch.clear();
+            }
+        }
+        if (!batch.isEmpty()) jdbc.batchUpdate(insertSql, batch);
+
+        // Second pass: wire up the self-references now that every row exists,
+        // batched per self-ref column.
+        if (!deferred.isEmpty()) {
+            Map<String, List<Object[]>> byColumn = new LinkedHashMap<>();
+            for (DeferredSelfRef d : deferred) {
+                byColumn.computeIfAbsent(d.column(), k -> new ArrayList<>())
+                        .add(new Object[] { d.value(), d.id() });
+            }
+            for (Map.Entry<String, List<Object[]>> e : byColumn.entrySet()) {
+                String update = "UPDATE " + quote(table) + " SET " + quote(e.getKey()) +
+                        " = ?::" + types.get(e.getKey()) + " WHERE id = ?::" + types.get("id");
+                List<Object[]> args = e.getValue();
+                for (int i = 0; i < args.size(); i += BATCH_SIZE) {
+                    jdbc.batchUpdate(update, args.subList(i, Math.min(i + BATCH_SIZE, args.size())));
+                }
+            }
         }
         return count;
     }
