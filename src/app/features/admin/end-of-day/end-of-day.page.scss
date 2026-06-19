@@ -119,11 +119,19 @@
     gap: 0.5rem;
 
     // Inline "Closing…" spinner: match the button's text colour (white on
-    // the warn-filled button) and sit just left of the label.
+    // the warn-filled button).
     mat-progress-spinner {
       --mdc-circular-progress-active-indicator-color: currentColor;
-      margin-right: 0.5rem;
     }
+  }
+
+  // The close-day button toggles between an icon and a spinner via @if, so its
+  // content is wrapped in a span (keeping the icon out of Material's projection
+  // slot). Lay it out so the icon/spinner sits centred beside the label.
+  &__btn-content {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
   }
 
   &__history-table {

@@ -135,13 +135,15 @@
             [disabled]="previewInitialLoading() || closing()"
             (click)="closeDay()"
           >
-            @if (closing()) {
-              <mat-progress-spinner mode="indeterminate" diameter="18" />
-              Closing…
-            } @else {
-              <mat-icon>event_busy</mat-icon>
-              Close day
-            }
+            <span class="eod__btn-content">
+              @if (closing()) {
+                <mat-progress-spinner mode="indeterminate" diameter="18" />
+                Closing…
+              } @else {
+                <mat-icon>event_busy</mat-icon>
+                Close day
+              }
+            </span>
           </button>
         </div>
       </mat-card-content>
