@@ -117,6 +117,24 @@ public class SaleService {
         return sales.findAllByCashierIdOrderByDateDesc(cashierId).stream().map(SaleDto::from).toList();
     }
 
+    /**
+     * Today's headline KPIs for the dashboard, computed in the DB. Revenue
+     * and transaction count cover completed sales on the current UTC day
+     * (matching the dashboard's existing "today" boundary); average ticket
+     * is the all-time average completed-sale total. Lets the dashboard drop
+     * deriving these from the full sales list in the browser.
+     */
+    public com.maxpos.sale.dto.TodaySummaryDto todaySummary() {
+        LocalDate today = LocalDate.now(ZoneOffset.UTC);
+        Instant start = today.atStartOfDay(ZoneOffset.UTC).toInstant();
+        Instant end = today.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
+        BigDecimal revenue = sales.completedRevenueBetween(start, end);
+        long transactions = sales.completedCountBetween(start, end);
+        BigDecimal averageTicket =
+                BigDecimal.valueOf(sales.averageCompletedTotal()).setScale(2, RoundingMode.HALF_UP);
+        return new com.maxpos.sale.dto.TodaySummaryDto(revenue, transactions, averageTicket);
+    }
+
     public SaleDto get(UUID id) {
         return sales.findById(id).map(SaleDto::from)
                 .orElseThrow(() -> new NotFoundException("Sale not found"));

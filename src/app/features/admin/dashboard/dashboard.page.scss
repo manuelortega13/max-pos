@@ -73,6 +73,12 @@
     font-size: 1.5rem;
     font-weight: 600;
   }
+
+  // Sits in place of the value while the today-summary loads; the top
+  // margin keeps the tile the same height as its loaded state.
+  &__spinner {
+    margin-top: 0.35rem;
+  }
 }
 
 .split {

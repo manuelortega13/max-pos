@@ -2,7 +2,7 @@ import { HttpClient, HttpErrorResponse, HttpParams } from '@angular/common/http'
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { Observable, of, tap, throwError } from 'rxjs';
 import { catchError } from 'rxjs/operators';
-import { CreateSaleRequest, Sale, SaleItem, SalesGrowth } from '../models';
+import { CreateSaleRequest, Sale, SaleItem, SalesGrowth, TodaySummary } from '../models';
 import { computeDiscount } from './cart.service';
 import { AuthService } from './auth.service';
 import { BusinessDayService } from './business-day.service';
@@ -114,6 +114,12 @@ export class SaleService {
   salesGrowth(days: number): Observable<SalesGrowth> {
     const params = new HttpParams().set('days', days);
     return this.http.get<SalesGrowth>('/api/sales/daily-revenue', { params });
+  }
+
+  /** Today's headline KPIs (revenue, transactions, average ticket) for the
+   *  dashboard, computed server-side instead of derived from the full list. */
+  todaySummary(): Observable<TodaySummary> {
+    return this.http.get<TodaySummary>('/api/sales/today-summary');
   }
 
   /**

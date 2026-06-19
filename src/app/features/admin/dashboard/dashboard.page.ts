@@ -1,7 +1,8 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { MatCardModule } from '@angular/material/card';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatChipsModule } from '@angular/material/chips';
@@ -10,7 +11,7 @@ import { MatDividerModule } from '@angular/material/divider';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { RouterLink } from '@angular/router';
-import { ExpiringBatch } from '../../../core/models';
+import { ExpiringBatch, TodaySummary } from '../../../core/models';
 import { ExpenseService } from '../../../core/services/expense.service';
 import { GcashService } from '../../../core/services/gcash.service';
 import { LoadService } from '../../../core/services/load.service';
@@ -34,6 +35,7 @@ import { TopProducts } from './components/top-products';
     MatChipsModule,
     MatButtonModule,
     MatDividerModule,
+    MatProgressSpinnerModule,
     MatTooltipModule,
     MoneyPipe,
     SalesGrowthChart,
@@ -80,13 +82,21 @@ export class DashboardPage {
       .reduce((sum, t) => sum + Number(t.fee ?? 0), 0);
   });
 
-  /** Today's revenue = product sales + GCash fees + Load fees. */
+  /**
+   * Today's headline sales figures, fetched from a dedicated server
+   * endpoint rather than derived from the full sales list. Null until the
+   * fetch resolves; {@link kpiLoading} drives the tiles' loading state.
+   */
+  private readonly salesSummary = signal<TodaySummary | null>(null);
+  protected readonly kpiLoading = signal(true);
+
+  /** Today's revenue = product sales (server) + GCash fees + Load fees. */
   protected readonly todayRevenue = computed(
-    () => this.saleService.todayRevenue() + this.todayGcashFees() + this.todayLoadFees(),
+    () => (this.salesSummary()?.revenue ?? 0) + this.todayGcashFees() + this.todayLoadFees(),
   );
 
-  protected readonly todayTransactions = this.saleService.todayTransactionCount;
-  protected readonly averageTicket = this.saleService.averageTicket;
+  protected readonly todayTransactions = computed(() => this.salesSummary()?.transactions ?? 0);
+  protected readonly averageTicket = computed(() => this.salesSummary()?.averageTicket ?? 0);
   protected readonly activeCashiers = computed(() => this.userService.activeCashiers().length);
   protected readonly lowStock = this.productService.lowStockProducts;
   protected readonly outOfStock = this.productService.outOfStockProducts;
@@ -273,6 +283,16 @@ export class DashboardPage {
     start.setDate(start.getDate() - (this.WINDOW_DAYS - 1));
     const iso = (d: Date) => d.toISOString().slice(0, 10);
     this.expenseService.load(iso(start), iso(today));
+
+    // Today KPIs from the dedicated server endpoint. Soft failure — the
+    // tiles fall back to zeros and the loading state ends either way.
+    this.saleService.todaySummary().subscribe({
+      next: (summary) => {
+        this.salesSummary.set(summary);
+        this.kpiLoading.set(false);
+      },
+      error: () => this.kpiLoading.set(false),
+    });
   }
 
   protected confirmWriteOff(batch: ExpiringBatch): void {

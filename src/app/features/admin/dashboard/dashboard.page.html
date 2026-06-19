@@ -13,7 +13,11 @@
       <div class="kpi__icon kpi__icon--primary"><mat-icon>payments</mat-icon></div>
       <div class="kpi__body">
         <span class="kpi__label">Revenue today</span>
-        <span class="kpi__value">{{ todayRevenue() | money }}</span>
+        @if (kpiLoading()) {
+          <mat-progress-spinner class="kpi__spinner" mode="indeterminate" diameter="22" />
+        } @else {
+          <span class="kpi__value">{{ todayRevenue() | money }}</span>
+        }
       </div>
     </mat-card>
 
@@ -21,7 +25,11 @@
       <div class="kpi__icon kpi__icon--tertiary"><mat-icon>receipt_long</mat-icon></div>
       <div class="kpi__body">
         <span class="kpi__label">Transactions today</span>
-        <span class="kpi__value">{{ todayTransactions() | number }}</span>
+        @if (kpiLoading()) {
+          <mat-progress-spinner class="kpi__spinner" mode="indeterminate" diameter="22" />
+        } @else {
+          <span class="kpi__value">{{ todayTransactions() | number }}</span>
+        }
       </div>
     </mat-card>
 
@@ -29,7 +37,11 @@
       <div class="kpi__icon kpi__icon--secondary"><mat-icon>local_atm</mat-icon></div>
       <div class="kpi__body">
         <span class="kpi__label">Average ticket</span>
-        <span class="kpi__value">{{ averageTicket() | money }}</span>
+        @if (kpiLoading()) {
+          <mat-progress-spinner class="kpi__spinner" mode="indeterminate" diameter="22" />
+        } @else {
+          <span class="kpi__value">{{ averageTicket() | money }}</span>
+        }
       </div>
     </mat-card>
 

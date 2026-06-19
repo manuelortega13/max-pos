@@ -42,6 +42,14 @@ public class SaleController {
         return service.growth(days);
     }
 
+    /** Today's headline KPIs (revenue, transaction count, average ticket)
+     *  for the dashboard, computed server-side. Admin-only. */
+    @GetMapping("/today-summary")
+    @PreAuthorize("hasRole('ADMIN')")
+    public com.maxpos.sale.dto.TodaySummaryDto todaySummary() {
+        return service.todaySummary();
+    }
+
     @GetMapping("/{id}")
     public SaleDto get(@PathVariable UUID id) {
         return service.get(id);

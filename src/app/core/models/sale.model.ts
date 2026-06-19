@@ -94,3 +94,12 @@ export interface SalesGrowth {
   readonly points: readonly DailyRevenue[];
   readonly previousTotal: number;
 }
+
+/** Today's headline sales KPIs for the dashboard, from
+ *  `GET /api/sales/today-summary`. Revenue/transactions cover the current
+ *  UTC day; averageTicket is the all-time average completed-sale total. */
+export interface TodaySummary {
+  readonly revenue: number;
+  readonly transactions: number;
+  readonly averageTicket: number;
+}

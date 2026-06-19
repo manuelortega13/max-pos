@@ -4,6 +4,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -38,4 +39,32 @@ public interface SaleRepository extends JpaRepository<Sale, UUID> {
             GROUP BY (date AT TIME ZONE 'UTC')::date
             """, nativeQuery = true)
     List<Object[]> dailyCompletedRevenueSince(@Param("start") Instant start);
+
+    /** Completed-sale revenue in [start, end). Backs the dashboard's
+     *  "Revenue today" KPI server-side. */
+    @Query("""
+            select coalesce(sum(s.total), 0)
+            from Sale s
+            where s.status = com.maxpos.sale.SaleStatus.COMPLETED
+              and s.date >= :start and s.date < :end
+            """)
+    BigDecimal completedRevenueBetween(@Param("start") Instant start, @Param("end") Instant end);
+
+    /** Count of completed sales in [start, end) — the "Transactions today" KPI. */
+    @Query("""
+            select count(s)
+            from Sale s
+            where s.status = com.maxpos.sale.SaleStatus.COMPLETED
+              and s.date >= :start and s.date < :end
+            """)
+    long completedCountBetween(@Param("start") Instant start, @Param("end") Instant end);
+
+    /** All-time average completed-sale total — the "Average ticket" KPI
+     *  (same scope the tile showed before). Returns 0 when there are none. */
+    @Query("""
+            select coalesce(avg(s.total), 0)
+            from Sale s
+            where s.status = com.maxpos.sale.SaleStatus.COMPLETED
+            """)
+    double averageCompletedTotal();
 }
