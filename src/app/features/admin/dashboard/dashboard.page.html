@@ -223,7 +223,7 @@
           </div>
         } @else {
           <ul class="stock-list">
-            @for (product of outOfStock(); track product.id) {
+            @for (product of outOfStockPreview(); track product.id) {
               <li class="stock-list__item">
                 @if (product.imageUrl) {
                   <img [src]="product.imageUrl" [alt]="product.name" class="stock-list__photo" />
@@ -246,6 +246,11 @@
               </li>
             }
           </ul>
+          @if (outOfStockOverflow() > 0) {
+            <p class="stock-list__more">
+              +{{ outOfStockOverflow() }} more out of stock — see all in inventory
+            </p>
+          }
         }
       </mat-card-content>
       <mat-card-actions align="end">

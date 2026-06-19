@@ -242,6 +242,12 @@ table.mat-mdc-table {
   flex-direction: column;
   gap: 0.75rem;
 
+  &__more {
+    margin: 0.75rem 0 0;
+    font-size: 0.85rem;
+    color: var(--mat-sys-on-surface-variant);
+  }
+
   &__item {
     display: flex;
     align-items: center;

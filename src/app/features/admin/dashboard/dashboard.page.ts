@@ -91,20 +91,31 @@ export class DashboardPage {
   protected readonly lowStock = this.productService.lowStockProducts;
   protected readonly outOfStock = this.productService.outOfStockProducts;
 
-  /** How many low-stock items the dashboard card shows before collapsing
-   *  the rest behind a "+N more" line — keeps the card compact when many
-   *  products are low. The full list lives on the Inventory page. */
-  private readonly LOW_STOCK_PREVIEW = 6;
+  /** How many stock items each dashboard card shows before collapsing the
+   *  rest behind a "+N more" line — keeps the cards compact when many
+   *  products are low / out. The full lists live on the Inventory page. */
+  private readonly STOCK_PREVIEW_LIMIT = 6;
 
   /** The most urgent low-stock items (lowest stock first), capped for the
    *  dashboard card. */
   protected readonly lowStockPreview = computed(() =>
-    [...this.lowStock()].sort((a, b) => a.stock - b.stock).slice(0, this.LOW_STOCK_PREVIEW),
+    [...this.lowStock()].sort((a, b) => a.stock - b.stock).slice(0, this.STOCK_PREVIEW_LIMIT),
   );
 
   /** Count of low-stock items beyond the preview cap (0 when all fit). */
   protected readonly lowStockOverflow = computed(() =>
-    Math.max(0, this.lowStock().length - this.LOW_STOCK_PREVIEW),
+    Math.max(0, this.lowStock().length - this.STOCK_PREVIEW_LIMIT),
+  );
+
+  /** The most urgent out-of-stock items (most oversold first), capped for
+   *  the dashboard card. */
+  protected readonly outOfStockPreview = computed(() =>
+    [...this.outOfStock()].sort((a, b) => a.stock - b.stock).slice(0, this.STOCK_PREVIEW_LIMIT),
+  );
+
+  /** Count of out-of-stock items beyond the preview cap (0 when all fit). */
+  protected readonly outOfStockOverflow = computed(() =>
+    Math.max(0, this.outOfStock().length - this.STOCK_PREVIEW_LIMIT),
   );
 
   /** Batches that have already passed their expiry — surfaced with write-off actions. */
