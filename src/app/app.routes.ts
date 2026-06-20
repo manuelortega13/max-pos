@@ -2,6 +2,7 @@ import { Routes } from '@angular/router';
 import { adminGuard } from './core/guards/admin.guard';
 import { authGuard } from './core/guards/auth.guard';
 import { publicOnlyGuard } from './core/guards/public-only.guard';
+import { platformGuard, platformPublicOnlyGuard } from './core/guards/platform.guard';
 
 export const routes: Routes = [
   {
@@ -9,6 +10,25 @@ export const routes: Routes = [
     canActivate: [publicOnlyGuard],
     loadComponent: () => import('./features/login/login.page').then((m) => m.LoginPage),
     title: 'Sign in — MaxPOS',
+  },
+  {
+    path: 'register',
+    loadComponent: () => import('./features/register/register.page').then((m) => m.RegisterPage),
+    title: 'Create your store — MaxPOS',
+  },
+  {
+    path: 'platform/login',
+    canActivate: [platformPublicOnlyGuard],
+    loadComponent: () =>
+      import('./features/platform/platform-login.page').then((m) => m.PlatformLoginPage),
+    title: 'Platform console — MaxPOS',
+  },
+  {
+    path: 'platform',
+    canActivate: [platformGuard],
+    loadComponent: () =>
+      import('./features/platform/platform-dashboard.page').then((m) => m.PlatformDashboardPage),
+    title: 'Platform console — MaxPOS',
   },
   {
     path: '',
@@ -19,8 +39,7 @@ export const routes: Routes = [
   {
     path: 'admin',
     canActivate: [adminGuard],
-    loadComponent: () =>
-      import('./layouts/admin-layout/admin-layout').then((m) => m.AdminLayout),
+    loadComponent: () => import('./layouts/admin-layout/admin-layout').then((m) => m.AdminLayout),
     children: [
       { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
       {
@@ -49,14 +68,12 @@ export const routes: Routes = [
       },
       {
         path: 'sales',
-        loadComponent: () =>
-          import('./features/admin/sales/sales.page').then((m) => m.SalesPage),
+        loadComponent: () => import('./features/admin/sales/sales.page').then((m) => m.SalesPage),
         title: 'Sales — MaxPOS',
       },
       {
         path: 'users',
-        loadComponent: () =>
-          import('./features/admin/users/users.page').then((m) => m.UsersPage),
+        loadComponent: () => import('./features/admin/users/users.page').then((m) => m.UsersPage),
         title: 'Users — MaxPOS',
       },
       {
@@ -87,14 +104,12 @@ export const routes: Routes = [
       },
       {
         path: 'gcash',
-        loadComponent: () =>
-          import('./features/admin/gcash/gcash.page').then((m) => m.GcashPage),
+        loadComponent: () => import('./features/admin/gcash/gcash.page').then((m) => m.GcashPage),
         title: 'GCash — MaxPOS',
       },
       {
         path: 'load',
-        loadComponent: () =>
-          import('./features/admin/load/load.page').then((m) => m.AdminLoadPage),
+        loadComponent: () => import('./features/admin/load/load.page').then((m) => m.AdminLoadPage),
         title: 'Load — MaxPOS',
       },
       {
@@ -140,8 +155,7 @@ export const routes: Routes = [
       { path: '', pathMatch: 'full', redirectTo: 'pos' },
       {
         path: 'pos',
-        loadComponent: () =>
-          import('./features/cashier/pos/pos.page').then((m) => m.PosPage),
+        loadComponent: () => import('./features/cashier/pos/pos.page').then((m) => m.PosPage),
         title: 'Register — MaxPOS',
       },
       {
@@ -162,14 +176,12 @@ export const routes: Routes = [
       },
       {
         path: 'gcash',
-        loadComponent: () =>
-          import('./features/cashier/gcash/gcash.page').then((m) => m.GcashPage),
+        loadComponent: () => import('./features/cashier/gcash/gcash.page').then((m) => m.GcashPage),
         title: 'GCash — MaxPOS',
       },
       {
         path: 'load',
-        loadComponent: () =>
-          import('./features/cashier/load/load.page').then((m) => m.LoadPage),
+        loadComponent: () => import('./features/cashier/load/load.page').then((m) => m.LoadPage),
         title: 'Load — MaxPOS',
       },
     ],

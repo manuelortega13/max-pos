@@ -27,13 +27,7 @@
         <mat-form-field appearance="outline">
           <mat-label>Email</mat-label>
           <mat-icon matPrefix>mail</mat-icon>
-          <input
-            matInput
-            type="email"
-            autocomplete="email"
-            formControlName="email"
-            autofocus
-          />
+          <input matInput type="email" autocomplete="email" formControlName="email" autofocus />
           @if (form.controls.email.touched && form.controls.email.invalid) {
             <mat-error>
               @if (form.controls.email.hasError('required')) {
@@ -85,6 +79,8 @@
           <mat-icon>{{ loading() ? 'hourglass_empty' : 'login' }}</mat-icon>
           {{ loading() ? 'Signing in…' : 'Sign in' }}
         </button>
+
+        <p class="login__register">New here? <a routerLink="/register">Create your store</a></p>
       </form>
     </mat-card-content>
   </mat-card>

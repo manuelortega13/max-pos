@@ -99,5 +99,14 @@
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.login__register {
+  text-align: center;
+  margin: 0.85rem 0 0;
+  font-size: 0.9rem;
+  color: var(--mat-sys-on-surface-variant);
 }

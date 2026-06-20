@@ -52,9 +52,7 @@ export class AuthService {
    * app versions, manual edits, half-written writes), and trusting a lone
    * token would let users past guards without a known identity.
    */
-  readonly isAuthenticated = computed(
-    () => this._token() !== null && this._user() !== null,
-  );
+  readonly isAuthenticated = computed(() => this._token() !== null && this._user() !== null);
 
   readonly isAdmin = computed(() => this._user()?.role === 'ADMIN');
   readonly isCashier = computed(() => this._user()?.role === 'CASHIER');
@@ -83,9 +81,7 @@ export class AuthService {
         // a real server response that we should NOT paper over.
         if (err.status !== 0) return throwError(() => err);
         return from(this.tryLocalLogin(credentials)).pipe(
-          switchMap((local) =>
-            local ? of(local) : throwError(() => err),
-          ),
+          switchMap((local) => (local ? of(local) : throwError(() => err))),
         );
       }),
     );
@@ -95,6 +91,38 @@ export class AuthService {
    *  snackbar — the user knows what they did. */
   logout(): void {
     this.clearStorageAndTimer();
+  }
+
+  /**
+   * Adopt an externally-minted store token as the current session. Used for
+   * registration auto-login and platform impersonation, where the backend
+   * hands back a ready store token. The user identity is read from the
+   * token's own claims (sub/email/name/role).
+   */
+  adoptToken(token: string): boolean {
+    const claims = this.decodeClaims(token);
+    if (!claims) return false;
+    const user: AuthUser = {
+      id: String(claims['sub'] ?? ''),
+      name: String(claims['name'] ?? ''),
+      email: String(claims['email'] ?? ''),
+      role: claims['role'] === 'ADMIN' ? 'ADMIN' : 'CASHIER',
+    };
+    if (!user.id || !user.email) return false;
+    this.storeSession({ token, user }, false);
+    return true;
+  }
+
+  /** Decode a JWT payload (segment 2) to its claims, or null if unparseable. */
+  private decodeClaims(token: string): Record<string, unknown> | null {
+    try {
+      const payload = token.split('.')[1];
+      if (!payload) return null;
+      const b64 = payload.replace(/-/g, '+').replace(/_/g, '/');
+      return JSON.parse(atob(b64)) as Record<string, unknown>;
+    } catch {
+      return null;
+    }
   }
 
   /**
@@ -108,11 +136,9 @@ export class AuthService {
   expireSession(): void {
     if (!this._token() && !this._user()) return;
     this.clearStorageAndTimer();
-    this.snackBar.open(
-      'Your session has expired. Please sign in again.',
-      'Dismiss',
-      { duration: 4000 },
-    );
+    this.snackBar.open('Your session has expired. Please sign in again.', 'Dismiss', {
+      duration: 4000,
+    });
     void this.router.navigate(['/login']);
   }
 
@@ -125,10 +151,7 @@ export class AuthService {
 
   /** Cache the password hash + user record after a successful online
    *  login so the same credentials can unlock the app while offline. */
-  private async cacheCredentials(
-    credentials: LoginRequest,
-    user: AuthUser,
-  ): Promise<void> {
+  private async cacheCredentials(credentials: LoginRequest, user: AuthUser): Promise<void> {
     try {
       const hash = await hashPassword(credentials.password);
       await this.localStore.saveCachedUser({
@@ -290,10 +313,7 @@ export class AuthService {
       this.expireSession();
       return;
     }
-    this.expiryTimer = setTimeout(
-      () => this.expireSession(),
-      Math.min(ms, MAX_TIMEOUT_MS),
-    );
+    this.expiryTimer = setTimeout(() => this.expireSession(), Math.min(ms, MAX_TIMEOUT_MS));
   }
 
   private readStoredToken(): string | null {

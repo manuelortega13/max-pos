@@ -1,8 +1,15 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  OnInit,
+  inject,
+  signal,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -16,6 +23,7 @@ import { AuthService } from '../../core/services/auth.service';
   selector: 'app-login-page',
   imports: [
     ReactiveFormsModule,
+    RouterLink,
     MatButtonModule,
     MatCardModule,
     MatFormFieldModule,
@@ -113,9 +121,10 @@ export class LoginPage implements OnInit {
     if (err.status === 0) return 'Cannot reach the server. Is the backend running?';
     if (err.status === 401) return 'Invalid email or password.';
     if (err.status === 403) return 'Your account is disabled.';
-    const apiMessage = (err.error && typeof err.error === 'object' && 'message' in err.error)
-      ? String((err.error as { message?: unknown }).message)
-      : null;
+    const apiMessage =
+      err.error && typeof err.error === 'object' && 'message' in err.error
+        ? String((err.error as { message?: unknown }).message)
+        : null;
     return apiMessage ?? 'Something went wrong. Please try again.';
   }
 }
