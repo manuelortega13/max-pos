@@ -102,7 +102,7 @@ import { StoreEditData, StoreEditDialog } from './store-edit-dialog';
             <ng-container matColumnDef="revenue">
               <th mat-header-cell *matHeaderCellDef>Revenue</th>
               <td mat-cell *matCellDef="let s">
-                {{ currencySymbol() }}{{ s.revenue | number: '1.2-2' }}
+                {{ s.currencySymbol || currencySymbol() }}{{ s.revenue | number: '1.2-2' }}
               </td>
             </ng-container>
             <ng-container matColumnDef="lastSale">

@@ -18,6 +18,13 @@ public record StoreSummaryDto(
         long products,
         long sales,
         BigDecimal revenue,
+        // The store's own currency (revenue above is in this currency).
+        String currency,
+        String currencySymbol,
+        // Revenue converted into the platform currency via live FX, for the
+        // cross-store total. Equals revenue when already in the platform
+        // currency or when no rate is available.
+        BigDecimal revenueConverted,
         Instant lastSaleAt,
         // Assigned plan + its limits (all null when no plan; limits null = unlimited).
         UUID planId,

@@ -6,6 +6,7 @@ import com.maxpos.platform.dto.ImpersonationResponse;
 import com.maxpos.platform.dto.StoreSummaryDto;
 import com.maxpos.platform.dto.StoreUpdateRequest;
 import com.maxpos.platform.dto.StoreUserDto;
+import com.maxpos.platform.fx.FxSnapshot;
 import com.maxpos.security.JwtService;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -32,15 +33,21 @@ public class PlatformStoreService {
     private final JwtService jwtService;
     private final JdbcTemplate jdbc;
     private final com.maxpos.platform.audit.PlatformAuditService audit;
+    private final com.maxpos.platform.fx.FxRateService fxService;
+    private final PlatformSettingsService platformSettings;
 
     public PlatformStoreService(StoreRepository stores, com.maxpos.platform.plan.PlanRepository plans,
                                 JwtService jwtService, JdbcTemplate jdbc,
-                                com.maxpos.platform.audit.PlatformAuditService audit) {
+                                com.maxpos.platform.audit.PlatformAuditService audit,
+                                com.maxpos.platform.fx.FxRateService fxService,
+                                PlatformSettingsService platformSettings) {
         this.stores = stores;
         this.plans = plans;
         this.jwtService = jwtService;
         this.jdbc = jdbc;
         this.audit = audit;
+        this.fxService = fxService;
+        this.platformSettings = platformSettings;
     }
 
     /** One store admin's fields, read via JdbcTemplate for impersonation. */
@@ -55,25 +62,35 @@ public class PlatformStoreService {
                    (SELECT COALESCE(sum(total), 0) FROM sales sa WHERE sa.store_id = s.id
                                                      AND sa.status = 'COMPLETED') AS revenue,
                    (SELECT max(date) FROM sales sa WHERE sa.store_id = s.id) AS last_sale,
+                   ss.currency        AS currency,
+                   ss.currency_symbol AS currency_symbol,
                    pl.id   AS plan_id,
                    pl.name AS plan_name,
                    pl.max_users    AS max_users,
                    pl.max_products AS max_products
             FROM stores s
             LEFT JOIN plans pl ON pl.id = s.plan_id
+            LEFT JOIN store_settings ss ON ss.store_id = s.id
             """;
 
     /** All stores with stats, newest activity first by created date. */
     public List<StoreSummaryDto> listStores() {
-        return jdbc.query(STATS_SQL + " ORDER BY s.created_at", (rs, n) -> mapRow(rs));
+        FxSnapshot fx = currentFx();
+        return jdbc.query(STATS_SQL + " ORDER BY s.created_at", (rs, n) -> mapRow(rs, fx));
     }
 
     /** One store with stats. */
     public StoreSummaryDto getStore(UUID id) {
+        FxSnapshot fx = currentFx();
         List<StoreSummaryDto> rows =
-                jdbc.query(STATS_SQL + " WHERE s.id = ?", (rs, n) -> mapRow(rs), id);
+                jdbc.query(STATS_SQL + " WHERE s.id = ?", (rs, n) -> mapRow(rs, fx), id);
         if (rows.isEmpty()) throw new NotFoundException("Store not found");
         return rows.get(0);
+    }
+
+    /** FX snapshot for the platform currency, used to convert store revenue. */
+    private FxSnapshot currentFx() {
+        return fxService.snapshot(platformSettings.get().defaultCurrency());
     }
 
     /**
@@ -190,8 +207,16 @@ public class PlatformStoreService {
         return new ImpersonationResponse(token, store.getId(), store.getName(), admin.email());
     }
 
-    private static StoreSummaryDto mapRow(java.sql.ResultSet rs) throws java.sql.SQLException {
+    private static StoreSummaryDto mapRow(java.sql.ResultSet rs, FxSnapshot fx)
+            throws java.sql.SQLException {
         Timestamp lastSale = rs.getTimestamp("last_sale");
+        BigDecimal revenue = rs.getBigDecimal("revenue") == null
+                ? BigDecimal.ZERO : rs.getBigDecimal("revenue");
+        String currency = rs.getString("currency");
+        // Convert into the platform currency for the cross-store total. Falls
+        // back to the raw amount when the currency is unknown to the rates.
+        BigDecimal multiplier = fx.multiplierFor(currency);
+        BigDecimal revenueConverted = multiplier == null ? revenue : revenue.multiply(multiplier);
         return new StoreSummaryDto(
                 rs.getObject("id", UUID.class),
                 rs.getString("name"),
@@ -201,7 +226,10 @@ public class PlatformStoreService {
                 rs.getLong("users"),
                 rs.getLong("products"),
                 rs.getLong("sales"),
-                rs.getBigDecimal("revenue") == null ? BigDecimal.ZERO : rs.getBigDecimal("revenue"),
+                revenue,
+                currency,
+                rs.getString("currency_symbol"),
+                revenueConverted,
                 lastSale == null ? null : lastSale.toInstant(),
                 rs.getObject("plan_id", UUID.class),
                 rs.getString("plan_name"),

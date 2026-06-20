@@ -21,13 +21,29 @@ export interface PlatformStore {
   readonly users: number;
   readonly products: number;
   readonly sales: number;
+  /** Revenue in the store's own currency. */
   readonly revenue: number;
+  /** The store's own currency code + symbol. */
+  readonly currency: string | null;
+  readonly currencySymbol: string | null;
+  /** Revenue converted into the platform currency (live FX) for the total. */
+  readonly revenueConverted: number;
   readonly lastSaleAt: string | null;
   /** Assigned plan + limits. null plan → unassigned; null limit → unlimited. */
   readonly planId: string | null;
   readonly planName: string | null;
   readonly maxUsers: number | null;
   readonly maxProducts: number | null;
+}
+
+/** Live FX rates into the platform currency (from the platform FX endpoint). */
+export interface FxRates {
+  readonly base: string;
+  readonly asOf: string;
+  /** False when rates couldn't be loaded — totals are then unconverted. */
+  readonly available: boolean;
+  /** currency code → units of base per 1 unit of that currency. */
+  readonly toBase: Record<string, number>;
 }
 
 /** Platform-wide settings owned by the super admin. */

@@ -1,6 +1,7 @@
 package com.maxpos.config;
 
 import com.maxpos.notification.push.PushProperties;
+import com.maxpos.platform.fx.FxProperties;
 import com.maxpos.security.JwtAuthenticationFilter;
 import jakarta.servlet.DispatcherType;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -26,7 +27,7 @@ import java.util.List;
 
 @Configuration
 @EnableMethodSecurity
-@EnableConfigurationProperties({ MaxPosProperties.class, PushProperties.class })
+@EnableConfigurationProperties({ MaxPosProperties.class, PushProperties.class, FxProperties.class })
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtFilter;

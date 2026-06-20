@@ -6,7 +6,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
-import { PlatformStore } from '../../core/models/platform.model';
+import { FxRates, PlatformStore } from '../../core/models/platform.model';
 import { PlatformService } from '../../core/services/platform.service';
 import { PlatformSettingsService } from '../../core/services/platform-settings.service';
 
@@ -83,7 +83,16 @@ import { PlatformSettingsService } from '../../core/services/platform-settings.s
           <div>
             <span class="kpi__label">Total revenue (all stores)</span>
             <span class="kpi__value">{{ currencySymbol() }}{{ revenue() | number: '1.2-2' }}</span>
-            <span class="kpi__hint">Sums each store's revenue across currencies</span>
+            <span class="kpi__hint">{{ revenueHint() }}</span>
+            @if (displayRates().length) {
+              <div class="kpi__rates">
+                @for (r of displayRates(); track r.code) {
+                  <span class="kpi__rate">
+                    1 {{ fxBase() }} = {{ r.perBase | number: '1.2-4' }} {{ r.code }}
+                  </span>
+                }
+              </div>
+            }
           </div>
         </mat-card>
       </div>
@@ -187,6 +196,20 @@ import { PlatformSettingsService } from '../../core/services/platform-settings.s
         font-size: 0.7rem;
         color: var(--mat-sys-on-surface-variant);
       }
+      .kpi__rates {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+        margin-top: 0.4rem;
+      }
+      .kpi__rate {
+        font-size: 0.7rem;
+        font-variant-numeric: tabular-nums;
+        padding: 0.1rem 0.45rem;
+        border-radius: 0.5rem;
+        background: var(--mat-sys-surface-container-high);
+        color: var(--mat-sys-on-surface-variant);
+      }
       .list {
         list-style: none;
         margin: 0;
@@ -223,6 +246,7 @@ export class PlatformOverviewPage {
   protected readonly currencySymbol = inject(PlatformSettingsService).currencySymbol;
 
   private readonly stores = signal<PlatformStore[]>([]);
+  protected readonly fx = signal<FxRates | null>(null);
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
 
@@ -236,7 +260,48 @@ export class PlatformOverviewPage {
   protected readonly users = computed(() => this.sum((s) => s.users));
   protected readonly products = computed(() => this.sum((s) => s.products));
   protected readonly sales = computed(() => this.sum((s) => s.sales));
-  protected readonly revenue = computed(() => this.sum((s) => s.revenue));
+  // Total uses each store's revenue already converted to the platform
+  // currency (server-side, via live FX) so mixed-currency stores add up.
+  protected readonly revenue = computed(() => this.sum((s) => s.revenueConverted));
+
+  /** Whether any store's revenue is in a currency other than the platform's. */
+  private readonly hasForeign = computed(() => {
+    const base = this.fx()?.base;
+    return this.stores().some((s) => s.currency && base && s.currency !== base);
+  });
+
+  protected readonly revenueHint = computed(() => {
+    if (!this.hasForeign()) return 'Across all stores';
+    const f = this.fx();
+    if (!f || !f.available) return 'Mixed currencies — exchange rates unavailable, not converted';
+    return `Converted to ${f.base} at live rates · ${this.formatAsOf(f.asOf)}`;
+  });
+
+  protected readonly fxBase = computed(() => this.fx()?.base ?? '');
+
+  /**
+   * The live rate applied for each foreign currency actually present among
+   * the stores, shown as "1 BASE = N CODE" (the inverse of the to-base
+   * multiplier). Empty when rates are unavailable or every store is in base.
+   */
+  protected readonly displayRates = computed(() => {
+    const f = this.fx();
+    if (!f || !f.available) return [];
+    const codes = [
+      ...new Set(
+        this.stores()
+          .map((s) => s.currency)
+          .filter((c): c is string => !!c && c !== f.base),
+      ),
+    ];
+    return codes
+      .map((code) => {
+        const toBase = f.toBase[code];
+        return { code, perBase: toBase ? 1 / toBase : null };
+      })
+      .filter((r): r is { code: string; perBase: number } => r.perBase != null)
+      .sort((a, b) => a.code.localeCompare(b.code));
+  });
   protected readonly newest = computed(() =>
     [...this.stores()]
       .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
@@ -260,9 +325,20 @@ export class PlatformOverviewPage {
         this.error.set(err.error?.message ?? 'Could not load platform data.');
       },
     });
+    // Rates power only the "as of / unavailable" hint; the converted figures
+    // come from the store rows themselves. Non-fatal on failure.
+    this.platform.getFxRates().subscribe({
+      next: (rates) => this.fx.set(rates),
+      error: () => this.fx.set(null),
+    });
   }
 
   private sum(pick: (s: PlatformStore) => number): number {
     return this.stores().reduce((acc, s) => acc + (pick(s) || 0), 0);
+  }
+
+  private formatAsOf(iso: string): string {
+    const d = new Date(iso);
+    return Number.isNaN(d.getTime()) ? 'just now' : `as of ${d.toLocaleString()}`;
   }
 }

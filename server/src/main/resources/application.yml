@@ -85,6 +85,13 @@ maxpos:
     public-key: ${VAPID_PUBLIC_KEY:}
     private-key: ${VAPID_PRIVATE_KEY:}
     subject: ${VAPID_SUBJECT:mailto:admin@maxpos.com}
+  fx:
+    # Live exchange rates for the platform revenue total. {base} is the
+    # platform currency; {key} is FX_API_KEY (only providers that need one).
+    enabled: ${FX_ENABLED:true}
+    url: ${FX_API_URL:https://open.er-api.com/v6/latest/{base}}
+    api-key: ${FX_API_KEY:}
+    ttl-minutes: ${FX_TTL_MINUTES:60}
   jwt:
     # Must be at least 256 bits (32 chars) of random entropy. Generate with:
     #   openssl rand -base64 48

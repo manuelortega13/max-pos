@@ -4,6 +4,7 @@ import { Observable } from 'rxjs';
 import {
   CreatePlanRequest,
   CreatePlatformAdminRequest,
+  FxRates,
   ImpersonationResponse,
   Plan,
   PlatformAdminAccount,
@@ -67,6 +68,10 @@ export class PlatformService {
 
   setAdminActive(id: string, active: boolean): Observable<PlatformAdminAccount> {
     return this.http.put<PlatformAdminAccount>(`/api/platform/admins/${id}/status`, { active });
+  }
+
+  getFxRates(): Observable<FxRates> {
+    return this.http.get<FxRates>('/api/platform/fx');
   }
 
   listActivity(limit = 100): Observable<PlatformAuditEntry[]> {

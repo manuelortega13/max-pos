@@ -91,7 +91,9 @@ import { StoreEditData, StoreEditDialog } from './store-edit-dialog';
           </mat-card>
           <mat-card appearance="outlined" class="stat">
             <span class="stat__label">Revenue</span>
-            <span class="stat__value">{{ currencySymbol() }}{{ s.revenue | number: '1.2-2' }}</span>
+            <span class="stat__value"
+              >{{ s.currencySymbol || currencySymbol() }}{{ s.revenue | number: '1.2-2' }}</span
+            >
           </mat-card>
           <mat-card appearance="outlined" class="stat">
             <span class="stat__label">Last sale</span>
