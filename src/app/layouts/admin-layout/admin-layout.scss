@@ -177,8 +177,13 @@
   border-bottom: 1px solid var(--mat-sys-outline-variant);
   background: var(--mat-sys-surface-container-low);
 
-  strong { font-size: 0.95rem; }
-  small { color: var(--mat-sys-on-surface-variant); font-size: 0.75rem; }
+  strong {
+    font-size: 0.95rem;
+  }
+  small {
+    color: var(--mat-sys-on-surface-variant);
+    font-size: 0.75rem;
+  }
 }
 
 .notif-menu__empty {
@@ -230,7 +235,7 @@
    still showed the nav, but with no padding-bottom the last scroll
    line sat behind it. This media query precisely mirrors isHandset(). */
 @media (max-width: 839.98px) and (orientation: portrait),
-       (max-width: 1279.98px) and (orientation: landscape) {
+  (max-width: 1279.98px) and (orientation: landscape) {
   .admin-shell__main {
     padding-bottom: calc(64px + env(safe-area-inset-bottom, 0) + 0.5rem);
   }
@@ -271,26 +276,16 @@
     color: var(--mat-sys-on-surface-variant);
   }
 
-  &--ok       { border-left-color: #10b981; }
-  &--soon     { border-left-color: #f59e0b; }
-  &--expired  { border-left-color: #ef4444; background: rgba(239, 68, 68, 0.05); }
-}
-
-/* "Sync now" menu item — relative-time hint after the label, plus a
-   spinning icon while a refresh is in flight. Scoped to the global
-   .admin-shell namespace so it doesn't leak. */
-.admin-shell__menu-hint {
-  color: var(--mat-sys-on-surface-variant);
-  font-weight: 400;
-}
-
-.admin-shell__sync-icon--spin {
-  animation: admin-shell-sync-spin 1.2s linear infinite;
-}
-
-@keyframes admin-shell-sync-spin {
-  from { transform: rotate(0deg); }
-  to   { transform: rotate(360deg); }
+  &--ok {
+    border-left-color: #10b981;
+  }
+  &--soon {
+    border-left-color: #f59e0b;
+  }
+  &--expired {
+    border-left-color: #ef4444;
+    background: rgba(239, 68, 68, 0.05);
+  }
 }
 
 // Floating "Owner's playbook" trigger. Sits at bottom-right on
@@ -312,7 +307,10 @@
   justify-content: center;
   cursor: pointer;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.22);
-  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease,
+    background 0.15s ease;
   z-index: 900;
 
   mat-icon {
@@ -326,7 +324,9 @@
     box-shadow: 0 6px 20px rgba(0, 0, 0, 0.28);
   }
 
-  &:active { transform: translateY(0); }
+  &:active {
+    transform: translateY(0);
+  }
   &:focus-visible {
     outline: 2px solid var(--mat-sys-primary);
     outline-offset: 3px;
@@ -375,6 +375,10 @@
 }
 
 @keyframes playbook-slide-in {
-  from { transform: translateX(100%); }
-  to   { transform: translateX(0); }
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
 }

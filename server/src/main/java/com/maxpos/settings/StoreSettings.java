@@ -43,10 +43,10 @@ public class StoreSettings {
     private String phone;
 
     @Column(name = "allow_negative_stock", nullable = false)
-    private boolean allowNegativeStock = false;
+    private boolean allowNegativeStock = true;
 
     @Column(name = "offline_mode_enabled", nullable = false)
-    private boolean offlineModeEnabled = false;
+    private boolean offlineModeEnabled = true;
 
     /** When true, the backend's scheduled job writes a daily database backup
      *  to disk and the admin web app downloads one daily. */

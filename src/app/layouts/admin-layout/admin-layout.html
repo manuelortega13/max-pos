@@ -38,7 +38,12 @@
           <mat-icon>menu</mat-icon>
         </button>
       } @else {
-        <img src="/icons/icon-192.png" alt="" class="admin-shell__toolbar-logo" aria-hidden="true" />
+        <img
+          src="/icons/icon-192.png"
+          alt=""
+          class="admin-shell__toolbar-logo"
+          aria-hidden="true"
+        />
         <span class="admin-shell__toolbar-title">MaxPOS</span>
       }
       <span class="admin-shell__toolbar-spacer"></span>
@@ -104,18 +109,6 @@
           </div>
           <mat-divider></mat-divider>
         }
-        <button mat-menu-item (click)="syncNow()" [disabled]="syncing()">
-          <mat-icon [class.admin-shell__sync-icon--spin]="syncing()">sync</mat-icon>
-          <span>
-            @if (syncing()) {
-              Syncing…
-            } @else if (lastSyncLabel(); as label) {
-              Sync now <small class="admin-shell__menu-hint">· {{ label }}</small>
-            } @else {
-              Sync now
-            }
-          </span>
-        </button>
         <button mat-menu-item (click)="goHome()">
           <mat-icon>home</mat-icon>
           <span>Home</span>
@@ -171,16 +164,19 @@
           <mat-icon>more_horiz</mat-icon>
           <span>More</span>
         </button>
-        <mat-menu #moreMenu="matMenu" yPosition="above" xPosition="before" class="admin-shell__more-menu">
+        <mat-menu
+          #moreMenu="matMenu"
+          yPosition="above"
+          xPosition="before"
+          class="admin-shell__more-menu"
+        >
           <a mat-menu-item routerLink="products">
             <mat-icon>inventory_2</mat-icon><span>Products</span>
           </a>
           <a mat-menu-item routerLink="categories">
             <mat-icon>category</mat-icon><span>Categories</span>
           </a>
-          <a mat-menu-item routerLink="users">
-            <mat-icon>group</mat-icon><span>Users</span>
-          </a>
+          <a mat-menu-item routerLink="users"> <mat-icon>group</mat-icon><span>Users</span> </a>
           <a mat-menu-item routerLink="reports">
             <mat-icon>bar_chart</mat-icon><span>Reports</span>
           </a>
@@ -193,9 +189,7 @@
           <a mat-menu-item routerLink="gcash">
             <mat-icon>smartphone</mat-icon><span>GCash</span>
           </a>
-          <a mat-menu-item routerLink="load">
-            <mat-icon>sim_card</mat-icon><span>Load</span>
-          </a>
+          <a mat-menu-item routerLink="load"> <mat-icon>sim_card</mat-icon><span>Load</span> </a>
           <a mat-menu-item routerLink="finances">
             <mat-icon>account_balance</mat-icon><span>Finances</span>
           </a>
@@ -229,11 +223,7 @@
 </button>
 
 @if (playbookOpen()) {
-  <aside
-    class="admin-shell__playbook-panel"
-    role="complementary"
-    aria-label="Owner's playbook"
-  >
+  <aside class="admin-shell__playbook-panel" role="complementary" aria-label="Owner's playbook">
     <app-playbook-panel (close)="closePlaybook()" />
   </aside>
 }

@@ -14,8 +14,8 @@ const SETTINGS_FALLBACK: StoreSettings = {
   receiptFooter: '',
   address: '',
   phone: '',
-  allowNegativeStock: false,
-  offlineModeEnabled: false,
+  allowNegativeStock: true,
+  offlineModeEnabled: true,
   autoBackupEnabled: false,
   cardAccountId: null,
   transferAccountId: null,
@@ -53,9 +53,9 @@ export class SettingsService {
   }
 
   save(patch: StoreSettings): Observable<StoreSettings> {
-    return this.http.put<StoreSettings>('/api/settings', patch).pipe(
-      tap((saved) => this._settings.set(saved)),
-    );
+    return this.http
+      .put<StoreSettings>('/api/settings', patch)
+      .pipe(tap((saved) => this._settings.set(saved)));
   }
 
   private describe(err: HttpErrorResponse): string {

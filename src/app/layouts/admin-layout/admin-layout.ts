@@ -1,4 +1,12 @@
-import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, effect, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  OnDestroy,
+  OnInit,
+  effect,
+  inject,
+  signal,
+} from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { MatBadgeModule } from '@angular/material/badge';
 import { MatSidenavModule } from '@angular/material/sidenav';
@@ -152,14 +160,6 @@ export class AdminLayout implements OnInit, OnDestroy {
   protected readonly expiringCount = this.notifications.count;
   protected readonly pushSubscribed = this.pushService.subscribed;
   protected readonly pushPermission = this.pushService.permission;
-  /** True while RefreshService.refreshAll() is in flight — drives the
-   *  spinner icon + disabled state on the "Sync now" menu item. */
-  protected readonly syncing = signal(false);
-  /** Human-friendly "synced X minutes ago" label for the user menu.
-   *  Returns null when no sync has ever completed on this device. */
-  protected readonly lastSyncLabel = computed(() =>
-    this.formatRelative(this.refreshService.lastSyncAt()),
-  );
 
   protected readonly isHandset = toSignal(
     this.breakpointObserver
@@ -190,39 +190,6 @@ export class AdminLayout implements OnInit, OnDestroy {
     this.router.navigate(['/']);
   }
 
-  /** "Sync now" menu item — same work as pull-to-refresh, just a
-   *  discoverable button. Guarded against concurrent invocations so
-   *  rapid clicks don't overlap. */
-  protected async syncNow(): Promise<void> {
-    if (this.syncing()) return;
-    this.syncing.set(true);
-    try {
-      await this.refreshService.refreshAll();
-    } finally {
-      this.syncing.set(false);
-    }
-  }
-
-  /**
-   * Compact relative-time formatter — "12s ago", "3m ago", "2h ago",
-   * "yesterday", or a date for older entries. Updated lazily (only
-   * recomputes when lastSyncAt changes) which is fine: the menu opens
-   * on demand, so a stale "5m ago" is at worst a few seconds off.
-   */
-  private formatRelative(at: number | null): string | null {
-    if (at === null) return null;
-    const secs = Math.max(0, Math.floor((Date.now() - at) / 1000));
-    if (secs < 60) return `${secs}s ago`;
-    const mins = Math.floor(secs / 60);
-    if (mins < 60) return `${mins}m ago`;
-    const hours = Math.floor(mins / 60);
-    if (hours < 24) return `${hours}h ago`;
-    const days = Math.floor(hours / 24);
-    if (days === 1) return 'yesterday';
-    if (days < 7) return `${days}d ago`;
-    return new Date(at).toLocaleDateString();
-  }
-
   protected goToInventory(): void {
     this.router.navigate(['/admin/inventory']);
   }
@@ -242,11 +209,9 @@ export class AdminLayout implements OnInit, OnDestroy {
     if (ok) {
       this.snackBar.open('Push notifications enabled', 'Dismiss', { duration: 2500 });
     } else if (this.pushPermission() === 'denied') {
-      this.snackBar.open(
-        'Browser denied notifications. Check site settings to allow.',
-        'Dismiss',
-        { duration: 4000 },
-      );
+      this.snackBar.open('Browser denied notifications. Check site settings to allow.', 'Dismiss', {
+        duration: 4000,
+      });
     } else if (this.pushPermission() === 'unsupported') {
       this.snackBar.open('This browser does not support push notifications.', 'Dismiss', {
         duration: 4000,

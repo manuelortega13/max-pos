@@ -2,22 +2,14 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
-import {
-  MAT_DIALOG_DATA,
-  MatDialogModule,
-  MatDialogRef,
-} from '@angular/material/dialog';
+import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import {
-  ACCOUNT_KIND_LABELS,
-  Account,
-  AccountKind,
-} from '../../../core/models';
+import { ACCOUNT_KIND_LABELS, Account, AccountKind } from '../../../core/models';
 import { FinanceService } from '../../../core/services/finance.service';
 
 export interface AccountFormDialogData {
@@ -62,12 +54,18 @@ const ACCOUNT_KINDS: AccountKind[] = [
     <mat-dialog-content class="afd__content pt-2!">
       <mat-form-field appearance="outline" class="afd__field">
         <mat-label>Name</mat-label>
-        <input matInput [(ngModel)]="name" maxlength="64" autofocus />
+        <input
+          matInput
+          [ngModel]="name()"
+          (ngModelChange)="name.set($event)"
+          maxlength="64"
+          autofocus
+        />
       </mat-form-field>
 
       <mat-form-field appearance="outline" class="afd__field">
         <mat-label>Kind</mat-label>
-        <mat-select [(ngModel)]="kind">
+        <mat-select [ngModel]="kind()" (ngModelChange)="kind.set($event)">
           @for (k of kinds; track k) {
             <mat-option [value]="k">{{ labels[k] }}</mat-option>
           }
@@ -81,11 +79,16 @@ const ACCOUNT_KINDS: AccountKind[] = [
           type="number"
           inputmode="numeric"
           step="1"
-          [(ngModel)]="sortOrder"
+          [ngModel]="sortOrder()"
+          (ngModelChange)="sortOrder.set($event)"
         />
       </mat-form-field>
 
-      <mat-slide-toggle [(ngModel)]="active" class="afd__toggle">
+      <mat-slide-toggle
+        [ngModel]="active()"
+        (ngModelChange)="active.set($event)"
+        class="afd__toggle"
+      >
         Active
       </mat-slide-toggle>
 
@@ -99,12 +102,7 @@ const ACCOUNT_KINDS: AccountKind[] = [
 
     <mat-dialog-actions align="end">
       <button mat-stroked-button mat-dialog-close [disabled]="submitting()">Cancel</button>
-      <button
-        mat-flat-button
-        color="primary"
-        [disabled]="!canSubmit()"
-        (click)="submit()"
-      >
+      <button mat-flat-button color="primary" [disabled]="!canSubmit()" (click)="submit()">
         <mat-icon>{{ submitting() ? 'hourglass_empty' : 'save' }}</mat-icon>
         Save
       </button>
@@ -112,21 +110,36 @@ const ACCOUNT_KINDS: AccountKind[] = [
   `,
   styles: [
     `
-      .afd__title { display: flex; align-items: center; gap: 0.5rem; margin: 0; }
+      .afd__title {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin: 0;
+      }
       .afd__content {
-        display: flex; flex-direction: column; gap: 0.5rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
         min-width: min(26rem, 90vw);
       }
-      .afd__field { width: 100%; }
-      .afd__toggle { margin: 0.25rem 0 0.5rem; }
+      .afd__field {
+        width: 100%;
+      }
+      .afd__toggle {
+        margin: 0.25rem 0 0.5rem;
+      }
       .afd__warn {
-        display: flex; gap: 0.5rem; align-items: flex-start;
+        display: flex;
+        gap: 0.5rem;
+        align-items: flex-start;
         padding: 0.7rem 0.85rem;
         border-radius: 0.5rem;
         background: var(--mat-sys-error-container);
         color: var(--mat-sys-on-error-container);
         font-size: 0.875rem;
-        mat-icon { flex-shrink: 0; }
+        mat-icon {
+          flex-shrink: 0;
+        }
       }
     `,
   ],
@@ -140,16 +153,16 @@ export class AccountFormDialog {
   protected readonly kinds = ACCOUNT_KINDS;
   protected readonly labels = ACCOUNT_KIND_LABELS;
 
-  protected name = this.data.account?.name ?? '';
-  protected kind: AccountKind = this.data.account?.kind ?? 'OTHER';
-  protected active = this.data.account?.active ?? true;
-  protected sortOrder = this.data.account?.sortOrder ?? 100;
+  protected readonly name = signal(this.data.account?.name ?? '');
+  protected readonly kind = signal<AccountKind>(this.data.account?.kind ?? 'OTHER');
+  protected readonly active = signal(this.data.account?.active ?? true);
+  protected readonly sortOrder = signal(this.data.account?.sortOrder ?? 100);
 
   protected readonly submitting = signal(false);
   protected readonly error = signal<string | null>(null);
 
   protected readonly canSubmit = computed(
-    () => !this.submitting() && this.name.trim().length > 0,
+    () => !this.submitting() && this.name().trim().length > 0,
   );
 
   protected submit(): void {
@@ -157,10 +170,10 @@ export class AccountFormDialog {
     this.submitting.set(true);
     this.error.set(null);
     const req = {
-      name: this.name.trim(),
-      kind: this.kind,
-      active: this.active,
-      sortOrder: this.sortOrder,
+      name: this.name().trim(),
+      kind: this.kind(),
+      active: this.active(),
+      sortOrder: this.sortOrder(),
     };
     const obs = this.data.account
       ? this.financeService.updateAccount(this.data.account.id, req)
