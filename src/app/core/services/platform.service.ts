@@ -1,7 +1,12 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
-import { ImpersonationResponse, PlatformStore } from '../models/platform.model';
+import {
+  CreatePlatformAdminRequest,
+  ImpersonationResponse,
+  PlatformAdminAccount,
+  PlatformStore,
+} from '../models/platform.model';
 
 /** Store-management calls for the platform console (admin-only on the server). */
 @Injectable({ providedIn: 'root' })
@@ -10,6 +15,10 @@ export class PlatformService {
 
   listStores(): Observable<PlatformStore[]> {
     return this.http.get<PlatformStore[]>('/api/platform/stores');
+  }
+
+  getStore(id: string): Observable<PlatformStore> {
+    return this.http.get<PlatformStore>(`/api/platform/stores/${id}`);
   }
 
   suspend(id: string): Observable<PlatformStore> {
@@ -26,5 +35,13 @@ export class PlatformService {
 
   impersonate(id: string): Observable<ImpersonationResponse> {
     return this.http.post<ImpersonationResponse>(`/api/platform/stores/${id}/impersonate`, {});
+  }
+
+  listAdmins(): Observable<PlatformAdminAccount[]> {
+    return this.http.get<PlatformAdminAccount[]>('/api/platform/admins');
+  }
+
+  createAdmin(body: CreatePlatformAdminRequest): Observable<PlatformAdminAccount> {
+    return this.http.post<PlatformAdminAccount>('/api/platform/admins', body);
   }
 }

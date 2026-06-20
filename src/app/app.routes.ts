@@ -27,8 +27,36 @@ export const routes: Routes = [
     path: 'platform',
     canActivate: [platformGuard],
     loadComponent: () =>
-      import('./features/platform/platform-dashboard.page').then((m) => m.PlatformDashboardPage),
-    title: 'Platform console — MaxPOS',
+      import('./layouts/platform-layout/platform-layout').then((m) => m.PlatformLayout),
+    children: [
+      { path: '', pathMatch: 'full', redirectTo: 'overview' },
+      {
+        path: 'overview',
+        loadComponent: () =>
+          import('./features/platform/platform-overview.page').then((m) => m.PlatformOverviewPage),
+        title: 'Overview — Platform console',
+      },
+      {
+        path: 'stores',
+        loadComponent: () =>
+          import('./features/platform/platform-stores.page').then((m) => m.PlatformStoresPage),
+        title: 'Stores — Platform console',
+      },
+      {
+        path: 'stores/:id',
+        loadComponent: () =>
+          import('./features/platform/platform-store-detail.page').then(
+            (m) => m.PlatformStoreDetailPage,
+          ),
+        title: 'Store — Platform console',
+      },
+      {
+        path: 'admins',
+        loadComponent: () =>
+          import('./features/platform/platform-admins.page').then((m) => m.PlatformAdminsPage),
+        title: 'Platform admins — Platform console',
+      },
+    ],
   },
   {
     path: '',

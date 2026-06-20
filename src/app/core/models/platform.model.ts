@@ -32,3 +32,19 @@ export interface ImpersonationResponse {
   readonly storeName: string;
   readonly actingAsEmail: string;
 }
+
+/** A platform-admin account in the console's admins list. */
+export interface PlatformAdminAccount {
+  readonly id: string;
+  readonly name: string;
+  readonly email: string;
+  readonly active: boolean;
+  readonly createdAt: string;
+}
+
+/** Payload to create another platform admin. */
+export interface CreatePlatformAdminRequest {
+  readonly name: string;
+  readonly email: string;
+  readonly password: string;
+}

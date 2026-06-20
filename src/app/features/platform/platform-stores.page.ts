@@ -1,7 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatChipsModule } from '@angular/material/chips';
@@ -14,16 +14,16 @@ import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { PlatformStore } from '../../core/models/platform.model';
 import { AuthService } from '../../core/services/auth.service';
-import { PlatformAuthService } from '../../core/services/platform-auth.service';
 import { PlatformService } from '../../core/services/platform.service';
 import { ConfirmDialog } from '../../shared/dialogs/confirm-dialog';
 import { StoreEditData, StoreEditDialog } from './store-edit-dialog';
 
 @Component({
-  selector: 'app-platform-dashboard-page',
+  selector: 'app-platform-stores-page',
   imports: [
     DatePipe,
     DecimalPipe,
+    RouterLink,
     MatButtonModule,
     MatCardModule,
     MatChipsModule,
@@ -35,40 +35,24 @@ import { StoreEditData, StoreEditDialog } from './store-edit-dialog';
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <section class="page">
-      <header class="page__header">
+    <section class="wrap">
+      <header class="head">
         <div>
           <h1>Stores</h1>
-          <p>{{ adminEmail() }} · platform console</p>
+          <p>{{ stores().length }} registered · {{ activeCount() }} active</p>
         </div>
-        <button mat-stroked-button (click)="logout()">
-          <mat-icon>logout</mat-icon>
-          Sign out
+        <button mat-stroked-button (click)="reload()" [disabled]="loading()">
+          <mat-icon>refresh</mat-icon>
+          Refresh
         </button>
       </header>
-
-      <div class="summary">
-        <mat-card appearance="outlined" class="summary__card">
-          <span class="summary__label">Stores</span>
-          <span class="summary__value">{{ stores().length }}</span>
-        </mat-card>
-        <mat-card appearance="outlined" class="summary__card">
-          <span class="summary__label">Active</span>
-          <span class="summary__value">{{ activeCount() }}</span>
-        </mat-card>
-        <mat-card appearance="outlined" class="summary__card summary__card--warn">
-          <span class="summary__label">Suspended</span>
-          <span class="summary__value">{{ suspendedCount() }}</span>
-        </mat-card>
-      </div>
 
       @if (loading()) {
         <mat-progress-bar mode="indeterminate"></mat-progress-bar>
       }
       @if (error(); as message) {
-        <mat-card appearance="outlined" class="error-card">
-          <mat-icon>error_outline</mat-icon>
-          <span>{{ message }}</span>
+        <mat-card appearance="outlined" class="err">
+          <mat-icon>error_outline</mat-icon><span>{{ message }}</span>
           <button mat-stroked-button (click)="reload()">Retry</button>
         </mat-card>
       }
@@ -79,10 +63,10 @@ import { StoreEditData, StoreEditDialog } from './store-edit-dialog';
             <ng-container matColumnDef="store">
               <th mat-header-cell *matHeaderCellDef>Store</th>
               <td mat-cell *matCellDef="let s">
-                <div class="cell-store">
+                <a [routerLink]="['/platform/stores', s.id]" class="store-link">
                   <strong>{{ s.name }}</strong>
                   <small>/{{ s.slug }}</small>
-                </div>
+                </a>
               </td>
             </ng-container>
             <ng-container matColumnDef="status">
@@ -125,23 +109,22 @@ import { StoreEditData, StoreEditDialog } from './store-edit-dialog';
                   <mat-icon>more_vert</mat-icon>
                 </button>
                 <mat-menu #menu="matMenu">
+                  <a mat-menu-item [routerLink]="['/platform/stores', s.id]">
+                    <mat-icon>visibility</mat-icon><span>View details</span>
+                  </a>
                   <button mat-menu-item [disabled]="s.status !== 'ACTIVE'" (click)="openStore(s)">
-                    <mat-icon>login</mat-icon>
-                    <span>Open store</span>
+                    <mat-icon>login</mat-icon><span>Open store</span>
                   </button>
                   <button mat-menu-item (click)="edit(s)">
-                    <mat-icon>edit</mat-icon>
-                    <span>Edit</span>
+                    <mat-icon>edit</mat-icon><span>Edit</span>
                   </button>
                   @if (s.status === 'ACTIVE') {
                     <button mat-menu-item (click)="setStatus(s, false)">
-                      <mat-icon>block</mat-icon>
-                      <span>Suspend</span>
+                      <mat-icon>block</mat-icon><span>Suspend</span>
                     </button>
                   } @else {
                     <button mat-menu-item (click)="setStatus(s, true)">
-                      <mat-icon>check_circle</mat-icon>
-                      <span>Activate</span>
+                      <mat-icon>check_circle</mat-icon><span>Activate</span>
                     </button>
                   }
                 </mat-menu>
@@ -159,7 +142,7 @@ import { StoreEditData, StoreEditDialog } from './store-edit-dialog';
   `,
   styles: [
     `
-      .page {
+      .wrap {
         max-width: 1100px;
         margin: 0 auto;
         padding: 1.5rem;
@@ -167,43 +150,21 @@ import { StoreEditData, StoreEditDialog } from './store-edit-dialog';
         flex-direction: column;
         gap: 1.25rem;
       }
-      .page__header {
+      .head {
         display: flex;
         justify-content: space-between;
         align-items: flex-end;
         gap: 1rem;
         flex-wrap: wrap;
       }
-      .page__header h1 {
+      .head h1 {
         margin: 0;
         font-size: 1.6rem;
         font-weight: 600;
       }
-      .page__header p {
+      .head p {
         margin: 0.2rem 0 0;
         color: var(--mat-sys-on-surface-variant);
-      }
-      .summary {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-        gap: 1rem;
-      }
-      .summary__card {
-        padding: 1rem 1.25rem;
-        display: flex;
-        flex-direction: column;
-        gap: 0.25rem;
-      }
-      .summary__label {
-        font-size: 0.8rem;
-        color: var(--mat-sys-on-surface-variant);
-      }
-      .summary__value {
-        font-size: 1.5rem;
-        font-weight: 600;
-      }
-      .summary__card--warn .summary__value {
-        color: var(--mat-sys-error);
       }
       .table-wrap {
         overflow-x: auto;
@@ -211,11 +172,16 @@ import { StoreEditData, StoreEditDialog } from './store-edit-dialog';
       .w-full {
         width: 100%;
       }
-      .cell-store {
+      .store-link {
         display: flex;
         flex-direction: column;
+        color: inherit;
+        text-decoration: none;
       }
-      .cell-store small {
+      .store-link:hover strong {
+        text-decoration: underline;
+      }
+      .store-link small {
         color: var(--mat-sys-on-surface-variant);
       }
       .chip {
@@ -230,14 +196,14 @@ import { StoreEditData, StoreEditDialog } from './store-edit-dialog';
         background: var(--mat-sys-error-container) !important;
         color: var(--mat-sys-error) !important;
       }
-      .error-card {
+      .err {
         display: flex;
         align-items: center;
         gap: 0.75rem;
         padding: 1rem;
         border-color: var(--mat-sys-error) !important;
       }
-      .error-card mat-icon {
+      .err mat-icon {
         color: var(--mat-sys-error);
       }
       .no-data {
@@ -248,9 +214,8 @@ import { StoreEditData, StoreEditDialog } from './store-edit-dialog';
     `,
   ],
 })
-export class PlatformDashboardPage {
+export class PlatformStoresPage {
   private readonly platform = inject(PlatformService);
-  private readonly platformAuth = inject(PlatformAuthService);
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   private readonly dialog = inject(MatDialog);
@@ -259,13 +224,8 @@ export class PlatformDashboardPage {
   protected readonly stores = signal<PlatformStore[]>([]);
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
-
-  protected readonly adminEmail = computed(() => this.platformAuth.admin()?.email ?? '');
   protected readonly activeCount = computed(
     () => this.stores().filter((s) => s.status === 'ACTIVE').length,
-  );
-  protected readonly suspendedCount = computed(
-    () => this.stores().filter((s) => s.status === 'SUSPENDED').length,
   );
 
   protected readonly columns = [
@@ -296,11 +256,6 @@ export class PlatformDashboardPage {
         this.error.set(err.error?.message ?? 'Could not load stores.');
       },
     });
-  }
-
-  protected logout(): void {
-    this.platformAuth.logout();
-    void this.router.navigateByUrl('/platform/login');
   }
 
   private replace(updated: PlatformStore): void {
@@ -339,8 +294,6 @@ export class PlatformDashboardPage {
     });
   }
 
-  /** Impersonate: adopt the store token as the current store session and
-   *  jump into that store's admin. The platform session is preserved. */
   protected openStore(store: PlatformStore): void {
     const ref = this.dialog.open(ConfirmDialog, {
       width: '460px',
