@@ -8,9 +8,22 @@ import {
   AccountUpsertRequest,
   FinanceOverview,
   ManualMovementRequest,
+  Page,
   ReconcileRequest,
   TransferRequest,
 } from '../models';
+
+/** Filters + paging for the movement feed tables. */
+export interface MovementQuery {
+  accountId?: string;
+  search?: string;
+  /** ISO instant, inclusive lower bound. */
+  from?: string;
+  /** ISO instant, exclusive upper bound. */
+  to?: string;
+  page: number;
+  size: number;
+}
 
 /**
  * Thin HTTP layer for the Finances admin feature.
@@ -68,6 +81,20 @@ export class FinanceService {
     return this.http.get<AccountMovement[]>(`${this.base}/movements`, { params });
   }
 
+  /**
+   * Server-paginated, filtered movement feed for the Finances tables.
+   * {@code search} matches note or category; {@code from}/{@code to} bound
+   * the date range. Pass {@code accountId} to scope to one account.
+   */
+  searchMovements(q: MovementQuery): Observable<Page<AccountMovement>> {
+    let params = new HttpParams().set('page', String(q.page)).set('size', String(q.size));
+    if (q.accountId) params = params.set('accountId', q.accountId);
+    if (q.search && q.search.trim()) params = params.set('search', q.search.trim());
+    if (q.from) params = params.set('from', q.from);
+    if (q.to) params = params.set('to', q.to);
+    return this.http.get<Page<AccountMovement>>(`${this.base}/movements/search`, { params });
+  }
+
   recordIn(req: ManualMovementRequest): Observable<AccountMovement> {
     return this.http.post<AccountMovement>(`${this.base}/in`, req);
   }
@@ -97,9 +124,6 @@ export class FinanceService {
   }
 
   voidReconciliation(id: string): Observable<AccountReconciliation> {
-    return this.http.post<AccountReconciliation>(
-      `${this.base}/reconciliations/${id}/void`,
-      {},
-    );
+    return this.http.post<AccountReconciliation>(`${this.base}/reconciliations/${id}/void`, {});
   }
 }

@@ -54,7 +54,7 @@
         </div>
         <div>
           <small>Net change (30d)</small>
-          <strong>{{ (data.periodIn - data.periodOut) | money }}</strong>
+          <strong>{{ data.periodIn - data.periodOut | money }}</strong>
         </div>
       </div>
     </section>
@@ -107,46 +107,125 @@
 
     <section class="fp__recent">
       <header>
-        <h2>Recent activity</h2>
-        <small>Last 30 days · transfers excluded from totals above</small>
+        <h2>Activity</h2>
+        <small>All-account movement feed · transfers excluded from totals above</small>
       </header>
 
-      @if (recentDisplayed().length === 0) {
-        <p class="fp__muted">No activity yet.</p>
-      } @else {
-        <table mat-table [dataSource]="recentDisplayed()" class="fp__table">
-          <ng-container matColumnDef="occurredAt">
-            <th mat-header-cell *matHeaderCellDef>When</th>
-            <td mat-cell *matCellDef="let m">{{ m.occurredAt | date: 'MMM d, h:mm a' }}</td>
-          </ng-container>
+      <div class="fp__filters">
+        <mat-form-field appearance="outline" class="fp__search" subscriptSizing="dynamic">
+          <mat-label>Search note or category</mat-label>
+          <mat-icon matPrefix>search</mat-icon>
+          <input
+            matInput
+            [ngModel]="search()"
+            (ngModelChange)="setSearch($event)"
+            placeholder="e.g. supplier, transfer, sale"
+          />
+          @if (search()) {
+            <button matSuffix mat-icon-button aria-label="Clear" (click)="setSearch('')">
+              <mat-icon>close</mat-icon>
+            </button>
+          }
+        </mat-form-field>
 
-          <ng-container matColumnDef="account">
-            <th mat-header-cell *matHeaderCellDef>Account</th>
-            <td mat-cell *matCellDef="let m">{{ m.accountName }}</td>
-          </ng-container>
+        <mat-form-field appearance="outline" class="fp__date" subscriptSizing="dynamic">
+          <mat-label>From</mat-label>
+          <input
+            matInput
+            [matDatepicker]="fromPicker"
+            [max]="toDate() ?? today"
+            [ngModel]="fromDate()"
+            (ngModelChange)="setFromDate($event)"
+          />
+          <mat-datepicker-toggle matSuffix [for]="fromPicker"></mat-datepicker-toggle>
+          <mat-datepicker #fromPicker></mat-datepicker>
+        </mat-form-field>
 
-          <ng-container matColumnDef="category">
-            <th mat-header-cell *matHeaderCellDef>Category</th>
-            <td mat-cell *matCellDef="let m">{{ categoryLabel(m.category) }}</td>
-          </ng-container>
+        <mat-form-field appearance="outline" class="fp__date" subscriptSizing="dynamic">
+          <mat-label>To</mat-label>
+          <input
+            matInput
+            [matDatepicker]="toPicker"
+            [min]="fromDate()"
+            [max]="today"
+            [ngModel]="toDate()"
+            (ngModelChange)="setToDate($event)"
+          />
+          <mat-datepicker-toggle matSuffix [for]="toPicker"></mat-datepicker-toggle>
+          <mat-datepicker #toPicker></mat-datepicker>
+        </mat-form-field>
 
-          <ng-container matColumnDef="amount">
-            <th mat-header-cell *matHeaderCellDef class="fp__amount-col">Amount</th>
-            <td mat-cell *matCellDef="let m" class="fp__amount-col">
-              <span [class.fp__in]="m.direction === 'IN'" [class.fp__out]="m.direction === 'OUT'">
-                {{ m.direction === 'IN' ? '+' : '-' }}{{ m.amount | money }}
-              </span>
-            </td>
-          </ng-container>
+        @if (hasDateFilter()) {
+          <button mat-stroked-button class="fp__clear-dates" (click)="clearDates()">
+            <mat-icon>event_busy</mat-icon> Clear dates
+          </button>
+        }
+      </div>
 
-          <tr mat-header-row *matHeaderRowDef="recentCols"></tr>
-          <tr
-            mat-row
-            *matRowDef="let row; columns: recentCols"
-            [class.fp__row--out]="row.direction === 'OUT'"
-          ></tr>
-        </table>
-      }
+      <div class="fp__results">
+        @if (movementsLoading()) {
+          <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+        }
+
+        @if (rows().length > 0) {
+          <table mat-table [dataSource]="rows()" class="fp__table">
+            <ng-container matColumnDef="occurredAt">
+              <th mat-header-cell *matHeaderCellDef>When</th>
+              <td mat-cell *matCellDef="let m">{{ m.occurredAt | date: 'MMM d, h:mm a' }}</td>
+            </ng-container>
+
+            <ng-container matColumnDef="account">
+              <th mat-header-cell *matHeaderCellDef>Account</th>
+              <td mat-cell *matCellDef="let m">{{ m.accountName }}</td>
+            </ng-container>
+
+            <ng-container matColumnDef="category">
+              <th mat-header-cell *matHeaderCellDef>Category</th>
+              <td mat-cell *matCellDef="let m">{{ categoryLabel(m.category) }}</td>
+            </ng-container>
+
+            <ng-container matColumnDef="note">
+              <th mat-header-cell *matHeaderCellDef>Note</th>
+              <td mat-cell *matCellDef="let m" class="fp__note-col">{{ m.note ?? '—' }}</td>
+            </ng-container>
+
+            <ng-container matColumnDef="amount">
+              <th mat-header-cell *matHeaderCellDef class="fp__amount-col">Amount</th>
+              <td mat-cell *matCellDef="let m" class="fp__amount-col">
+                <span
+                  [class.fp__in]="m.direction === 'IN' && !m.voidedAt"
+                  [class.fp__out]="m.direction === 'OUT' && !m.voidedAt"
+                  [class.fp__voided]="m.voidedAt"
+                >
+                  {{ m.direction === 'IN' ? '+' : '-' }}{{ m.amount | money }}
+                </span>
+                @if (m.voidedAt) {
+                  <small class="fp__voided-tag">VOID</small>
+                }
+              </td>
+            </ng-container>
+
+            <tr mat-header-row *matHeaderRowDef="recentCols"></tr>
+            <tr
+              mat-row
+              *matRowDef="let row; columns: recentCols"
+              [class.fp__row--voided]="row.voidedAt"
+              [class.fp__row--out]="row.direction === 'OUT' && !row.voidedAt"
+            ></tr>
+          </table>
+        } @else if (!movementsLoading()) {
+          <p class="fp__muted fp__empty">No activity matches these filters.</p>
+        }
+      </div>
+
+      <mat-paginator
+        [length]="total()"
+        [pageSize]="pageSize()"
+        [pageIndex]="pageIndex()"
+        [pageSizeOptions]="pageSizeOptions"
+        (page)="onPage($event)"
+        showFirstLastButtons
+      ></mat-paginator>
     </section>
   }
 </section>

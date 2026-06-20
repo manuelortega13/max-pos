@@ -1,19 +1,33 @@
 import { DatePipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  OnInit,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
+import { toObservable, toSignal } from '@angular/core/rxjs-interop';
+import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatChipsModule } from '@angular/material/chips';
+import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatDialog } from '@angular/material/dialog';
 import { MatDividerModule } from '@angular/material/divider';
+import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
+import { MatInputModule } from '@angular/material/input';
 import { MatMenuModule } from '@angular/material/menu';
+import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
+import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { forkJoin } from 'rxjs';
+import { catchError, forkJoin, of, debounceTime, switchMap, tap } from 'rxjs';
 import {
   ACCOUNT_KIND_LABELS,
   Account,
@@ -22,6 +36,7 @@ import {
   AccountSummary,
   MOVEMENT_CATEGORY_LABELS,
   MovementSourceKind,
+  Page,
 } from '../../../core/models';
 import { FinanceService } from '../../../core/services/finance.service';
 import { ConfirmDialog } from '../../../shared/dialogs/confirm-dialog';
@@ -35,11 +50,17 @@ import { TransferDialog, TransferDialogData } from './transfer-dialog';
   selector: 'app-finances-account-detail-page',
   imports: [
     DatePipe,
+    FormsModule,
     MatButtonModule,
     MatChipsModule,
+    MatDatepickerModule,
     MatDividerModule,
+    MatFormFieldModule,
     MatIconModule,
+    MatInputModule,
     MatMenuModule,
+    MatPaginatorModule,
+    MatProgressBarModule,
     MatProgressSpinnerModule,
     MatTableModule,
     MatTabsModule,
@@ -60,10 +81,12 @@ export class FinancesAccountDetailPage implements OnInit {
   protected readonly account = signal<Account | null>(null);
   protected readonly summary = signal<AccountSummary | null>(null);
   protected readonly allAccounts = signal<Account[]>([]);
-  protected readonly movements = signal<AccountMovement[]>([]);
   protected readonly reconciliations = signal<AccountReconciliation[]>([]);
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
+
+  /** Current account id, from the route. Drives the paged movement feed. */
+  private readonly accountId = signal<string | null>(null);
 
   protected readonly kindLabels = ACCOUNT_KIND_LABELS;
   protected readonly categoryLabels = MOVEMENT_CATEGORY_LABELS;
@@ -86,14 +109,92 @@ export class FinancesAccountDetailPage implements OnInit {
     'actions',
   ] as const;
 
-  protected readonly activeMovements = computed(() =>
-    this.movements().filter((m) => !m.voidedAt),
+  // ─── Movement filters ─────────────────────────────────────────
+  protected readonly search = signal('');
+  protected readonly fromDate = signal<Date | null>(null);
+  protected readonly toDate = signal<Date | null>(null);
+  protected readonly today = new Date();
+
+  private readonly fromIso = computed(() => {
+    const d = this.fromDate();
+    return d ? new Date(d.getFullYear(), d.getMonth(), d.getDate()).toISOString() : undefined;
+  });
+
+  private readonly toIso = computed(() => {
+    const d = this.toDate();
+    return d ? new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).toISOString() : undefined;
+  });
+
+  protected readonly hasDateFilter = computed(
+    () => this.fromDate() !== null || this.toDate() !== null,
   );
+
+  // ─── Pagination ───────────────────────────────────────────────
+  protected readonly pageSizeOptions = [10, 25, 50, 100];
+  protected readonly pageSize = signal(10);
+  protected readonly pageIndex = signal(0);
+
+  private readonly fetching = signal(false);
+  protected readonly movementsLoading = this.fetching.asReadonly();
+
+  /** Bumped to force a re-fetch of the current page after a mutation. */
+  private readonly reloadTick = signal(0);
+
+  private readonly emptyPage: Page<AccountMovement> = {
+    content: [],
+    page: 0,
+    size: 10,
+    totalElements: 0,
+    totalPages: 0,
+  };
+
+  private readonly queryParams = computed(() => ({
+    accountId: this.accountId(),
+    search: this.search().trim(),
+    from: this.fromIso(),
+    to: this.toIso(),
+    page: this.pageIndex(),
+    size: this.pageSize(),
+    tick: this.reloadTick(),
+  }));
+
+  /** Current page of this account's movements, server-side. Skips the
+   *  request until the route account id is known. */
+  private readonly pageData = toSignal(
+    toObservable(this.queryParams).pipe(
+      debounceTime(200),
+      switchMap((q) => {
+        if (!q.accountId) return of(this.emptyPage);
+        this.fetching.set(true);
+        return this.financeService
+          .searchMovements({
+            accountId: q.accountId,
+            search: q.search,
+            from: q.from,
+            to: q.to,
+            page: q.page,
+            size: q.size,
+          })
+          .pipe(catchError(() => of(this.emptyPage)));
+      }),
+      tap(() => this.fetching.set(false)),
+    ),
+    { initialValue: this.emptyPage },
+  );
+
+  protected readonly movements = computed(() => this.pageData().content);
+  protected readonly total = computed(() => this.pageData().totalElements);
 
   ngOnInit(): void {
     this.route.paramMap.subscribe((p) => {
       const id = p.get('id');
-      if (id) this.reload(id);
+      if (id) {
+        // Reset paging when switching accounts so we never land past the
+        // new account's last page.
+        this.pageIndex.set(0);
+        this.accountId.set(id);
+        this.reload(id);
+      }
     });
   }
 
@@ -106,16 +207,12 @@ export class FinancesAccountDetailPage implements OnInit {
       account: this.financeService.getAccount(accountId),
       accounts: this.financeService.listAccounts(),
       overview: this.financeService.overview(),
-      movements: this.financeService.listMovements({ accountId }),
       reconciliations: this.financeService.listReconciliations(accountId),
     }).subscribe({
-      next: ({ account, accounts, overview, movements, reconciliations }) => {
+      next: ({ account, accounts, overview, reconciliations }) => {
         this.account.set(account);
         this.allAccounts.set(accounts);
-        this.summary.set(
-          overview.accounts.find((a) => a.id === accountId) ?? null,
-        );
-        this.movements.set(movements);
+        this.summary.set(overview.accounts.find((a) => a.id === accountId) ?? null);
         this.reconciliations.set(reconciliations);
         this.loading.set(false);
       },
@@ -124,6 +221,40 @@ export class FinancesAccountDetailPage implements OnInit {
         this.error.set(err.error?.message ?? 'Could not load account.');
       },
     });
+  }
+
+  /** After a mutation, refresh account/summary/reconciliations and
+   *  re-fetch the movements page. */
+  private afterMutation(): void {
+    this.reload();
+    this.reloadTick.update((t) => t + 1);
+  }
+
+  protected onPage(event: PageEvent): void {
+    this.pageIndex.set(event.pageIndex);
+    this.pageSize.set(event.pageSize);
+  }
+
+  protected setSearch(value: string): void {
+    this.search.set(value);
+    this.pageIndex.set(0);
+  }
+
+  protected setFromDate(value: Date | null): void {
+    this.fromDate.set(value);
+    if (value && this.toDate() === null) this.toDate.set(value);
+    this.pageIndex.set(0);
+  }
+
+  protected setToDate(value: Date | null): void {
+    this.toDate.set(value);
+    this.pageIndex.set(0);
+  }
+
+  protected clearDates(): void {
+    this.fromDate.set(null);
+    this.toDate.set(null);
+    this.pageIndex.set(0);
   }
 
   protected openRecordIn(): void {
@@ -139,7 +270,7 @@ export class FinancesAccountDetailPage implements OnInit {
         autoFocus: false,
       })
       .afterClosed()
-      .subscribe((res) => res && this.reload());
+      .subscribe((res) => res && this.afterMutation());
   }
 
   protected openRecordOut(): void {
@@ -155,7 +286,7 @@ export class FinancesAccountDetailPage implements OnInit {
         autoFocus: false,
       })
       .afterClosed()
-      .subscribe((res) => res && this.reload());
+      .subscribe((res) => res && this.afterMutation());
   }
 
   protected openTransfer(): void {
@@ -170,7 +301,7 @@ export class FinancesAccountDetailPage implements OnInit {
         autoFocus: false,
       })
       .afterClosed()
-      .subscribe((res) => res && this.reload());
+      .subscribe((res) => res && this.afterMutation());
   }
 
   protected openReconcile(): void {
@@ -178,19 +309,16 @@ export class FinancesAccountDetailPage implements OnInit {
     const sum = this.summary();
     if (!acct || !sum) return;
     this.dialog
-      .open<ReconcileDialog, ReconcileDialogData, AccountReconciliation>(
-        ReconcileDialog,
-        {
-          data: {
-            accountId: acct.id,
-            accountName: acct.name,
-            expectedAmount: sum.balance,
-          },
-          autoFocus: false,
+      .open<ReconcileDialog, ReconcileDialogData, AccountReconciliation>(ReconcileDialog, {
+        data: {
+          accountId: acct.id,
+          accountName: acct.name,
+          expectedAmount: sum.balance,
         },
-      )
+        autoFocus: false,
+      })
       .afterClosed()
-      .subscribe((res) => res && this.reload());
+      .subscribe((res) => res && this.afterMutation());
   }
 
   protected openEdit(): void {
@@ -202,7 +330,7 @@ export class FinancesAccountDetailPage implements OnInit {
         autoFocus: false,
       })
       .afterClosed()
-      .subscribe((res) => res && this.reload());
+      .subscribe((res) => res && this.afterMutation());
   }
 
   /** Only MANUAL and TRANSFER movements can be voided directly —
@@ -231,14 +359,12 @@ export class FinancesAccountDetailPage implements OnInit {
         this.financeService.voidMovement(m.id).subscribe({
           next: () => {
             this.snackBar.open('Movement voided', 'Dismiss', { duration: 2000 });
-            this.reload();
+            this.afterMutation();
           },
           error: (err: HttpErrorResponse) => {
-            this.snackBar.open(
-              err.error?.message ?? 'Could not void movement.',
-              'Dismiss',
-              { duration: 3500 },
-            );
+            this.snackBar.open(err.error?.message ?? 'Could not void movement.', 'Dismiss', {
+              duration: 3500,
+            });
           },
         });
       });
@@ -260,14 +386,12 @@ export class FinancesAccountDetailPage implements OnInit {
         this.financeService.voidReconciliation(r.id).subscribe({
           next: () => {
             this.snackBar.open('Reconciliation voided', 'Dismiss', { duration: 2000 });
-            this.reload();
+            this.afterMutation();
           },
           error: (err: HttpErrorResponse) => {
-            this.snackBar.open(
-              err.error?.message ?? 'Could not void reconciliation.',
-              'Dismiss',
-              { duration: 3500 },
-            );
+            this.snackBar.open(err.error?.message ?? 'Could not void reconciliation.', 'Dismiss', {
+              duration: 3500,
+            });
           },
         });
       });

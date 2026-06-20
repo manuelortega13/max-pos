@@ -6,6 +6,7 @@ import { MatCardModule } from '@angular/material/card';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
+import { MatMenuModule } from '@angular/material/menu';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
@@ -21,6 +22,7 @@ import { AdminCreateDialog } from './admin-create-dialog';
     MatCardModule,
     MatChipsModule,
     MatIconModule,
+    MatMenuModule,
     MatProgressBarModule,
     MatTableModule,
   ],
@@ -48,7 +50,7 @@ import { AdminCreateDialog } from './admin-create-dialog';
         </mat-card>
       }
 
-      <mat-card appearance="outlined">
+      <mat-card appearance="outlined" class="table-card">
         <div class="table-wrap">
           <table mat-table [dataSource]="admins()" class="w-full">
             <ng-container matColumnDef="name">
@@ -71,6 +73,25 @@ import { AdminCreateDialog } from './admin-create-dialog';
             <ng-container matColumnDef="created">
               <th mat-header-cell *matHeaderCellDef>Added</th>
               <td mat-cell *matCellDef="let a">{{ a.createdAt | date: 'mediumDate' }}</td>
+            </ng-container>
+            <ng-container matColumnDef="actions">
+              <th mat-header-cell *matHeaderCellDef></th>
+              <td mat-cell *matCellDef="let a">
+                <button mat-icon-button [matMenuTriggerFor]="menu" aria-label="Admin actions">
+                  <mat-icon>more_vert</mat-icon>
+                </button>
+                <mat-menu #menu="matMenu">
+                  @if (a.active) {
+                    <button mat-menu-item (click)="setActive(a, false)">
+                      <mat-icon>block</mat-icon><span>Disable</span>
+                    </button>
+                  } @else {
+                    <button mat-menu-item (click)="setActive(a, true)">
+                      <mat-icon>check_circle</mat-icon><span>Enable</span>
+                    </button>
+                  }
+                </mat-menu>
+              </td>
             </ng-container>
             <tr mat-header-row *matHeaderRowDef="columns"></tr>
             <tr mat-row *matRowDef="let row; columns: columns"></tr>
@@ -107,6 +128,9 @@ import { AdminCreateDialog } from './admin-create-dialog';
       .head p {
         margin: 0.2rem 0 0;
         color: var(--mat-sys-on-surface-variant);
+      }
+      .table-card {
+        overflow: hidden;
       }
       .table-wrap {
         overflow-x: auto;
@@ -159,7 +183,7 @@ export class PlatformAdminsPage {
   protected readonly admins = signal<PlatformAdminAccount[]>([]);
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
-  protected readonly columns = ['name', 'status', 'created'] as const;
+  protected readonly columns = ['name', 'status', 'created', 'actions'] as const;
 
   constructor() {
     this.reload();
@@ -177,6 +201,21 @@ export class PlatformAdminsPage {
         this.loading.set(false);
         this.error.set(err.error?.message ?? 'Could not load admins.');
       },
+    });
+  }
+
+  protected setActive(admin: PlatformAdminAccount, active: boolean): void {
+    this.platform.setAdminActive(admin.id, active).subscribe({
+      next: () => {
+        this.snackBar.open(active ? 'Admin enabled.' : 'Admin disabled.', 'Dismiss', {
+          duration: 2500,
+        });
+        this.reload();
+      },
+      error: (err: HttpErrorResponse) =>
+        this.snackBar.open(err.error?.message ?? 'Could not update admin.', 'Dismiss', {
+          duration: 4000,
+        }),
     });
   }
 

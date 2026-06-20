@@ -3,6 +3,8 @@ package com.maxpos.platform;
 import com.maxpos.platform.dto.ImpersonationResponse;
 import com.maxpos.platform.dto.StoreSummaryDto;
 import com.maxpos.platform.dto.StoreUpdateRequest;
+import com.maxpos.platform.dto.StoreUserDto;
+import com.maxpos.platform.plan.AssignPlanRequest;
 import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -32,6 +34,11 @@ public class PlatformStoreController {
         return service.getStore(id);
     }
 
+    @GetMapping("/{id}/users")
+    public List<StoreUserDto> users(@PathVariable UUID id) {
+        return service.listUsers(id);
+    }
+
     @PutMapping("/{id}")
     public StoreSummaryDto update(@PathVariable UUID id, @Valid @RequestBody StoreUpdateRequest req) {
         return service.update(id, req);
@@ -45,6 +52,12 @@ public class PlatformStoreController {
     @PostMapping("/{id}/activate")
     public StoreSummaryDto activate(@PathVariable UUID id) {
         return service.setStatus(id, StoreStatus.ACTIVE);
+    }
+
+    /** Assign (or clear, when planId is null) the store's subscription plan. */
+    @PutMapping("/{id}/plan")
+    public StoreSummaryDto assignPlan(@PathVariable UUID id, @RequestBody AssignPlanRequest req) {
+        return service.assignPlan(id, req.planId());
     }
 
     /** Mint a store-scoped token to act inside this store. */

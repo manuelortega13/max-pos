@@ -1,6 +1,7 @@
 package com.maxpos.signup;
 
 import com.maxpos.auth.dto.AuthResponse;
+import com.maxpos.signup.dto.RegistrationDefaults;
 import com.maxpos.signup.dto.StoreRegistrationRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -15,6 +16,12 @@ public class StoreRegistrationController {
 
     public StoreRegistrationController(StoreRegistrationService service) {
         this.service = service;
+    }
+
+    /** Public: the default currency the sign-up form pre-selects. */
+    @GetMapping("/register/defaults")
+    public RegistrationDefaults defaults() {
+        return service.defaults();
     }
 
     @PostMapping("/register")

@@ -2,7 +2,11 @@ package com.maxpos.signup;
 
 import com.maxpos.auth.dto.AuthResponse;
 import com.maxpos.common.ConflictException;
+import com.maxpos.platform.PlatformSettingsService;
+import com.maxpos.platform.audit.PlatformAuditService;
+import com.maxpos.platform.dto.PlatformSettingsDto;
 import com.maxpos.security.JwtService;
+import com.maxpos.signup.dto.RegistrationDefaults;
 import com.maxpos.signup.dto.StoreRegistrationRequest;
 import com.maxpos.user.UserRole;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -30,12 +34,23 @@ public class StoreRegistrationService {
     private final JdbcTemplate jdbc;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final PlatformAuditService audit;
+    private final PlatformSettingsService platformSettings;
 
     public StoreRegistrationService(JdbcTemplate jdbc, PasswordEncoder passwordEncoder,
-                                    JwtService jwtService) {
+                                    JwtService jwtService, PlatformAuditService audit,
+                                    PlatformSettingsService platformSettings) {
         this.jdbc = jdbc;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
+        this.audit = audit;
+        this.platformSettings = platformSettings;
+    }
+
+    /** The platform default currency the sign-up form should pre-select. */
+    public RegistrationDefaults defaults() {
+        PlatformSettingsDto s = platformSettings.get();
+        return new RegistrationDefaults(s.defaultCurrency(), s.defaultCurrencySymbol());
     }
 
     @Transactional
@@ -44,8 +59,10 @@ public class StoreRegistrationService {
         String email = req.adminEmail().trim().toLowerCase();
         String storeName = req.storeName().trim();
         String adminName = req.adminName().trim();
-        String currency = blankDefault(req.currency(), "USD");
-        String symbol = blankDefault(req.currencySymbol(), "$");
+        // Fall back to the platform default currency when the form omits it.
+        PlatformSettingsDto defaults = platformSettings.get();
+        String currency = blankDefault(req.currency(), defaults.defaultCurrency());
+        String symbol = blankDefault(req.currencySymbol(), defaults.defaultCurrencySymbol());
 
         Integer slugTaken = jdbc.queryForObject(
                 "SELECT count(*) FROM stores WHERE lower(slug) = ?", Integer.class, slug);
@@ -73,6 +90,8 @@ public class StoreRegistrationService {
                 INSERT INTO store_settings (store_id, store_name, currency, currency_symbol, tax_rate)
                 VALUES (?, ?, ?, ?, 0)
                 """, storeId, storeName, currency, symbol);
+
+        audit.record("STORE_REGISTERED", storeId, storeName, "self-service signup by " + email);
 
         String token = jwtService.issueStoreToken(userId, email, adminName, "ADMIN", storeId);
         return new AuthResponse(token,

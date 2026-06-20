@@ -11,6 +11,7 @@ import { MatSidenavModule } from '@angular/material/sidenav';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { PlatformAuthService } from '../../core/services/platform-auth.service';
+import { PlatformSettingsService } from '../../core/services/platform-settings.service';
 
 interface NavItem {
   readonly path: string;
@@ -151,11 +152,21 @@ export class PlatformLayout {
   private readonly auth = inject(PlatformAuthService);
   private readonly router = inject(Router);
   private readonly breakpoints = inject(BreakpointObserver);
+  private readonly platformSettings = inject(PlatformSettingsService);
+
+  constructor() {
+    // Load platform settings once so pages can format revenue with the
+    // platform currency symbol. Non-fatal if it fails (symbol defaults to '$').
+    this.platformSettings.load().subscribe({ error: () => {} });
+  }
 
   protected readonly nav: readonly NavItem[] = [
     { path: 'overview', label: 'Overview', icon: 'dashboard' },
     { path: 'stores', label: 'Stores', icon: 'storefront' },
+    { path: 'plans', label: 'Plans', icon: 'workspace_premium' },
+    { path: 'activity', label: 'Activity', icon: 'history' },
     { path: 'admins', label: 'Platform admins', icon: 'shield_person' },
+    { path: 'settings', label: 'Settings', icon: 'settings' },
   ];
 
   protected readonly sidenavOpen = signal(true);

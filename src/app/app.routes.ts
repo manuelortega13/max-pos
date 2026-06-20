@@ -51,10 +51,28 @@ export const routes: Routes = [
         title: 'Store — Platform console',
       },
       {
+        path: 'plans',
+        loadComponent: () =>
+          import('./features/platform/platform-plans.page').then((m) => m.PlatformPlansPage),
+        title: 'Plans — Platform console',
+      },
+      {
+        path: 'activity',
+        loadComponent: () =>
+          import('./features/platform/platform-activity.page').then((m) => m.PlatformActivityPage),
+        title: 'Activity — Platform console',
+      },
+      {
         path: 'admins',
         loadComponent: () =>
           import('./features/platform/platform-admins.page').then((m) => m.PlatformAdminsPage),
         title: 'Platform admins — Platform console',
+      },
+      {
+        path: 'settings',
+        loadComponent: () =>
+          import('./features/platform/platform-settings.page').then((m) => m.PlatformSettingsPage),
+        title: 'Settings — Platform console',
       },
     ],
   },

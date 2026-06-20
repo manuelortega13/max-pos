@@ -9,10 +9,13 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { PlatformStore } from '../../core/models/platform.model';
+import { MatTableModule } from '@angular/material/table';
+import { PlatformStore, StoreUser } from '../../core/models/platform.model';
 import { AuthService } from '../../core/services/auth.service';
 import { PlatformService } from '../../core/services/platform.service';
+import { PlatformSettingsService } from '../../core/services/platform-settings.service';
 import { ConfirmDialog } from '../../shared/dialogs/confirm-dialog';
+import { PlanAssignData, PlanAssignDialog } from './plan-assign-dialog';
 import { StoreEditData, StoreEditDialog } from './store-edit-dialog';
 
 @Component({
@@ -26,6 +29,7 @@ import { StoreEditData, StoreEditDialog } from './store-edit-dialog';
     MatChipsModule,
     MatIconModule,
     MatProgressBarModule,
+    MatTableModule,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -87,7 +91,7 @@ import { StoreEditData, StoreEditDialog } from './store-edit-dialog';
           </mat-card>
           <mat-card appearance="outlined" class="stat">
             <span class="stat__label">Revenue</span>
-            <span class="stat__value">{{ s.revenue | number: '1.2-2' }}</span>
+            <span class="stat__value">{{ currencySymbol() }}{{ s.revenue | number: '1.2-2' }}</span>
           </mat-card>
           <mat-card appearance="outlined" class="stat">
             <span class="stat__label">Last sale</span>
@@ -96,6 +100,98 @@ import { StoreEditData, StoreEditDialog } from './store-edit-dialog';
             </span>
           </mat-card>
         </div>
+
+        <mat-card appearance="outlined" class="plan-card">
+          <div class="plan-card__head">
+            <div>
+              <span class="stat__label">Subscription</span>
+              <div class="plan-name">
+                <mat-icon>workspace_premium</mat-icon>
+                <strong>{{ s.planName ?? 'No plan' }}</strong>
+              </div>
+            </div>
+            <button mat-stroked-button (click)="changePlan(s)">
+              <mat-icon>tune</mat-icon> Change plan
+            </button>
+          </div>
+
+          <div class="usage">
+            <div class="usage__row">
+              <div class="usage__top">
+                <span>Users</span>
+                <span class="usage__count">
+                  {{ s.users }}{{ s.maxUsers === null ? '' : ' / ' + s.maxUsers }}
+                </span>
+              </div>
+              @if (s.maxUsers === null) {
+                <span class="usage__unlimited">Unlimited</span>
+              } @else {
+                <mat-progress-bar
+                  mode="determinate"
+                  [value]="pct(s.users, s.maxUsers)"
+                  [class.over]="s.users > s.maxUsers"
+                ></mat-progress-bar>
+              }
+            </div>
+            <div class="usage__row">
+              <div class="usage__top">
+                <span>Products</span>
+                <span class="usage__count">
+                  {{ s.products }}{{ s.maxProducts === null ? '' : ' / ' + s.maxProducts }}
+                </span>
+              </div>
+              @if (s.maxProducts === null) {
+                <span class="usage__unlimited">Unlimited</span>
+              } @else {
+                <mat-progress-bar
+                  mode="determinate"
+                  [value]="pct(s.products, s.maxProducts)"
+                  [class.over]="s.products > s.maxProducts"
+                ></mat-progress-bar>
+              }
+            </div>
+          </div>
+        </mat-card>
+
+        <mat-card appearance="outlined" class="table-card">
+          <div class="users-head">
+            <span class="stat__label">Users in this store</span>
+          </div>
+          <div class="table-wrap">
+            <table mat-table [dataSource]="users()" class="w-full">
+              <ng-container matColumnDef="name">
+                <th mat-header-cell *matHeaderCellDef>Name</th>
+                <td mat-cell *matCellDef="let u">
+                  <div class="ucell">
+                    <strong>{{ u.name }}</strong>
+                    <small>{{ u.email }}</small>
+                  </div>
+                </td>
+              </ng-container>
+              <ng-container matColumnDef="role">
+                <th mat-header-cell *matHeaderCellDef>Role</th>
+                <td mat-cell *matCellDef="let u">{{ u.role }}</td>
+              </ng-container>
+              <ng-container matColumnDef="status">
+                <th mat-header-cell *matHeaderCellDef>Status</th>
+                <td mat-cell *matCellDef="let u">
+                  <mat-chip disableRipple [class]="'chip chip--' + (u.active ? 'active' : 'off')">
+                    {{ u.active ? 'Active' : 'Disabled' }}
+                  </mat-chip>
+                </td>
+              </ng-container>
+              <ng-container matColumnDef="created">
+                <th mat-header-cell *matHeaderCellDef>Added</th>
+                <td mat-cell *matCellDef="let u">{{ u.createdAt | date: 'mediumDate' }}</td>
+              </ng-container>
+              <tr mat-header-row *matHeaderRowDef="userColumns"></tr>
+              <tr mat-row *matRowDef="let row; columns: userColumns"></tr>
+              <tr *matNoDataRow>
+                <td [attr.colspan]="userColumns.length" class="no-data">No users.</td>
+              </tr>
+            </table>
+          </div>
+        </mat-card>
       }
     </section>
   `,
@@ -171,6 +267,79 @@ import { StoreEditData, StoreEditDialog } from './store-edit-dialog';
         font-size: 1rem;
         font-weight: 500;
       }
+      .plan-card {
+        padding: 1.25rem;
+        display: flex;
+        flex-direction: column;
+        gap: 1.25rem;
+      }
+      .plan-card__head {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 1rem;
+        flex-wrap: wrap;
+      }
+      .plan-name {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        margin-top: 0.2rem;
+        font-size: 1.2rem;
+      }
+      .plan-name mat-icon {
+        color: var(--mat-sys-primary);
+      }
+      .usage {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
+      .usage__top {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 0.35rem;
+      }
+      .usage__count {
+        color: var(--mat-sys-on-surface-variant);
+        font-variant-numeric: tabular-nums;
+      }
+      .usage__unlimited {
+        font-size: 0.85rem;
+        color: var(--mat-sys-on-surface-variant);
+      }
+      .usage mat-progress-bar.over {
+        --mat-sys-primary: var(--mat-sys-error);
+      }
+      .table-card {
+        overflow: hidden;
+        padding: 0;
+      }
+      .users-head {
+        padding: 1rem 1.1rem 0;
+      }
+      .table-wrap {
+        overflow-x: auto;
+      }
+      .w-full {
+        width: 100%;
+      }
+      .ucell {
+        display: flex;
+        flex-direction: column;
+      }
+      .ucell small {
+        color: var(--mat-sys-on-surface-variant);
+      }
+      .chip--off {
+        background: var(--mat-sys-surface-container-high) !important;
+        color: var(--mat-sys-on-surface-variant) !important;
+      }
+      .no-data {
+        padding: 1.5rem;
+        text-align: center;
+        color: var(--mat-sys-on-surface-variant);
+      }
       .chip {
         font-size: 0.75rem;
         font-weight: 500;
@@ -205,10 +374,13 @@ export class PlatformStoreDetailPage {
   private readonly router = inject(Router);
   private readonly dialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
+  protected readonly currencySymbol = inject(PlatformSettingsService).currencySymbol;
 
   protected readonly store = signal<PlatformStore | null>(null);
+  protected readonly users = signal<StoreUser[]>([]);
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
+  protected readonly userColumns = ['name', 'role', 'status', 'created'] as const;
 
   constructor() {
     this.reload();
@@ -228,6 +400,45 @@ export class PlatformStoreDetailPage {
           err.status === 404 ? 'Store not found.' : (err.error?.message ?? 'Could not load store.'),
         );
       },
+    });
+    this.platform.listStoreUsers(this.id()).subscribe({
+      next: (list) => this.users.set(list),
+      // Non-fatal: the store card still renders; users table just stays empty.
+      error: () => this.users.set([]),
+    });
+  }
+
+  /** Usage as a 0–100 percentage of the limit, clamped for the progress bar. */
+  protected pct(used: number, max: number): number {
+    if (max <= 0) return 100;
+    return Math.min(100, Math.round((used / max) * 100));
+  }
+
+  protected changePlan(store: PlatformStore): void {
+    this.platform.listPlans().subscribe({
+      next: (plans) => {
+        const ref = this.dialog.open<PlanAssignDialog, PlanAssignData, { planId: string | null }>(
+          PlanAssignDialog,
+          { width: '420px', data: { plans, currentPlanId: store.planId } },
+        );
+        ref.afterClosed().subscribe((result) => {
+          if (!result) return;
+          this.platform.assignPlan(store.id, result.planId).subscribe({
+            next: (updated) => {
+              this.store.set(updated);
+              this.snackBar.open('Plan updated.', 'Dismiss', { duration: 2500 });
+            },
+            error: (err: HttpErrorResponse) =>
+              this.snackBar.open(err.error?.message ?? 'Could not update plan.', 'Dismiss', {
+                duration: 4000,
+              }),
+          });
+        });
+      },
+      error: (err: HttpErrorResponse) =>
+        this.snackBar.open(err.error?.message ?? 'Could not load plans.', 'Dismiss', {
+          duration: 4000,
+        }),
     });
   }
 

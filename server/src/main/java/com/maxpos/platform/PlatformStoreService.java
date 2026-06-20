@@ -5,6 +5,7 @@ import com.maxpos.common.NotFoundException;
 import com.maxpos.platform.dto.ImpersonationResponse;
 import com.maxpos.platform.dto.StoreSummaryDto;
 import com.maxpos.platform.dto.StoreUpdateRequest;
+import com.maxpos.platform.dto.StoreUserDto;
 import com.maxpos.security.JwtService;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -27,13 +28,19 @@ import java.util.UUID;
 public class PlatformStoreService {
 
     private final StoreRepository stores;
+    private final com.maxpos.platform.plan.PlanRepository plans;
     private final JwtService jwtService;
     private final JdbcTemplate jdbc;
+    private final com.maxpos.platform.audit.PlatformAuditService audit;
 
-    public PlatformStoreService(StoreRepository stores, JwtService jwtService, JdbcTemplate jdbc) {
+    public PlatformStoreService(StoreRepository stores, com.maxpos.platform.plan.PlanRepository plans,
+                                JwtService jwtService, JdbcTemplate jdbc,
+                                com.maxpos.platform.audit.PlatformAuditService audit) {
         this.stores = stores;
+        this.plans = plans;
         this.jwtService = jwtService;
         this.jdbc = jdbc;
+        this.audit = audit;
     }
 
     /** One store admin's fields, read via JdbcTemplate for impersonation. */
@@ -47,8 +54,13 @@ public class PlatformStoreService {
                                                      AND sa.status = 'COMPLETED') AS sales,
                    (SELECT COALESCE(sum(total), 0) FROM sales sa WHERE sa.store_id = s.id
                                                      AND sa.status = 'COMPLETED') AS revenue,
-                   (SELECT max(date) FROM sales sa WHERE sa.store_id = s.id) AS last_sale
+                   (SELECT max(date) FROM sales sa WHERE sa.store_id = s.id) AS last_sale,
+                   pl.id   AS plan_id,
+                   pl.name AS plan_name,
+                   pl.max_users    AS max_users,
+                   pl.max_products AS max_products
             FROM stores s
+            LEFT JOIN plans pl ON pl.id = s.plan_id
             """;
 
     /** All stores with stats, newest activity first by created date. */
@@ -64,6 +76,28 @@ public class PlatformStoreService {
         return rows.get(0);
     }
 
+    /**
+     * The store's users. Read via JdbcTemplate with an explicit store_id —
+     * @TenantId would otherwise scope this to the (untenanted) request context.
+     */
+    public List<StoreUserDto> listUsers(UUID storeId) {
+        if (!stores.existsById(storeId)) throw new NotFoundException("Store not found");
+        return jdbc.query("""
+                SELECT id, name, email, role, active, created_at
+                FROM users
+                WHERE store_id = ?
+                ORDER BY system_account DESC, created_at ASC
+                """,
+                (rs, n) -> new StoreUserDto(
+                        rs.getObject("id", UUID.class),
+                        rs.getString("name"),
+                        rs.getString("email"),
+                        rs.getString("role"),
+                        rs.getBoolean("active"),
+                        toInstant(rs.getTimestamp("created_at"))),
+                storeId);
+    }
+
     @Transactional
     public StoreSummaryDto setStatus(UUID id, StoreStatus status) {
         Store store = stores.findById(id)
@@ -72,6 +106,28 @@ public class PlatformStoreService {
         // Flush so the JdbcTemplate read-back in getStore (raw SQL, same
         // transaction) sees the change rather than the pre-update row.
         stores.saveAndFlush(store);
+        audit.record(status == StoreStatus.ACTIVE ? "STORE_ACTIVATED" : "STORE_SUSPENDED",
+                store.getId(), store.getName(), null);
+        return getStore(id);
+    }
+
+    @Transactional
+    public StoreSummaryDto assignPlan(UUID id, UUID planId) {
+        Store store = stores.findById(id)
+                .orElseThrow(() -> new NotFoundException("Store not found"));
+        String planLabel;
+        if (planId == null) {
+            store.setPlanId(null);
+            planLabel = "no plan";
+        } else {
+            com.maxpos.platform.plan.Plan plan = plans.findById(planId)
+                    .orElseThrow(() -> new NotFoundException("Plan not found"));
+            store.setPlanId(plan.getId());
+            planLabel = plan.getName();
+        }
+        // Flush so the JdbcTemplate read-back in getStore reflects the change.
+        stores.saveAndFlush(store);
+        audit.record("STORE_PLAN_CHANGED", store.getId(), store.getName(), "plan: " + planLabel);
         return getStore(id);
     }
 
@@ -87,6 +143,7 @@ public class PlatformStoreService {
         store.setSlug(slug);
         // Flush so the JdbcTemplate read-back in getStore reflects the edit.
         stores.saveAndFlush(store);
+        audit.record("STORE_EDITED", store.getId(), store.getName(), "name/slug updated");
         return getStore(id);
     }
 
@@ -128,6 +185,8 @@ public class PlatformStoreService {
         AdminRow admin = rows.get(0);
         String token = jwtService.issueStoreToken(
                 admin.id(), admin.email(), admin.name(), admin.role(), admin.storeId());
+        audit.record("STORE_IMPERSONATED", store.getId(), store.getName(),
+                "as " + admin.email());
         return new ImpersonationResponse(token, store.getId(), store.getName(), admin.email());
     }
 
@@ -143,7 +202,11 @@ public class PlatformStoreService {
                 rs.getLong("products"),
                 rs.getLong("sales"),
                 rs.getBigDecimal("revenue") == null ? BigDecimal.ZERO : rs.getBigDecimal("revenue"),
-                lastSale == null ? null : lastSale.toInstant());
+                lastSale == null ? null : lastSale.toInstant(),
+                rs.getObject("plan_id", UUID.class),
+                rs.getString("plan_name"),
+                (Integer) rs.getObject("max_users"),
+                (Integer) rs.getObject("max_products"));
     }
 
     private static Instant toInstant(Timestamp ts) {

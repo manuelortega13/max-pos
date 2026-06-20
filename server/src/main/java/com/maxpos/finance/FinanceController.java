@@ -1,5 +1,6 @@
 package com.maxpos.finance;
 
+import com.maxpos.common.PageResponse;
 import com.maxpos.finance.dto.AccountDto;
 import com.maxpos.finance.dto.AccountMovementDto;
 import com.maxpos.finance.dto.AccountUpsertRequest;
@@ -92,6 +93,22 @@ public class FinanceController {
             return movementService.feedForAccount(accountId, fromTs, toTs);
         }
         return movementService.feed(fromTs, toTs);
+    }
+
+    /**
+     * Server-paginated, filtered movement feed for the Finances tables.
+     * {@code accountId} null = all accounts. {@code search} matches the note
+     * or category; {@code from}/{@code to} are ISO instants bounding the range.
+     */
+    @GetMapping("/movements/search")
+    public PageResponse<AccountMovementDto> searchMovements(
+            @RequestParam(required = false) UUID accountId,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String from,
+            @RequestParam(required = false) String to,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return movementService.feedPaged(accountId, from, to, search, page, size);
     }
 
     // ─── Manual entries ────────────────────────────────────────────

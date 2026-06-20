@@ -18,5 +18,10 @@ public record StoreSummaryDto(
         long products,
         long sales,
         BigDecimal revenue,
-        Instant lastSaleAt
+        Instant lastSaleAt,
+        // Assigned plan + its limits (all null when no plan; limits null = unlimited).
+        UUID planId,
+        String planName,
+        Integer maxUsers,
+        Integer maxProducts
 ) {}

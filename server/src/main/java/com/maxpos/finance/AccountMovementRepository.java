@@ -1,5 +1,7 @@
 package com.maxpos.finance;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -52,6 +54,38 @@ public interface AccountMovementRepository extends JpaRepository<AccountMovement
 
     List<AccountMovement> findAllByOccurredAtBetweenOrderByOccurredAtDesc(
             Instant from, Instant to);
+
+    /**
+     * One filtered, sorted, paginated page of the movement feed for the
+     * Finances tables. {@code accountId} null = all accounts. The date range
+     * is gated by {@code hasFrom}/{@code hasTo} booleans rather than a bare
+     * {@code :from is null}: a null-check on an Instant parameter leaves
+     * Postgres unable to determine its type, whereas inside the comparison
+     * the {@code occurredAt} column supplies it. {@code from} is inclusive,
+     * {@code to} exclusive. {@code term} is never null — the caller passes ""
+     * for "no search" (matched with {@code :term = ''}), because a null bound
+     * into a {@code like}/{@code concat} has no column to take its type from
+     * and PgJDBC would bind it as {@code bytea}. {@code term} must be
+     * pre-lowercased; it matches the note OR the category. Voided rows are
+     * included (the tables show them with a VOID tag). Spring Data derives the
+     * count query.
+     */
+    @Query("""
+            select m from AccountMovement m
+            where (:accountId is null or m.account.id = :accountId)
+              and (:hasFrom = false or m.occurredAt >= :from)
+              and (:hasTo = false or m.occurredAt < :to)
+              and (:term = ''
+                   or lower(m.note) like concat('%', :term, '%')
+                   or lower(m.category) like concat('%', :term, '%'))
+            """)
+    Page<AccountMovement> search(@Param("accountId") UUID accountId,
+                                 @Param("hasFrom") boolean hasFrom,
+                                 @Param("from") Instant from,
+                                 @Param("hasTo") boolean hasTo,
+                                 @Param("to") Instant to,
+                                 @Param("term") String term,
+                                 Pageable pageable);
 
     /** Source-row lookup — used when a source event is voided so we
      *  can cascade-void its movement rows. Returns non-voided rows

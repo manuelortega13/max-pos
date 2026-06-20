@@ -49,6 +49,7 @@ Key conventions used consistently across the codebase — follow these when addi
 - **Lazy-loaded routes.** All feature routes use `loadComponent: () => import(...).then(m => m.Foo)` in `app.routes.ts`. Layouts are themselves lazy-loaded; feature routes are their children.
 - **Material-first UI.** Reusable UI comes from `@angular/material`: tables (`mat-table`), forms (`mat-form-field` + `mat-input`/`mat-select`), dialogs (`mat-dialog`), chips, buttons, icons, sidenav, toolbar. Tailwind is kept in the project for tiny utility layers (e.g. `w-full`) and anything Material doesn't cover — default to Material components first.
 - **Money/formatting.** Format monetary values with the `money` pipe (`src/app/shared/pipes/currency-symbol.pipe.ts`) so the currency symbol stays in sync with `SettingsService`. Don't hardcode `$`.
+- **Always show a loading state while data is being fetched.** Any view that loads or refetches data (initial load, pagination, filtering, refresh) must surface a visible loading indicator during the in-flight request — `mat-progress-bar` / `mat-spinner` for sections, a skeleton/disabled state for controls. Never leave the user staring at stale or empty content with no signal that work is happening. For tables/lists that paginate or filter, also reserve a stable minimum height for the results area so the page doesn't reflow as data changes (see the Finances tables for the pattern: a `__results` wrapper with `min-height` plus a centered empty state that only shows when not loading).
 
 ### Theming
 
@@ -80,13 +81,13 @@ Prettier config lives in `package.json`: `printWidth: 100`, `singleQuote: true`,
 
 ## Working with this repo
 
-- **Explain changes briefly after every edit.** After making code changes, write a short summary (bullet list is fine) that covers: which file(s) changed, what the change does, and *why* — enough context for a reviewer to understand the diff without reading every line. Do this in the chat reply, not in code comments. Keep it tight: match the size of the explanation to the size of the change (one-line fix → one sentence; multi-file feature → a few grouped bullets).
+- **Explain changes briefly after every edit.** After making code changes, write a short summary (bullet list is fine) that covers: which file(s) changed, what the change does, and _why_ — enough context for a reviewer to understand the diff without reading every line. Do this in the chat reply, not in code comments. Keep it tight: match the size of the explanation to the size of the change (one-line fix → one sentence; multi-file feature → a few grouped bullets).
 - **Always follow best coding standards. Be efficient and optimized.** Centralize cross-cutting logic, avoid redundancy/duplication, prefer the existing patterns in the codebase (signals over BehaviorSubjects, `inject()` over constructor DI, layered Controller→Service→Repository on the server, OnPush + standalone components on the client). Plan multi-file changes before editing. **Be careful not to break anything** — re-read files before non-trivial edits, run the relevant build (`./gradlew assemble` and/or `npm run build`) before declaring work done, and prefer additive changes over rewrites when extending existing services.
 
 ## Git conventions
 
 - **Do not add a `Co-Authored-By: Claude …` trailer to commit messages.** Commits should be authored solely by the human contributor.
-- **Never commit or push without explicit per-change authorization.** Finish the work, summarize it, then stop. If commit/push seems like the obvious next step, ask first (e.g. "ready to commit?") and wait. A prior "commit and push" instruction applies only to the change then in flight — it is *not* a standing permission for later unrelated changes in the same session. When the user does say "commit", that means commit *and* push in the same step.
+- **Never commit or push without explicit per-change authorization.** Finish the work, summarize it, then stop. If commit/push seems like the obvious next step, ask first (e.g. "ready to commit?") and wait. A prior "commit and push" instruction applies only to the change then in flight — it is _not_ a standing permission for later unrelated changes in the same session. When the user does say "commit", that means commit _and_ push in the same step.
 
 ## Testing notes
 
@@ -106,4 +107,3 @@ See `server/README.md` for full setup & endpoint reference. Quick points:
 - **Error envelope:** every thrown `NotFoundException` / `ConflictException` / validation / auth error is rendered as a uniform `ApiError` JSON via `GlobalExceptionHandler`.
 - **API base path:** all endpoints live under `/api/*`. CORS is pre-configured for `http://localhost:4200` (configurable via `maxpos.cors.allowed-origins`).
 - **Default seed admin:** `admin@maxpos.com` / `admin123` (from `V2__seed_data.sql`). Change in production.
-

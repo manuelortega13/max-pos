@@ -8,6 +8,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { PlatformStore } from '../../core/models/platform.model';
 import { PlatformService } from '../../core/services/platform.service';
+import { PlatformSettingsService } from '../../core/services/platform-settings.service';
 
 @Component({
   selector: 'app-platform-overview-page',
@@ -81,8 +82,8 @@ import { PlatformService } from '../../core/services/platform.service';
           <div class="kpi__icon kpi__icon--a"><mat-icon>payments</mat-icon></div>
           <div>
             <span class="kpi__label">Total revenue (all stores)</span>
-            <span class="kpi__value">{{ revenue() | number: '1.2-2' }}</span>
-            <span class="kpi__hint">Sums each store's currency as-is</span>
+            <span class="kpi__value">{{ currencySymbol() }}{{ revenue() | number: '1.2-2' }}</span>
+            <span class="kpi__hint">Sums each store's revenue across currencies</span>
           </div>
         </mat-card>
       </div>
@@ -219,6 +220,7 @@ import { PlatformService } from '../../core/services/platform.service';
 })
 export class PlatformOverviewPage {
   private readonly platform = inject(PlatformService);
+  protected readonly currencySymbol = inject(PlatformSettingsService).currencySymbol;
 
   private readonly stores = signal<PlatformStore[]>([]);
   protected readonly loading = signal(false);

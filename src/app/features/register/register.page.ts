@@ -9,13 +9,21 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { AuthResponse } from '../../core/models';
+import { symbolFor } from '../../core/data/currencies';
 import { AuthService } from '../../core/services/auth.service';
+import { CurrencySelect } from '../../shared/components/currency-select';
+
+interface RegistrationDefaults {
+  readonly currency: string;
+  readonly currencySymbol: string;
+}
 
 @Component({
   selector: 'app-register-page',
   imports: [
     ReactiveFormsModule,
     RouterLink,
+    CurrencySelect,
     MatButtonModule,
     MatCardModule,
     MatFormFieldModule,
@@ -51,16 +59,7 @@ import { AuthService } from '../../core/services/auth.service';
             }
           </mat-form-field>
 
-          <div class="row">
-            <mat-form-field appearance="outline">
-              <mat-label>Currency code</mat-label>
-              <input matInput formControlName="currency" placeholder="USD" maxlength="8" />
-            </mat-form-field>
-            <mat-form-field appearance="outline">
-              <mat-label>Symbol</mat-label>
-              <input matInput formControlName="currencySymbol" placeholder="$" maxlength="4" />
-            </mat-form-field>
-          </div>
+          <app-currency-select [formControl]="form.controls.currency" label="Currency" />
 
           <div class="divider">Your admin account</div>
 
@@ -203,8 +202,7 @@ export class RegisterPage {
   protected readonly form = this.fb.nonNullable.group({
     storeName: ['', [Validators.required, Validators.maxLength(255)]],
     slug: ['', [Validators.required, Validators.maxLength(64), Validators.pattern('[a-z0-9-]+')]],
-    currency: ['USD', [Validators.maxLength(8)]],
-    currencySymbol: ['$', [Validators.maxLength(4)]],
+    currency: ['USD', [Validators.required, Validators.maxLength(8)]],
     adminName: ['', [Validators.required, Validators.maxLength(255)]],
     adminEmail: ['', [Validators.required, Validators.email]],
     adminPassword: ['', [Validators.required, Validators.minLength(6)]],
@@ -214,6 +212,17 @@ export class RegisterPage {
   protected readonly error = signal<string | null>(null);
   protected readonly hide = signal(true);
 
+  constructor() {
+    // Pre-select the platform's default currency (public endpoint). On
+    // failure we keep the USD default already set on the form.
+    this.http.get<RegistrationDefaults>('/api/stores/register/defaults').subscribe({
+      next: (d) => {
+        if (d?.currency) this.form.controls.currency.setValue(d.currency);
+      },
+      error: () => {},
+    });
+  }
+
   protected submit(): void {
     if (this.loading()) return;
     if (this.form.invalid) {
@@ -222,7 +231,12 @@ export class RegisterPage {
     }
     this.loading.set(true);
     this.error.set(null);
-    this.http.post<AuthResponse>('/api/stores/register', this.form.getRawValue()).subscribe({
+    const payload = {
+      ...this.form.getRawValue(),
+      // Derive the symbol from the chosen currency code.
+      currencySymbol: symbolFor(this.form.controls.currency.value),
+    };
+    this.http.post<AuthResponse>('/api/stores/register', payload).subscribe({
       next: (res) => {
         // Auto-login into the new store's admin.
         if (this.auth.adoptToken(res.token)) {

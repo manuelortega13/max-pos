@@ -10,4 +10,5 @@ public interface PlatformAdminRepository extends JpaRepository<PlatformAdmin, UU
     Optional<PlatformAdmin> findByEmailIgnoreCase(String email);
     boolean existsByEmailIgnoreCase(String email);
     List<PlatformAdmin> findAllByOrderByCreatedAtAsc();
+    long countByActiveTrue();
 }

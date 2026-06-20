@@ -13,7 +13,11 @@
   }
 
   &__title {
-    h1 { margin: 0; font-size: 1.6rem; font-weight: 600; }
+    h1 {
+      margin: 0;
+      font-size: 1.6rem;
+      font-weight: 600;
+    }
     p {
       display: flex;
       gap: 0.5rem;
@@ -32,8 +36,14 @@
     font-size: 0.85rem;
     margin-bottom: 0.4rem;
 
-    &:hover { color: var(--mat-sys-primary); }
-    mat-icon { font-size: 1rem; width: 1rem; height: 1rem; }
+    &:hover {
+      color: var(--mat-sys-primary);
+    }
+    mat-icon {
+      font-size: 1rem;
+      width: 1rem;
+      height: 1rem;
+    }
   }
 
   &__kind {
@@ -49,10 +59,16 @@
     align-items: center;
   }
 
-  &__loader { display: flex; justify-content: center; padding: 2.5rem 0; }
+  &__loader {
+    display: flex;
+    justify-content: center;
+    padding: 2.5rem 0;
+  }
 
   &__error {
-    display: flex; gap: 0.5rem; align-items: center;
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
     padding: 0.75rem 1rem;
     border-radius: 0.5rem;
     background: var(--mat-sys-error-container);
@@ -68,7 +84,9 @@
     background: var(--mat-sys-primary-container);
     color: var(--mat-sys-on-primary-container);
 
-    @media (max-width: 720px) { grid-template-columns: 1fr; }
+    @media (max-width: 720px) {
+      grid-template-columns: 1fr;
+    }
 
     small {
       font-size: 0.7rem;
@@ -78,8 +96,14 @@
   }
 
   &__balance {
-    display: flex; flex-direction: column; gap: 0.35rem;
-    strong { font-size: 2.2rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    strong {
+      font-size: 2.2rem;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
   }
 
   &__period {
@@ -87,8 +111,15 @@
     grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
     gap: 1rem;
 
-    > div { display: flex; flex-direction: column; gap: 0.25rem; }
-    strong { font-size: 1.05rem; font-variant-numeric: tabular-nums; }
+    > div {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+    strong {
+      font-size: 1.05rem;
+      font-variant-numeric: tabular-nums;
+    }
   }
 
   &__variance {
@@ -97,12 +128,18 @@
     opacity: 0.85;
   }
 
-  &__variance--short { /* same styling but visible flag for screen readers */ }
+  &__variance--short {
+    /* same styling but visible flag for screen readers */
+  }
 
   // IN reads as default text (black in light, white in dark) so it
   // doesn't fight for attention; OUT pops red to flag money leaving.
-  &__in { color: var(--mat-sys-on-surface); }
-  &__out { color: var(--mat-sys-error); }
+  &__in {
+    color: var(--mat-sys-on-surface);
+  }
+  &__out {
+    color: var(--mat-sys-error);
+  }
   &__voided {
     text-decoration: line-through;
     color: var(--mat-sys-on-surface-variant);
@@ -121,12 +158,57 @@
     padding: 1rem 0;
   }
 
+  &__filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: center;
+    margin-bottom: 0.5rem;
+
+    .mat-mdc-form-field {
+      margin: 0;
+    }
+  }
+
+  &__search {
+    flex: 1 1 16rem;
+    min-width: 12rem;
+  }
+
+  &__date {
+    flex: 0 0 9.5rem;
+    width: 9.5rem;
+  }
+
+  &__clear-dates {
+    flex: 0 0 auto;
+    // Center against the filter-field row, matching the Sales page.
+    align-self: center;
+  }
+
+  // Fixed minimum height (~ a full default page of 10 rows) so the page
+  // doesn't reflow as rows load, filter, or change between pages.
+  &__results {
+    min-height: 34rem;
+    position: relative;
+  }
+
+  &__empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 34rem;
+    margin: 0;
+  }
+
   &__table {
     width: 100%;
     background: transparent;
   }
 
-  &__amount-col { text-align: right; }
+  &__amount-col {
+    text-align: right;
+  }
   &__note-col {
     max-width: 22rem;
     white-space: pre-wrap;
@@ -143,7 +225,9 @@
     color: var(--mat-sys-on-surface-variant);
   }
 
-  &__row--voided { opacity: 0.65; }
+  &__row--voided {
+    opacity: 0.65;
+  }
 
   // Tint outgoing rows with a very light red so the eye finds money
   // leaving without re-reading the sign. Subtle alpha keeps the

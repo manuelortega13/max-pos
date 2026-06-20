@@ -8,7 +8,9 @@
         <h1>{{ a.name }}</h1>
         <p>
           <span class="ad__kind">{{ kindLabels[a.kind] }}</span>
-          @if (!a.active) { <mat-chip>Inactive</mat-chip> }
+          @if (!a.active) {
+            <mat-chip>Inactive</mat-chip>
+          }
         </p>
       }
     </div>
@@ -68,9 +70,13 @@
             <small>Last reconciled</small>
             <strong>{{ ts | date: 'MMM d, h:mm a' }}</strong>
             @if (s.lastReconciledVariance !== null && s.lastReconciledVariance !== 0) {
-              <small class="ad__variance" [class.ad__variance--short]="s.lastReconciledVariance! < 0">
+              <small
+                class="ad__variance"
+                [class.ad__variance--short]="s.lastReconciledVariance! < 0"
+              >
                 Variance:
-                {{ s.lastReconciledVariance! > 0 ? '+' : '' }}{{ s.lastReconciledVariance! | money }}
+                {{ s.lastReconciledVariance! > 0 ? '+' : ''
+                }}{{ s.lastReconciledVariance! | money }}
               </small>
             }
           </div>
@@ -81,77 +87,143 @@
     <mat-tab-group preserveContent>
       <mat-tab label="Movements">
         <div class="ad__tab">
-          @if (movements().length === 0) {
-            <p class="ad__muted">No movements yet.</p>
-          } @else {
-            <table mat-table [dataSource]="movements()" class="ad__table">
-              <ng-container matColumnDef="occurredAt">
-                <th mat-header-cell *matHeaderCellDef>When</th>
-                <td mat-cell *matCellDef="let m">
-                  {{ m.occurredAt | date: 'MMM d, h:mm a' }}
-                </td>
-              </ng-container>
+          <div class="ad__filters">
+            <mat-form-field appearance="outline" class="ad__search" subscriptSizing="dynamic">
+              <mat-label>Search note or category</mat-label>
+              <mat-icon matPrefix>search</mat-icon>
+              <input
+                matInput
+                [ngModel]="search()"
+                (ngModelChange)="setSearch($event)"
+                placeholder="e.g. transfer, supplier"
+              />
+              @if (search()) {
+                <button matSuffix mat-icon-button aria-label="Clear" (click)="setSearch('')">
+                  <mat-icon>close</mat-icon>
+                </button>
+              }
+            </mat-form-field>
 
-              <ng-container matColumnDef="category">
-                <th mat-header-cell *matHeaderCellDef>Category</th>
-                <td mat-cell *matCellDef="let m">{{ categoryLabel(m.category) }}</td>
-              </ng-container>
+            <mat-form-field appearance="outline" class="ad__date" subscriptSizing="dynamic">
+              <mat-label>From</mat-label>
+              <input
+                matInput
+                [matDatepicker]="fromPicker"
+                [max]="toDate() ?? today"
+                [ngModel]="fromDate()"
+                (ngModelChange)="setFromDate($event)"
+              />
+              <mat-datepicker-toggle matSuffix [for]="fromPicker"></mat-datepicker-toggle>
+              <mat-datepicker #fromPicker></mat-datepicker>
+            </mat-form-field>
 
-              <ng-container matColumnDef="note">
-                <th mat-header-cell *matHeaderCellDef>Note</th>
-                <td mat-cell *matCellDef="let m" class="ad__note-col">
-                  {{ m.note ?? '—' }}
-                </td>
-              </ng-container>
+            <mat-form-field appearance="outline" class="ad__date" subscriptSizing="dynamic">
+              <mat-label>To</mat-label>
+              <input
+                matInput
+                [matDatepicker]="toPicker"
+                [min]="fromDate()"
+                [max]="today"
+                [ngModel]="toDate()"
+                (ngModelChange)="setToDate($event)"
+              />
+              <mat-datepicker-toggle matSuffix [for]="toPicker"></mat-datepicker-toggle>
+              <mat-datepicker #toPicker></mat-datepicker>
+            </mat-form-field>
 
-              <ng-container matColumnDef="source">
-                <th mat-header-cell *matHeaderCellDef>Source</th>
-                <td mat-cell *matCellDef="let m">
-                  <span class="ad__source">{{ sourceLabel(m.sourceKind) }}</span>
-                </td>
-              </ng-container>
+            @if (hasDateFilter()) {
+              <button mat-stroked-button class="ad__clear-dates" (click)="clearDates()">
+                <mat-icon>event_busy</mat-icon> Clear dates
+              </button>
+            }
+          </div>
 
-              <ng-container matColumnDef="amount">
-                <th mat-header-cell *matHeaderCellDef class="ad__amount-col">Amount</th>
-                <td mat-cell *matCellDef="let m" class="ad__amount-col">
-                  <span
-                    [class.ad__in]="m.direction === 'IN' && !m.voidedAt"
-                    [class.ad__out]="m.direction === 'OUT' && !m.voidedAt"
-                    [class.ad__voided]="m.voidedAt"
-                  >
-                    {{ m.direction === 'IN' ? '+' : '-' }}{{ m.amount | money }}
-                  </span>
-                  @if (m.voidedAt) {
-                    <small class="ad__voided-tag">VOID</small>
-                  }
-                </td>
-              </ng-container>
+          <div class="ad__results">
+            @if (movementsLoading()) {
+              <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+            }
 
-              <ng-container matColumnDef="actions">
-                <th mat-header-cell *matHeaderCellDef></th>
-                <td mat-cell *matCellDef="let m">
-                  @if (canVoidMovement(m)) {
-                    <button
-                      mat-icon-button
-                      color="warn"
-                      (click)="voidMovement(m)"
-                      matTooltip="Void"
+            @if (movements().length > 0) {
+              <table mat-table [dataSource]="movements()" class="ad__table">
+                <ng-container matColumnDef="occurredAt">
+                  <th mat-header-cell *matHeaderCellDef>When</th>
+                  <td mat-cell *matCellDef="let m">
+                    {{ m.occurredAt | date: 'MMM d, h:mm a' }}
+                  </td>
+                </ng-container>
+
+                <ng-container matColumnDef="category">
+                  <th mat-header-cell *matHeaderCellDef>Category</th>
+                  <td mat-cell *matCellDef="let m">{{ categoryLabel(m.category) }}</td>
+                </ng-container>
+
+                <ng-container matColumnDef="note">
+                  <th mat-header-cell *matHeaderCellDef>Note</th>
+                  <td mat-cell *matCellDef="let m" class="ad__note-col">
+                    {{ m.note ?? '—' }}
+                  </td>
+                </ng-container>
+
+                <ng-container matColumnDef="source">
+                  <th mat-header-cell *matHeaderCellDef>Source</th>
+                  <td mat-cell *matCellDef="let m">
+                    <span class="ad__source">{{ sourceLabel(m.sourceKind) }}</span>
+                  </td>
+                </ng-container>
+
+                <ng-container matColumnDef="amount">
+                  <th mat-header-cell *matHeaderCellDef class="ad__amount-col">Amount</th>
+                  <td mat-cell *matCellDef="let m" class="ad__amount-col">
+                    <span
+                      [class.ad__in]="m.direction === 'IN' && !m.voidedAt"
+                      [class.ad__out]="m.direction === 'OUT' && !m.voidedAt"
+                      [class.ad__voided]="m.voidedAt"
                     >
-                      <mat-icon>block</mat-icon>
-                    </button>
-                  }
-                </td>
-              </ng-container>
+                      {{ m.direction === 'IN' ? '+' : '-' }}{{ m.amount | money }}
+                    </span>
+                    @if (m.voidedAt) {
+                      <small class="ad__voided-tag">VOID</small>
+                    }
+                  </td>
+                </ng-container>
 
-              <tr mat-header-row *matHeaderRowDef="movementCols"></tr>
-              <tr
-                mat-row
-                *matRowDef="let row; columns: movementCols"
-                [class.ad__row--voided]="row.voidedAt"
-                [class.ad__row--out]="row.direction === 'OUT' && !row.voidedAt"
-              ></tr>
-            </table>
-          }
+                <ng-container matColumnDef="actions">
+                  <th mat-header-cell *matHeaderCellDef></th>
+                  <td mat-cell *matCellDef="let m">
+                    @if (canVoidMovement(m)) {
+                      <button
+                        mat-icon-button
+                        color="warn"
+                        (click)="voidMovement(m)"
+                        matTooltip="Void"
+                      >
+                        <mat-icon>block</mat-icon>
+                      </button>
+                    }
+                  </td>
+                </ng-container>
+
+                <tr mat-header-row *matHeaderRowDef="movementCols"></tr>
+                <tr
+                  mat-row
+                  *matRowDef="let row; columns: movementCols"
+                  [class.ad__row--voided]="row.voidedAt"
+                  [class.ad__row--out]="row.direction === 'OUT' && !row.voidedAt"
+                ></tr>
+              </table>
+            } @else if (!movementsLoading()) {
+              <p class="ad__muted ad__empty">No movements match these filters.</p>
+            }
+          </div>
+
+          <mat-paginator
+            [length]="total()"
+            [pageSize]="pageSize()"
+            [pageIndex]="pageIndex()"
+            [pageSizeOptions]="pageSizeOptions"
+            (page)="onPage($event)"
+            showFirstLastButtons
+          ></mat-paginator>
         </div>
       </mat-tab>
 

@@ -4,6 +4,7 @@ import com.maxpos.businessday.BusinessDay;
 import com.maxpos.businessday.FloatAddition;
 import com.maxpos.common.ConflictException;
 import com.maxpos.common.NotFoundException;
+import com.maxpos.common.PageResponse;
 import com.maxpos.creditor.CreditorPayment;
 import com.maxpos.expense.Expense;
 import com.maxpos.finance.dto.AccountMovementDto;
@@ -18,12 +19,17 @@ import com.maxpos.settings.StoreSettings;
 import com.maxpos.settings.StoreSettingsRepository;
 import com.maxpos.user.User;
 import com.maxpos.user.UserRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -449,6 +455,50 @@ public class AccountMovementService {
     public List<AccountMovementDto> feedForAccount(UUID accountId, Instant from, Instant to) {
         return movements.findAllByAccountIdAndOccurredAtBetweenOrderByOccurredAtDesc(accountId, from, to)
                 .stream().map(AccountMovementDto::from).toList();
+    }
+
+    /** Defensive page-size ceiling so a crafted request can't pull the whole
+     *  ledger and defeat the point of paging. */
+    private static final int MAX_PAGE_SIZE = 200;
+
+    /**
+     * One filtered, paginated page of the movement feed for the Finances
+     * tables, newest first (id as a stable tiebreaker so paging never drops
+     * or repeats a row when two movements share a timestamp). {@code accountId}
+     * null = all accounts. Blank search = no filter; {@code search} matches the
+     * note or category (case-insensitive). {@code from}/{@code to} are ISO
+     * instants; a blank/garbage date simply doesn't constrain the query.
+     */
+    public PageResponse<AccountMovementDto> feedPaged(UUID accountId, String from, String to,
+                                                      String search, int page, int size) {
+        // Empty string (not null) means "no search" — see the repository query
+        // doc for why the term parameter must never be null.
+        String term = (search == null || search.isBlank())
+                ? "" : search.trim().toLowerCase(Locale.ROOT);
+        Instant fromInstant = parseInstant(from);
+        Instant toInstant = parseInstant(to);
+
+        int safeSize = Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
+        int safePage = Math.max(page, 0);
+        Pageable pageable = PageRequest.of(
+                safePage, safeSize,
+                Sort.by(Sort.Direction.DESC, "occurredAt").and(Sort.by(Sort.Direction.DESC, "id")));
+
+        Page<AccountMovement> result = movements.search(
+                accountId, fromInstant != null, fromInstant, toInstant != null, toInstant,
+                term, pageable);
+        return PageResponse.of(result, AccountMovementDto::from);
+    }
+
+    /** Parse an ISO-8601 instant, or null for blank/garbage (a bad date filter
+     *  simply doesn't constrain the query rather than 500-ing). */
+    private static Instant parseInstant(String value) {
+        if (value == null || value.isBlank()) return null;
+        try {
+            return Instant.parse(value.trim());
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     public BigDecimal balanceFor(UUID accountId) {

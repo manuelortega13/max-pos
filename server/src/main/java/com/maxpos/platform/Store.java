@@ -31,6 +31,10 @@ public class Store {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+    /** Assigned plan, or null when the store has no plan. */
+    @Column(name = "plan_id")
+    private UUID planId;
+
     @PrePersist
     void onCreate() {
         if (createdAt == null) {
@@ -47,4 +51,6 @@ public class Store {
     public StoreStatus getStatus() { return status; }
     public void setStatus(StoreStatus status) { this.status = status; }
     public Instant getCreatedAt() { return createdAt; }
+    public UUID getPlanId() { return planId; }
+    public void setPlanId(UUID planId) { this.planId = planId; }
 }

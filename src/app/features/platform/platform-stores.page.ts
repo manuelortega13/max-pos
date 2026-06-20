@@ -15,6 +15,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { PlatformStore } from '../../core/models/platform.model';
 import { AuthService } from '../../core/services/auth.service';
 import { PlatformService } from '../../core/services/platform.service';
+import { PlatformSettingsService } from '../../core/services/platform-settings.service';
 import { ConfirmDialog } from '../../shared/dialogs/confirm-dialog';
 import { StoreEditData, StoreEditDialog } from './store-edit-dialog';
 
@@ -41,10 +42,16 @@ import { StoreEditData, StoreEditDialog } from './store-edit-dialog';
           <h1>Stores</h1>
           <p>{{ stores().length }} registered · {{ activeCount() }} active</p>
         </div>
-        <button mat-stroked-button (click)="reload()" [disabled]="loading()">
-          <mat-icon>refresh</mat-icon>
-          Refresh
-        </button>
+        <div class="head-actions">
+          <button mat-stroked-button (click)="exportCsv()" [disabled]="!stores().length">
+            <mat-icon>download</mat-icon>
+            Export CSV
+          </button>
+          <button mat-stroked-button (click)="reload()" [disabled]="loading()">
+            <mat-icon>refresh</mat-icon>
+            Refresh
+          </button>
+        </div>
       </header>
 
       @if (loading()) {
@@ -57,7 +64,7 @@ import { StoreEditData, StoreEditDialog } from './store-edit-dialog';
         </mat-card>
       }
 
-      <mat-card appearance="outlined">
+      <mat-card appearance="outlined" class="table-card">
         <div class="table-wrap">
           <table mat-table [dataSource]="stores()" class="w-full">
             <ng-container matColumnDef="store">
@@ -94,7 +101,9 @@ import { StoreEditData, StoreEditDialog } from './store-edit-dialog';
             </ng-container>
             <ng-container matColumnDef="revenue">
               <th mat-header-cell *matHeaderCellDef>Revenue</th>
-              <td mat-cell *matCellDef="let s">{{ s.revenue | number: '1.2-2' }}</td>
+              <td mat-cell *matCellDef="let s">
+                {{ currencySymbol() }}{{ s.revenue | number: '1.2-2' }}
+              </td>
             </ng-container>
             <ng-container matColumnDef="lastSale">
               <th mat-header-cell *matHeaderCellDef>Last sale</th>
@@ -166,6 +175,16 @@ import { StoreEditData, StoreEditDialog } from './store-edit-dialog';
         margin: 0.2rem 0 0;
         color: var(--mat-sys-on-surface-variant);
       }
+      .head-actions {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+      }
+      /* Clip the square-cornered table to the card's rounded corners so the
+         header fill doesn't paint over the border arc (faded corners). */
+      .table-card {
+        overflow: hidden;
+      }
       .table-wrap {
         overflow-x: auto;
       }
@@ -220,6 +239,7 @@ export class PlatformStoresPage {
   private readonly router = inject(Router);
   private readonly dialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
+  protected readonly currencySymbol = inject(PlatformSettingsService).currencySymbol;
 
   protected readonly stores = signal<PlatformStore[]>([]);
   protected readonly loading = signal(false);
@@ -260,6 +280,55 @@ export class PlatformStoresPage {
 
   private replace(updated: PlatformStore): void {
     this.stores.update((list) => list.map((s) => (s.id === updated.id ? updated : s)));
+  }
+
+  /** Download the current store list as a CSV (client-side, no backend call). */
+  protected exportCsv(): void {
+    const rows = this.stores();
+    if (!rows.length) return;
+    const headers = [
+      'Name',
+      'Slug',
+      'Status',
+      'Plan',
+      'Users',
+      'Products',
+      'Sales',
+      'Revenue',
+      'Last sale',
+      'Created',
+    ];
+    const cell = (v: string | number | null): string => {
+      const s = v === null || v === undefined ? '' : String(v);
+      // Quote and escape per RFC 4180 so commas/quotes/newlines stay intact.
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const lines = [
+      headers.join(','),
+      ...rows.map((s) =>
+        [
+          s.name,
+          s.slug,
+          s.status,
+          s.planName ?? '',
+          s.users,
+          s.products,
+          s.sales,
+          s.revenue,
+          s.lastSaleAt ?? '',
+          s.createdAt,
+        ]
+          .map(cell)
+          .join(','),
+      ),
+    ];
+    const blob = new Blob([lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'stores.csv';
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   protected setStatus(store: PlatformStore, activate: boolean): void {
