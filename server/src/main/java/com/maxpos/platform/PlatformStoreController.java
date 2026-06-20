@@ -1,5 +1,6 @@
 package com.maxpos.platform;
 
+import com.maxpos.platform.dto.ImpersonationResponse;
 import com.maxpos.platform.dto.StoreSummaryDto;
 import com.maxpos.platform.dto.StoreUpdateRequest;
 import jakarta.validation.Valid;
@@ -44,5 +45,11 @@ public class PlatformStoreController {
     @PostMapping("/{id}/activate")
     public StoreSummaryDto activate(@PathVariable UUID id) {
         return service.setStatus(id, StoreStatus.ACTIVE);
+    }
+
+    /** Mint a store-scoped token to act inside this store. */
+    @PostMapping("/{id}/impersonate")
+    public ImpersonationResponse impersonate(@PathVariable UUID id) {
+        return service.impersonate(id);
     }
 }

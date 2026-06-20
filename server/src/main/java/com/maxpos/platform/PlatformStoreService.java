@@ -2,8 +2,10 @@ package com.maxpos.platform;
 
 import com.maxpos.common.ConflictException;
 import com.maxpos.common.NotFoundException;
+import com.maxpos.platform.dto.ImpersonationResponse;
 import com.maxpos.platform.dto.StoreSummaryDto;
 import com.maxpos.platform.dto.StoreUpdateRequest;
+import com.maxpos.security.JwtService;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,12 +27,17 @@ import java.util.UUID;
 public class PlatformStoreService {
 
     private final StoreRepository stores;
+    private final JwtService jwtService;
     private final JdbcTemplate jdbc;
 
-    public PlatformStoreService(StoreRepository stores, JdbcTemplate jdbc) {
+    public PlatformStoreService(StoreRepository stores, JwtService jwtService, JdbcTemplate jdbc) {
         this.stores = stores;
+        this.jwtService = jwtService;
         this.jdbc = jdbc;
     }
+
+    /** One store admin's fields, read via JdbcTemplate for impersonation. */
+    private record AdminRow(UUID id, String email, String name, String role, UUID storeId) {}
 
     private static final String STATS_SQL = """
             SELECT s.id, s.name, s.slug, s.status, s.created_at,
@@ -81,6 +88,47 @@ public class PlatformStoreService {
         // Flush so the JdbcTemplate read-back in getStore reflects the edit.
         stores.saveAndFlush(store);
         return getStore(id);
+    }
+
+    /**
+     * Mint a store token so the platform admin can act inside a store. It's
+     * a normal store token issued for that store's admin user, so it reuses
+     * the entire tenancy path with no special-casing. Blocked for suspended
+     * stores (the token wouldn't work anyway — sessions are cut off there).
+     */
+    public ImpersonationResponse impersonate(UUID storeId) {
+        Store store = stores.findById(storeId)
+                .orElseThrow(() -> new NotFoundException("Store not found"));
+        if (store.getStatus() != StoreStatus.ACTIVE) {
+            throw new ConflictException("Cannot impersonate a suspended store; activate it first.");
+        }
+        // Resolve that store's admin with an explicit typed query and mint the
+        // token from the raw fields. We deliberately do NOT load the User via
+        // JPA here: this service is @Transactional, so its Hibernate session is
+        // bound to the (NONE) tenant at method entry and a JPA load wouldn't see
+        // the row. JdbcTemplate bypasses @TenantId. Prefer the system account,
+        // then the oldest admin.
+        List<AdminRow> rows = jdbc.query(
+                """
+                SELECT id, email, name, role, store_id FROM users
+                WHERE store_id = ? AND role = 'ADMIN' AND active = true
+                ORDER BY system_account DESC, created_at ASC
+                LIMIT 1
+                """,
+                (rs, n) -> new AdminRow(
+                        rs.getObject("id", UUID.class),
+                        rs.getString("email"),
+                        rs.getString("name"),
+                        rs.getString("role"),
+                        rs.getObject("store_id", UUID.class)),
+                storeId);
+        if (rows.isEmpty()) {
+            throw new ConflictException("Store has no active admin to impersonate.");
+        }
+        AdminRow admin = rows.get(0);
+        String token = jwtService.issueStoreToken(
+                admin.id(), admin.email(), admin.name(), admin.role(), admin.storeId());
+        return new ImpersonationResponse(token, store.getId(), store.getName(), admin.email());
     }
 
     private static StoreSummaryDto mapRow(java.sql.ResultSet rs) throws java.sql.SQLException {

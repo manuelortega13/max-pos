@@ -31,16 +31,27 @@ public class JwtService {
     public static final String TYPE_PLATFORM = "PLATFORM";
 
     public String issue(User user) {
+        return issueStoreToken(user.getId(), user.getEmail(), user.getName(),
+                user.getRole().name(), user.getStoreId());
+    }
+
+    /**
+     * Issue a store-user token from raw fields. Lets callers that resolve a
+     * user without a managed JPA entity (e.g. platform impersonation, which
+     * reads via JdbcTemplate to avoid the tenant-bound session) mint a token.
+     */
+    public String issueStoreToken(java.util.UUID userId, String email, String name,
+                                  String role, java.util.UUID storeId) {
         Instant now = Instant.now();
         Instant exp = now.plusSeconds(props.ttlMinutes() * 60);
         return Jwts.builder()
                 .issuer(props.issuer())
-                .subject(user.getId().toString())
+                .subject(userId.toString())
                 .claim(CLAIM_TYPE, TYPE_STORE)
-                .claim("email", user.getEmail())
-                .claim("name", user.getName())
-                .claim("role", user.getRole().name())
-                .claim("storeId", user.getStoreId().toString())
+                .claim("email", email)
+                .claim("name", name)
+                .claim("role", role)
+                .claim("storeId", storeId.toString())
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(exp))
                 .signWith(key)
