@@ -13,6 +13,7 @@ import java.util.UUID;
 public class AppUserDetails implements UserDetails {
 
     private final UUID id;
+    private final UUID storeId;
     private final String email;
     private final UserRole role;
     private final String passwordHash;
@@ -21,6 +22,7 @@ public class AppUserDetails implements UserDetails {
 
     public AppUserDetails(User user) {
         this.id = user.getId();
+        this.storeId = user.getStoreId();
         this.email = user.getEmail();
         this.role = user.getRole();
         this.passwordHash = user.getPasswordHash();
@@ -29,6 +31,9 @@ public class AppUserDetails implements UserDetails {
     }
 
     public UUID getId() { return id; }
+
+    /** Owning store of this user; drives the request's tenant context. */
+    public UUID getStoreId() { return storeId; }
 
     public UserRole getRole() { return role; }
 

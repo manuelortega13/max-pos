@@ -5,6 +5,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import org.hibernate.annotations.Immutable;
+import org.hibernate.annotations.TenantId;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -28,6 +29,12 @@ public class TransactionFeedRow {
 
     @Id
     private UUID id;
+
+    /** Owning store — scopes the feed via Hibernate @TenantId (the view
+     *  surfaces store_id from each underlying table; see V35). Read-only. */
+    @TenantId
+    @Column(name = "store_id", updatable = false, insertable = false)
+    private UUID storeId;
 
     /** SALE | GCASH_IN | GCASH_OUT | LOAD. */
     private String kind;

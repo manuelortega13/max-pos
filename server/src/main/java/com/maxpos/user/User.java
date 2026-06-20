@@ -1,6 +1,7 @@
 package com.maxpos.user;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.TenantId;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -12,6 +13,12 @@ public class User {
     @Id
     @GeneratedValue
     private UUID id;
+    /** Owning store. Hibernate discriminator multi-tenancy (@TenantId):
+     *  auto-filtered on reads, auto-stamped on insert from TenantContext. */
+    @TenantId
+    @Column(name = "store_id", nullable = false, updatable = false)
+    private UUID storeId;
+
 
     @Column(nullable = false)
     private String name;
@@ -46,6 +53,7 @@ public class User {
     }
 
     public UUID getId() { return id; }
+    public UUID getStoreId() { return storeId; }
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
     public String getEmail() { return email; }

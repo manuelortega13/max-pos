@@ -2,6 +2,7 @@ package com.maxpos.product;
 
 import com.maxpos.category.Category;
 import jakarta.persistence.*;
+import org.hibernate.annotations.TenantId;
 import org.hibernate.annotations.Formula;
 
 import java.math.BigDecimal;
@@ -17,6 +18,12 @@ public class Product {
     @Id
     @GeneratedValue
     private UUID id;
+    /** Owning store. Hibernate discriminator multi-tenancy (@TenantId):
+     *  auto-filtered on reads, auto-stamped on insert from TenantContext. */
+    @TenantId
+    @Column(name = "store_id", nullable = false, updatable = false)
+    private UUID storeId;
+
 
     @Column(nullable = false)
     private String name;

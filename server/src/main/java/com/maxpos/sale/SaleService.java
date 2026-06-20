@@ -94,8 +94,10 @@ public class SaleService {
         LocalDate prevStart = today.minusDays(2L * n - 1);
 
         // Fetch both windows in one grouped query (prevStart .. today).
+        // Native query bypasses @TenantId, so pass the current store explicitly.
         Map<String, BigDecimal> byDay = new HashMap<>();
         for (Object[] r : sales.dailyCompletedRevenueSince(
+                com.maxpos.tenant.TenantContext.currentStore(),
                 prevStart.atStartOfDay(ZoneOffset.UTC).toInstant())) {
             byDay.put((String) r[0], (BigDecimal) r[1]);
         }

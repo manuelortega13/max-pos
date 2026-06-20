@@ -1,6 +1,7 @@
 package com.maxpos.category;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.TenantId;
 
 import java.util.UUID;
 
@@ -11,6 +12,12 @@ public class Category {
     @Id
     @GeneratedValue
     private UUID id;
+    /** Owning store. Hibernate discriminator multi-tenancy (@TenantId):
+     *  auto-filtered on reads, auto-stamped on insert from TenantContext. */
+    @TenantId
+    @Column(name = "store_id", nullable = false, updatable = false)
+    private UUID storeId;
+
 
     @Column(nullable = false, unique = true)
     private String name;

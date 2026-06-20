@@ -26,19 +26,23 @@ public interface SaleRepository extends JpaRepository<Sale, UUID> {
 
     /**
      * Completed-sale revenue grouped by UTC calendar day, from {@code start}
-     * onward. Backs the dashboard Sales Growth chart so it aggregates in the
-     * database instead of shipping every sale to the browser. Returns rows of
-     * {@code [day 'YYYY-MM-DD' (String), total (BigDecimal)]}; days with no
-     * sales are absent (the service zero-fills the window).
+     * onward, for one store. Backs the dashboard Sales Growth chart so it
+     * aggregates in the database instead of shipping every sale to the
+     * browser. Returns rows of {@code [day 'YYYY-MM-DD' (String), total
+     * (BigDecimal)]}; days with no sales are absent (the service zero-fills).
+     *
+     * NATIVE query → it bypasses Hibernate's @TenantId filter, so the store
+     * is filtered explicitly here; the caller passes the current tenant.
      */
     @Query(value = """
             SELECT to_char((date AT TIME ZONE 'UTC')::date, 'YYYY-MM-DD') AS day,
                    COALESCE(SUM(total), 0) AS total
             FROM sales
-            WHERE status = 'COMPLETED' AND date >= :start
+            WHERE status = 'COMPLETED' AND store_id = :storeId AND date >= :start
             GROUP BY (date AT TIME ZONE 'UTC')::date
             """, nativeQuery = true)
-    List<Object[]> dailyCompletedRevenueSince(@Param("start") Instant start);
+    List<Object[]> dailyCompletedRevenueSince(@Param("storeId") UUID storeId,
+                                              @Param("start") Instant start);
 
     /** Completed-sale revenue in [start, end). Backs the dashboard's
      *  "Revenue today" KPI server-side. */
