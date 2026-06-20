@@ -3,6 +3,8 @@ package com.maxpos.security;
 import com.maxpos.platform.PlatformAdmin;
 import com.maxpos.platform.PlatformAdminRepository;
 import com.maxpos.platform.PlatformPrincipal;
+import com.maxpos.platform.StoreRepository;
+import com.maxpos.platform.StoreStatus;
 import com.maxpos.tenant.TenantContext;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
@@ -29,13 +31,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final JwtService jwtService;
     private final AppUserDetailsService userDetailsService;
     private final PlatformAdminRepository platformAdmins;
+    private final StoreRepository stores;
 
     public JwtAuthenticationFilter(JwtService jwtService,
                                    AppUserDetailsService userDetailsService,
-                                   PlatformAdminRepository platformAdmins) {
+                                   PlatformAdminRepository platformAdmins,
+                                   StoreRepository stores) {
         this.jwtService = jwtService;
         this.userDetailsService = userDetailsService;
         this.platformAdmins = platformAdmins;
+        this.stores = stores;
     }
 
     @Override
@@ -70,16 +75,22 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     } else {
                         // Store user. Load across tenants (by primary key) — at
                         // this point no store is known yet, and User is scoped.
+                        // Also read the store's status (non-tenant table) to cut
+                        // off sessions of a store that's been suspended.
                         AppUserDetails principal;
+                        boolean storeActive;
                         TenantContext.runAsRoot();
                         try {
                             principal = userDetailsService.loadById(subjectId);
+                            storeActive = stores.findById(principal.getStoreId())
+                                    .map(s -> s.getStatus() == StoreStatus.ACTIVE)
+                                    .orElse(false);
                         } finally {
                             // Leave root mode; the store is set explicitly below.
                             TenantContext.clear();
                         }
 
-                        if (principal.isEnabled()
+                        if (principal.isEnabled() && storeActive
                                 && SecurityContextHolder.getContext().getAuthentication() == null) {
                             // Scope the rest of the request to the user's store.
                             // Authoritative from the DB, so a token can't spoof it.
