@@ -1,5 +1,8 @@
 package com.maxpos.security;
 
+import com.maxpos.platform.PlatformAdmin;
+import com.maxpos.platform.PlatformAdminRepository;
+import com.maxpos.platform.PlatformPrincipal;
 import com.maxpos.tenant.TenantContext;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
@@ -25,10 +28,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
     private final AppUserDetailsService userDetailsService;
+    private final PlatformAdminRepository platformAdmins;
 
-    public JwtAuthenticationFilter(JwtService jwtService, AppUserDetailsService userDetailsService) {
+    public JwtAuthenticationFilter(JwtService jwtService,
+                                   AppUserDetailsService userDetailsService,
+                                   PlatformAdminRepository platformAdmins) {
         this.jwtService = jwtService;
         this.userDetailsService = userDetailsService;
+        this.platformAdmins = platformAdmins;
     }
 
     @Override
@@ -43,28 +50,45 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 String token = header.substring(PREFIX.length()).trim();
                 try {
                     Claims claims = jwtService.parse(token);
-                    UUID userId = UUID.fromString(claims.getSubject());
+                    UUID subjectId = UUID.fromString(claims.getSubject());
+                    String type = claims.get(JwtService.CLAIM_TYPE, String.class);
 
-                    // Load the user across tenants (by primary key) — at this
-                    // point no store is known yet, and User is tenant-scoped.
-                    AppUserDetails principal;
-                    TenantContext.runAsRoot();
-                    try {
-                        principal = userDetailsService.loadById(userId);
-                    } finally {
-                        // Leave root mode; the store is set explicitly below.
-                        TenantContext.clear();
-                    }
+                    if (JwtService.TYPE_PLATFORM.equals(type)) {
+                        // Platform admin: no store tenant is set, so the
+                        // context stays NONE (fail-closed) — a platform token
+                        // hitting a store endpoint sees nothing. platform_admins
+                        // is a non-tenant table, so this load isn't scoped.
+                        PlatformAdmin admin = platformAdmins.findById(subjectId).orElse(null);
+                        if (admin != null && admin.isActive()
+                                && SecurityContextHolder.getContext().getAuthentication() == null) {
+                            var principal = new PlatformPrincipal(admin);
+                            var auth = new UsernamePasswordAuthenticationToken(
+                                    principal, null, principal.getAuthorities());
+                            auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                            SecurityContextHolder.getContext().setAuthentication(auth);
+                        }
+                    } else {
+                        // Store user. Load across tenants (by primary key) — at
+                        // this point no store is known yet, and User is scoped.
+                        AppUserDetails principal;
+                        TenantContext.runAsRoot();
+                        try {
+                            principal = userDetailsService.loadById(subjectId);
+                        } finally {
+                            // Leave root mode; the store is set explicitly below.
+                            TenantContext.clear();
+                        }
 
-                    if (principal.isEnabled()
-                            && SecurityContextHolder.getContext().getAuthentication() == null) {
-                        // Scope the rest of the request to the user's store.
-                        // Authoritative from the DB, so a token can't spoof it.
-                        TenantContext.setStore(principal.getStoreId());
-                        var auth = new UsernamePasswordAuthenticationToken(
-                                principal, null, principal.getAuthorities());
-                        auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                        SecurityContextHolder.getContext().setAuthentication(auth);
+                        if (principal.isEnabled()
+                                && SecurityContextHolder.getContext().getAuthentication() == null) {
+                            // Scope the rest of the request to the user's store.
+                            // Authoritative from the DB, so a token can't spoof it.
+                            TenantContext.setStore(principal.getStoreId());
+                            var auth = new UsernamePasswordAuthenticationToken(
+                                    principal, null, principal.getAuthorities());
+                            auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                            SecurityContextHolder.getContext().setAuthentication(auth);
+                        }
                     }
                 } catch (JwtException | IllegalArgumentException ex) {
                     // Invalid/expired token — stay unauthenticated and untenanted.

@@ -51,6 +51,11 @@ public class SecurityConfig {
                         // ServletException. Short-circuit those dispatches.
                         .dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR).permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/platform/auth/login").permitAll()
+                        // Platform-admin console: platform admins only. A store
+                        // token lacks the role; a platform token is untenanted,
+                        // so it also can't read store endpoints (fail-closed).
+                        .requestMatchers("/api/platform/**").hasRole("PLATFORM_ADMIN")
                         .requestMatchers(HttpMethod.GET, "/actuator/health").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/health").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/push/vapid-public-key").permitAll()
