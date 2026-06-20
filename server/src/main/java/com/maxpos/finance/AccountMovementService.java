@@ -518,12 +518,12 @@ public class AccountMovementService {
                 return accounts.findFirstByKindAndActiveTrueOrderBySortOrderAsc(AccountKind.CASH)
                         .orElse(null);
             case CARD: {
-                StoreSettings s = settings.findById(1).orElse(null);
+                StoreSettings s = settings.findFirstByOrderByIdAsc().orElse(null);
                 if (s == null || s.getCardAccountId() == null) return null;
                 return accounts.findById(s.getCardAccountId()).orElse(null);
             }
             case TRANSFER: {
-                StoreSettings s = settings.findById(1).orElse(null);
+                StoreSettings s = settings.findFirstByOrderByIdAsc().orElse(null);
                 if (s == null || s.getTransferAccountId() == null) return null;
                 return accounts.findById(s.getTransferAccountId()).orElse(null);
             }

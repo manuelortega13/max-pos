@@ -15,7 +15,8 @@ import java.util.UUID;
 public class StoreSettings {
 
     @Id
-    private Integer id = 1;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Integer id;
     /** Owning store. Hibernate discriminator multi-tenancy (@TenantId):
      *  auto-filtered on reads, auto-stamped on insert from TenantContext. */
     @TenantId

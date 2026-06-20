@@ -51,6 +51,7 @@ public class SecurityConfig {
                         // ServletException. Short-circuit those dispatches.
                         .dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR).permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/stores/register").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/platform/auth/login").permitAll()
                         // Platform-admin console: platform admins only. A store
                         // token lacks the role; a platform token is untenanted,

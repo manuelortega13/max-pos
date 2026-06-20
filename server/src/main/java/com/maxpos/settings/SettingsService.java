@@ -18,7 +18,7 @@ public class SettingsService {
     }
 
     public StoreSettingsDto get() {
-        StoreSettings s = repo.findById(1)
+        StoreSettings s = repo.findFirstByOrderByIdAsc()
                 .orElseThrow(() -> new NotFoundException("Store settings not initialized"));
         return StoreSettingsDto.from(s);
     }
@@ -35,7 +35,7 @@ public class SettingsService {
                     "Offline mode requires 'Allow negative stock' to be enabled");
         }
 
-        StoreSettings s = repo.findById(1)
+        StoreSettings s = repo.findFirstByOrderByIdAsc()
                 .orElseThrow(() -> new NotFoundException("Store settings not initialized"));
         s.setStoreName(req.storeName());
         s.setCurrency(req.currency());

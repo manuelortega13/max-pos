@@ -36,7 +36,7 @@ public class BackupScheduler {
         boolean enabled;
         TenantContext.runAsRoot();
         try {
-            enabled = settings.findById(1)
+            enabled = settings.findFirstByOrderByIdAsc()
                     .map(s -> s.isAutoBackupEnabled())
                     .orElse(false);
         } finally {

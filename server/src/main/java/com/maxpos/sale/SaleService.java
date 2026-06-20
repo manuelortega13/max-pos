@@ -175,7 +175,7 @@ public class SaleService {
         User cashier = users.findById(cashierId)
                 .orElseThrow(() -> new NotFoundException("Cashier not found"));
 
-        StoreSettings storeSettings = settings.findById(1)
+        StoreSettings storeSettings = settings.findFirstByOrderByIdAsc()
                 .orElseThrow(() -> new IllegalStateException("Store settings missing"));
         BigDecimal taxRate = storeSettings.getTaxRate();
         boolean allowNegative = storeSettings.isAllowNegativeStock();
