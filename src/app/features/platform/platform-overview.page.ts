@@ -156,6 +156,15 @@ import { PlatformSettingsService } from '../../core/services/platform-settings.s
       }
       .kpi--wide {
         grid-column: 1 / -1;
+        /* Center the Total Revenue card's content (icon + text group). */
+        justify-content: center;
+        text-align: center;
+      }
+      .kpi--wide > div:last-child {
+        align-items: center;
+      }
+      .kpi--wide .kpi__rates {
+        justify-content: center;
       }
       .kpi__icon {
         width: 2.5rem;
