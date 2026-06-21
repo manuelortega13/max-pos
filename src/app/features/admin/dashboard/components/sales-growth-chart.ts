@@ -7,15 +7,17 @@ import {
   effect,
   inject,
   input,
+  signal,
   viewChild,
 } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { DecimalPipe } from '@angular/common';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
+import { MatProgressBarModule } from '@angular/material/progress-bar';
 import ApexCharts from 'apexcharts';
 import type { ApexOptions } from 'apexcharts';
-import { catchError, of, switchMap } from 'rxjs';
+import { catchError, of, switchMap, tap } from 'rxjs';
 import { SalesGrowth } from '../../../../core/models';
 import { SaleService } from '../../../../core/services/sale.service';
 import { SettingsService } from '../../../../core/services/settings.service';
@@ -43,7 +45,7 @@ interface DayPoint {
  */
 @Component({
   selector: 'app-sales-growth-chart',
-  imports: [DecimalPipe, MatCardModule, MatIconModule, MoneyPipe],
+  imports: [DecimalPipe, MatCardModule, MatIconModule, MatProgressBarModule, MoneyPipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <mat-card appearance="outlined" class="growth">
@@ -75,14 +77,24 @@ interface DayPoint {
           }
         </div>
 
-        @if (hasData()) {
-          <div #chartHost class="growth__chart"></div>
-        } @else {
-          <div class="growth__empty">
-            <mat-icon>bar_chart</mat-icon>
-            <p>No sales in this period yet — ring up a sale to start the trend.</p>
-          </div>
-        }
+        <div class="growth__body">
+          @if (loading()) {
+            <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+          }
+          @if (hasData()) {
+            <div #chartHost class="growth__chart"></div>
+          } @else if (loading()) {
+            <div class="growth__empty growth__empty--loading">
+              <mat-icon>query_stats</mat-icon>
+              <p>Loading sales…</p>
+            </div>
+          } @else {
+            <div class="growth__empty">
+              <mat-icon>bar_chart</mat-icon>
+              <p>No sales in this period yet — ring up a sale to start the trend.</p>
+            </div>
+          }
+        </div>
       </mat-card-content>
     </mat-card>
   `,
@@ -146,6 +158,22 @@ interface DayPoint {
         background: var(--mat-sys-surface-container);
         color: var(--mat-sys-on-surface-variant);
       }
+      .growth__body {
+        position: relative;
+        /* Reserve a stable height so the chart, loading, and empty states
+           all occupy the same space — the card never reflows as data loads. */
+        min-height: 16rem;
+
+        /* Overlay the loading bar at the top so toggling it on/off never
+           shifts the chart below it. */
+        mat-progress-bar {
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          z-index: 1;
+        }
+      }
       .growth__chart {
         width: 100%;
         min-height: 16rem;
@@ -191,11 +219,19 @@ export class SalesGrowthChart {
    * window length changes), so the chart no longer buckets the whole sales
    * history in the browser.
    */
+  private readonly fetching = signal(false);
+  /** True while a window's revenue series is in flight. */
+  protected readonly loading = this.fetching.asReadonly();
+
   private readonly data = toSignal(
     toObservable(this.windowDays).pipe(
-      switchMap((days) =>
-        this.saleService.salesGrowth(days).pipe(catchError(() => of(EMPTY_GROWTH))),
-      ),
+      switchMap((days) => {
+        this.fetching.set(true);
+        return this.saleService.salesGrowth(days).pipe(
+          catchError(() => of(EMPTY_GROWTH)),
+          tap(() => this.fetching.set(false)),
+        );
+      }),
     ),
     { initialValue: EMPTY_GROWTH },
   );
