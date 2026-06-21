@@ -1,6 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { DatePipe, DecimalPipe } from '@angular/common';
-import { ChangeDetectionStrategy, Component, inject, input, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, inject, input, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
@@ -367,7 +367,7 @@ import { StoreEditData, StoreEditDialog } from './store-edit-dialog';
     `,
   ],
 })
-export class PlatformStoreDetailPage {
+export class PlatformStoreDetailPage implements OnInit {
   /** Route param (component input binding is enabled in app config). */
   readonly id = input.required<string>();
 
@@ -384,7 +384,9 @@ export class PlatformStoreDetailPage {
   protected readonly error = signal<string | null>(null);
   protected readonly userColumns = ['name', 'role', 'status', 'created'] as const;
 
-  constructor() {
+  ngOnInit(): void {
+    // Read the route-bound `id` input here, not in the constructor — required
+    // inputs aren't set until after construction (NG0950 otherwise).
     this.reload();
   }
 
