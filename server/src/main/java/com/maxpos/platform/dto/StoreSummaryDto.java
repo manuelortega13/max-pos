@@ -30,5 +30,7 @@ public record StoreSummaryDto(
         UUID planId,
         String planName,
         Integer maxUsers,
-        Integer maxProducts
+        Integer maxProducts,
+        // End of the current free trial, or null when not on a trial.
+        Instant trialEndsAt
 ) {}

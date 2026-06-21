@@ -12,11 +12,18 @@ public record PlanDto(
         Integer maxUsers,
         Integer maxProducts,
         int sortOrder,
+        int trialDays,
         boolean active,
-        Instant createdAt
+        Instant createdAt,
+        // Stores currently on this plan; the console blocks delete when > 0.
+        long subscriberCount,
+        // The plan's own pricing currency (set at creation, fixed).
+        String currency,
+        String currencySymbol
 ) {
-    public static PlanDto from(Plan p) {
+    public static PlanDto from(Plan p, long subscriberCount) {
         return new PlanDto(p.getId(), p.getCode(), p.getName(), p.getPriceCents(),
-                p.getMaxUsers(), p.getMaxProducts(), p.getSortOrder(), p.isActive(), p.getCreatedAt());
+                p.getMaxUsers(), p.getMaxProducts(), p.getSortOrder(), p.getTrialDays(),
+                p.isActive(), p.getCreatedAt(), subscriberCount, p.getCurrency(), p.getCurrencySymbol());
     }
 }

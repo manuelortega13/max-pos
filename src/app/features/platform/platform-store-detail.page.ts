@@ -111,6 +111,11 @@ import { StoreEditData, StoreEditDialog } from './store-edit-dialog';
                 <mat-icon>workspace_premium</mat-icon>
                 <strong>{{ s.planName ?? 'No plan' }}</strong>
               </div>
+              @if (s.trialEndsAt) {
+                <span class="trial-note"
+                  >Trial ends {{ s.trialEndsAt | date: 'MMM d, y, h:mm a' }}</span
+                >
+              }
             </div>
             <button mat-stroked-button (click)="changePlan(s)">
               <mat-icon>tune</mat-icon> Change plan
@@ -291,6 +296,12 @@ import { StoreEditData, StoreEditDialog } from './store-edit-dialog';
       }
       .plan-name mat-icon {
         color: var(--mat-sys-primary);
+      }
+      .trial-note {
+        display: block;
+        margin-top: 0.25rem;
+        font-size: 0.8rem;
+        color: var(--mat-sys-on-surface-variant);
       }
       .usage {
         display: flex;

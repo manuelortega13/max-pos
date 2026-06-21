@@ -238,9 +238,9 @@ export class RegisterPage {
     };
     this.http.post<AuthResponse>('/api/stores/register', payload).subscribe({
       next: (res) => {
-        // Auto-login into the new store's admin.
+        // Auto-login into the new store's admin, then have them pick a plan.
         if (this.auth.adoptToken(res.token)) {
-          void this.router.navigateByUrl('/admin/dashboard');
+          void this.router.navigateByUrl('/subscribe');
         } else {
           void this.router.navigateByUrl('/login');
         }

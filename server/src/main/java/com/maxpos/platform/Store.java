@@ -35,6 +35,10 @@ public class Store {
     @Column(name = "plan_id")
     private UUID planId;
 
+    /** End of the current free trial, or null when not on a trial. */
+    @Column(name = "trial_ends_at")
+    private Instant trialEndsAt;
+
     @PrePersist
     void onCreate() {
         if (createdAt == null) {
@@ -53,4 +57,6 @@ public class Store {
     public Instant getCreatedAt() { return createdAt; }
     public UUID getPlanId() { return planId; }
     public void setPlanId(UUID planId) { this.planId = planId; }
+    public Instant getTrialEndsAt() { return trialEndsAt; }
+    public void setTrialEndsAt(Instant trialEndsAt) { this.trialEndsAt = trialEndsAt; }
 }

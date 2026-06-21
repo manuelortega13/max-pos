@@ -58,6 +58,14 @@ export class PlatformService {
     return this.http.post<Plan>('/api/platform/plans', body);
   }
 
+  updatePlan(id: string, body: CreatePlanRequest): Observable<Plan> {
+    return this.http.put<Plan>(`/api/platform/plans/${id}`, body);
+  }
+
+  deletePlan(id: string): Observable<void> {
+    return this.http.delete<void>(`/api/platform/plans/${id}`);
+  }
+
   listAdmins(): Observable<PlatformAdminAccount[]> {
     return this.http.get<PlatformAdminAccount[]>('/api/platform/admins');
   }

@@ -126,6 +126,19 @@
       [refreshing]="refreshing()"
       (refresh)="onPullRefresh()"
     >
+      @if (onTrial()) {
+        <div class="admin-shell__trial" role="status">
+          <mat-icon>schedule</mat-icon>
+          <span>
+            @if (trialDaysLeft() === 0) {
+              Free trial expires today.
+            } @else {
+              Free trial — {{ trialDaysLeft() }} day{{ trialDaysLeft() === 1 ? '' : 's' }} left.
+            }
+          </span>
+          <a routerLink="/subscribe">Choose a plan</a>
+        </div>
+      }
       <router-outlet></router-outlet>
     </main>
 

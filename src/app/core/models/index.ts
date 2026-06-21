@@ -13,3 +13,4 @@ export * from './gcash.model';
 export * from './load.model';
 export * from './finance.model';
 export * from './transaction.model';
+export * from './subscription.model';

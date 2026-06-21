@@ -64,6 +64,7 @@ public class PlatformStoreService {
                    (SELECT max(date) FROM sales sa WHERE sa.store_id = s.id) AS last_sale,
                    ss.currency        AS currency,
                    ss.currency_symbol AS currency_symbol,
+                   s.trial_ends_at    AS trial_ends_at,
                    pl.id   AS plan_id,
                    pl.name AS plan_name,
                    pl.max_users    AS max_users,
@@ -234,7 +235,8 @@ public class PlatformStoreService {
                 rs.getObject("plan_id", UUID.class),
                 rs.getString("plan_name"),
                 (Integer) rs.getObject("max_users"),
-                (Integer) rs.getObject("max_products"));
+                (Integer) rs.getObject("max_products"),
+                toInstant(rs.getTimestamp("trial_ends_at")));
     }
 
     private static Instant toInstant(Timestamp ts) {

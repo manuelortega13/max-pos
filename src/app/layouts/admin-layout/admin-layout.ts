@@ -3,6 +3,7 @@ import {
   Component,
   OnDestroy,
   OnInit,
+  computed,
   effect,
   inject,
   signal,
@@ -30,6 +31,7 @@ import { SettingsService } from '../../core/services/settings.service';
 import { PushService } from '../../core/services/push.service';
 import { RealtimeService } from '../../core/services/realtime.service';
 import { RefreshService } from '../../core/services/refresh.service';
+import { SubscriptionService } from '../../core/services/subscription.service';
 import { PlaybookPanel } from '../../shared/components/playbook-panel/playbook-panel';
 import { PullToRefreshDirective } from '../../shared/directives/pull-to-refresh.directive';
 import { downloadBlob } from '../../shared/utils/download';
@@ -89,6 +91,12 @@ export class AdminLayout implements OnInit, OnDestroy {
   private readonly refreshService = inject(RefreshService);
   private readonly businessDayService = inject(BusinessDayService);
   private readonly settingsService = inject(SettingsService);
+  private readonly subscription = inject(SubscriptionService);
+
+  /** Drives the trial banner. onTrial is the gate (0 days left is still a
+   *  trial — "expires today" — so don't rely on a truthy day count). */
+  protected readonly onTrial = computed(() => this.subscription.status()?.onTrial ?? false);
+  protected readonly trialDaysLeft = computed(() => this.subscription.status()?.trialDaysLeft ?? 0);
   private readonly backupService = inject(BackupService);
   protected readonly refreshing = signal(false);
   /** Session latch so the daily client-side auto-download fires at most once

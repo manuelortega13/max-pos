@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 import { adminGuard } from './core/guards/admin.guard';
 import { authGuard } from './core/guards/auth.guard';
+import { planGuard } from './core/guards/plan.guard';
 import { publicOnlyGuard } from './core/guards/public-only.guard';
 import { platformGuard, platformPublicOnlyGuard } from './core/guards/platform.guard';
 
@@ -15,6 +16,13 @@ export const routes: Routes = [
     path: 'register',
     loadComponent: () => import('./features/register/register.page').then((m) => m.RegisterPage),
     title: 'Create your store — MaxPOS',
+  },
+  {
+    path: 'subscribe',
+    canActivate: [adminGuard],
+    loadComponent: () =>
+      import('./features/subscription/choose-plan.page').then((m) => m.ChoosePlanPage),
+    title: 'Choose your plan — MaxPOS',
   },
   {
     path: 'platform/login',
@@ -84,7 +92,7 @@ export const routes: Routes = [
   },
   {
     path: 'admin',
-    canActivate: [adminGuard],
+    canActivate: [adminGuard, planGuard],
     loadComponent: () => import('./layouts/admin-layout/admin-layout').then((m) => m.AdminLayout),
     children: [
       { path: '', pathMatch: 'full', redirectTo: 'dashboard' },

@@ -9,4 +9,7 @@ public interface StoreRepository extends JpaRepository<Store, UUID> {
 
     Optional<Store> findBySlugIgnoreCase(String slug);
     boolean existsBySlugIgnoreCase(String slug);
+
+    /** How many stores are currently on a given plan (gates plan deletion). */
+    long countByPlanId(UUID planId);
 }

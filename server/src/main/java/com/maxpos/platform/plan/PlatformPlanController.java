@@ -6,6 +6,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.UUID;
 
 /** Subscription-plan catalog. Platform admins only. */
 @RestController
@@ -28,5 +29,16 @@ public class PlatformPlanController {
     @ResponseStatus(HttpStatus.CREATED)
     public PlanDto create(@Valid @RequestBody CreatePlanRequest req) {
         return service.create(req);
+    }
+
+    @PutMapping("/{id}")
+    public PlanDto update(@PathVariable UUID id, @Valid @RequestBody CreatePlanRequest req) {
+        return service.update(id, req);
+    }
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@PathVariable UUID id) {
+        service.delete(id);
     }
 }

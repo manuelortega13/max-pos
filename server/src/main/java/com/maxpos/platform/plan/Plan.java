@@ -26,6 +26,13 @@ public class Plan {
     @Column(name = "price_cents", nullable = false)
     private int priceCents;
 
+    /** The plan's pricing currency — set at creation, never changed. */
+    @Column(nullable = false, length = 8)
+    private String currency;
+
+    @Column(name = "currency_symbol", nullable = false, length = 8)
+    private String currencySymbol;
+
     @Column(name = "max_users")
     private Integer maxUsers;
 
@@ -34,6 +41,10 @@ public class Plan {
 
     @Column(name = "sort_order", nullable = false)
     private int sortOrder;
+
+    /** Free-trial length in days; 0 means this is not a trial plan. */
+    @Column(name = "trial_days", nullable = false)
+    private int trialDays;
 
     @Column(nullable = false)
     private boolean active = true;
@@ -53,12 +64,19 @@ public class Plan {
     public void setName(String name) { this.name = name; }
     public int getPriceCents() { return priceCents; }
     public void setPriceCents(int priceCents) { this.priceCents = priceCents; }
+    public String getCurrency() { return currency; }
+    public void setCurrency(String currency) { this.currency = currency; }
+    public String getCurrencySymbol() { return currencySymbol; }
+    public void setCurrencySymbol(String currencySymbol) { this.currencySymbol = currencySymbol; }
     public Integer getMaxUsers() { return maxUsers; }
     public void setMaxUsers(Integer maxUsers) { this.maxUsers = maxUsers; }
     public Integer getMaxProducts() { return maxProducts; }
     public void setMaxProducts(Integer maxProducts) { this.maxProducts = maxProducts; }
     public int getSortOrder() { return sortOrder; }
     public void setSortOrder(int sortOrder) { this.sortOrder = sortOrder; }
+    public int getTrialDays() { return trialDays; }
+    public void setTrialDays(int trialDays) { this.trialDays = trialDays; }
+    public boolean isTrial() { return trialDays > 0; }
     public boolean isActive() { return active; }
     public void setActive(boolean active) { this.active = active; }
     public Instant getCreatedAt() { return createdAt; }

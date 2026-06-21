@@ -34,6 +34,8 @@ export interface PlatformStore {
   readonly planName: string | null;
   readonly maxUsers: number | null;
   readonly maxProducts: number | null;
+  /** End of the current free trial, or null when not on a trial. */
+  readonly trialEndsAt: string | null;
 }
 
 /** Live FX rates into the platform currency (from the platform FX endpoint). */
@@ -62,18 +64,28 @@ export interface Plan {
   readonly maxUsers: number | null;
   readonly maxProducts: number | null;
   readonly sortOrder: number;
+  /** > 0 means this is a free-trial plan of that length. */
+  readonly trialDays: number;
   readonly active: boolean;
   readonly createdAt: string;
+  /** Stores currently on this plan; delete is blocked when > 0. */
+  readonly subscriberCount: number;
+  /** The plan's own pricing currency (set at creation, fixed). */
+  readonly currency: string;
+  readonly currencySymbol: string;
 }
 
-/** Payload to create a plan. */
+/** Payload to create/edit a plan. (currency is applied on create only.) */
 export interface CreatePlanRequest {
   readonly code: string;
   readonly name: string;
   readonly priceCents: number;
+  readonly currency: string;
+  readonly currencySymbol: string;
   readonly maxUsers: number | null;
   readonly maxProducts: number | null;
   readonly sortOrder: number;
+  readonly trialDays: number;
 }
 
 /** Result of impersonating a store. */

@@ -9,7 +9,11 @@ public record CreatePlanRequest(
         @NotBlank @Size(max = 32) String code,
         @NotBlank @Size(max = 80) String name,
         @Min(0) int priceCents,
+        // Pricing currency — used on create; ignored on edit (it's fixed).
+        @NotBlank @Size(max = 8) String currency,
+        @NotBlank @Size(max = 8) String currencySymbol,
         @Min(0) Integer maxUsers,
         @Min(0) Integer maxProducts,
-        int sortOrder
+        int sortOrder,
+        @Min(0) int trialDays
 ) {}

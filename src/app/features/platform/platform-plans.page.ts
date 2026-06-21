@@ -5,15 +5,26 @@ import { MatCardModule } from '@angular/material/card';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
+import { MatMenuModule } from '@angular/material/menu';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { Plan } from '../../core/models/platform.model';
 import { PlatformService } from '../../core/services/platform.service';
-import { PlanCreateDialog } from './plan-create-dialog';
+import { ConfirmDialog } from '../../shared/dialogs/confirm-dialog';
+import { PlanFormData, PlanFormDialog } from './plan-form-dialog';
 
 @Component({
   selector: 'app-platform-plans-page',
-  imports: [MatButtonModule, MatCardModule, MatChipsModule, MatIconModule, MatProgressBarModule],
+  imports: [
+    MatButtonModule,
+    MatCardModule,
+    MatChipsModule,
+    MatIconModule,
+    MatMenuModule,
+    MatProgressBarModule,
+    MatTooltipModule,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="wrap">
@@ -44,12 +55,33 @@ import { PlanCreateDialog } from './plan-create-dialog';
             <div class="plan__top">
               <h2>{{ p.name }}</h2>
               <mat-chip disableRipple class="code">{{ p.code }}</mat-chip>
+              <button mat-icon-button [matMenuTriggerFor]="menu" aria-label="Plan actions">
+                <mat-icon>more_vert</mat-icon>
+              </button>
+              <mat-menu #menu="matMenu">
+                <button mat-menu-item (click)="edit(p)">
+                  <mat-icon>edit</mat-icon><span>Edit</span>
+                </button>
+                <button
+                  mat-menu-item
+                  [disabled]="p.subscriberCount > 0"
+                  [matTooltip]="
+                    p.subscriberCount > 0
+                      ? p.subscriberCount + ' store(s) subscribed — can\\'t delete'
+                      : ''
+                  "
+                  matTooltipPosition="left"
+                  (click)="remove(p)"
+                >
+                  <mat-icon>delete</mat-icon><span>Delete</span>
+                </button>
+              </mat-menu>
             </div>
             <p class="price">
               @if (p.priceCents === 0) {
                 <span class="amount">Free</span>
               } @else {
-                <span class="amount">{{ dollars(p.priceCents) }}</span>
+                <span class="amount">{{ p.currencySymbol }}{{ amount(p.priceCents) }}</span>
                 <span class="per">/mo</span>
               }
             </p>
@@ -61,6 +93,16 @@ import { PlanCreateDialog } from './plan-create-dialog';
               <li>
                 <mat-icon>inventory_2</mat-icon>
                 {{ p.maxProducts === null ? 'Unlimited products' : p.maxProducts + ' products' }}
+              </li>
+              @if (p.trialDays > 0) {
+                <li>
+                  <mat-icon>schedule</mat-icon>
+                  {{ p.trialDays }}-day free trial
+                </li>
+              }
+              <li>
+                <mat-icon>storefront</mat-icon>
+                {{ p.subscriberCount }} subscriber{{ p.subscriberCount === 1 ? '' : 's' }}
               </li>
             </ul>
           </mat-card>
@@ -116,6 +158,7 @@ import { PlanCreateDialog } from './plan-create-dialog';
         margin: 0;
         font-size: 1.2rem;
         font-weight: 600;
+        flex: 1;
       }
       .code {
         font-size: 0.7rem !important;
@@ -197,12 +240,13 @@ export class PlatformPlansPage {
     });
   }
 
-  protected dollars(cents: number): string {
-    return '$' + (cents / 100).toFixed(cents % 100 === 0 ? 0 : 2);
+  /** Price without symbol; the symbol comes from the plan (platform currency). */
+  protected amount(cents: number): string {
+    return (cents / 100).toFixed(cents % 100 === 0 ? 0 : 2);
   }
 
   protected add(): void {
-    const ref = this.dialog.open(PlanCreateDialog, { width: '440px' });
+    const ref = this.dialog.open<PlanFormDialog, PlanFormData>(PlanFormDialog, { width: '440px' });
     ref.afterClosed().subscribe((payload) => {
       if (!payload) return;
       this.platform.createPlan(payload).subscribe({
@@ -212,6 +256,53 @@ export class PlatformPlansPage {
         },
         error: (err: HttpErrorResponse) =>
           this.snackBar.open(err.error?.message ?? 'Could not add plan.', 'Dismiss', {
+            duration: 4000,
+          }),
+      });
+    });
+  }
+
+  protected edit(plan: Plan): void {
+    const ref = this.dialog.open<PlanFormDialog, PlanFormData>(PlanFormDialog, {
+      width: '440px',
+      data: { plan },
+    });
+    ref.afterClosed().subscribe((payload) => {
+      if (!payload) return;
+      this.platform.updatePlan(plan.id, payload).subscribe({
+        next: () => {
+          this.snackBar.open('Plan updated.', 'Dismiss', { duration: 2500 });
+          this.reload();
+        },
+        error: (err: HttpErrorResponse) =>
+          this.snackBar.open(err.error?.message ?? 'Could not update plan.', 'Dismiss', {
+            duration: 4000,
+          }),
+      });
+    });
+  }
+
+  protected remove(plan: Plan): void {
+    if (plan.subscriberCount > 0) return; // also blocked server-side
+    const ref = this.dialog.open<ConfirmDialog, { title: string; message: string }, boolean>(
+      ConfirmDialog,
+      {
+        width: '420px',
+        data: {
+          title: 'Delete plan?',
+          message: `Delete "${plan.name}"? This can't be undone.`,
+        },
+      },
+    );
+    ref.afterClosed().subscribe((ok) => {
+      if (!ok) return;
+      this.platform.deletePlan(plan.id).subscribe({
+        next: () => {
+          this.snackBar.open('Plan deleted.', 'Dismiss', { duration: 2500 });
+          this.reload();
+        },
+        error: (err: HttpErrorResponse) =>
+          this.snackBar.open(err.error?.message ?? 'Could not delete plan.', 'Dismiss', {
             duration: 4000,
           }),
       });

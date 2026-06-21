@@ -141,6 +141,29 @@
     }
   }
 
+  &__trial {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    padding: 0.6rem 0.9rem;
+    border-radius: 0.5rem;
+    background: var(--mat-sys-primary-container);
+    color: var(--mat-sys-on-primary-container);
+    font-size: 0.9rem;
+
+    mat-icon {
+      font-size: 1.15rem;
+      width: 1.15rem;
+      height: 1.15rem;
+    }
+    a {
+      margin-left: auto;
+      font-weight: 600;
+      color: inherit;
+    }
+  }
+
   &__user-info {
     display: flex;
     flex-direction: column;
